@@ -33,6 +33,7 @@ class AsyncWAL:
         self._waiters: list[tuple[int, asyncio.Future]] = []
         self._wake: Optional[asyncio.Event] = None
         self._task: Optional[asyncio.Task] = None
+        self._closing = False
         self._fh = None
         self._max_buffer = max_buffer
         self.dropped = 0
@@ -84,27 +85,41 @@ class AsyncWAL:
             while True:
                 await self._wake.wait()
                 self._wake.clear()
-
-                # Take everything queued as one batch. Concurrent barriers
-                # landing in the same cycle share a single fsync -- group
-                # commit, for free, as a consequence of batching.
-                batch = self._take()
-                if batch:
-                    if self._fh is not None:
-                        # fsync is a blocking syscall. Running it here would
-                        # stall every other saga in the process, including
-                        # REVERSIBLE steps that never asked to pay for disk.
-                        await asyncio.to_thread(self._write_batch, batch)
-                    self._durable_seq = batch[-1]["seq"]
-                self._resolve_waiters()
+                await self._flush_once()
+                if self._closing:
+                    # Drain anything that arrived while the last flush ran, then
+                    # exit cleanly. Because every write above is awaited, no
+                    # worker thread is touching the file when this returns --
+                    # which is what makes close() safe to shut the handle.
+                    await self._flush_once()
+                    return
         except asyncio.CancelledError:
-            batch = self._take()
-            if batch:
-                if self._fh is not None:
-                    self._write_batch(batch)
-                self._durable_seq = batch[-1]["seq"]
+            # Process teardown may cancel us. Best-effort synchronous drain so a
+            # pending barrier still lands, then propagate.
+            self._flush_sync()
             self._resolve_waiters()
             raise
+
+    async def _flush_once(self) -> None:
+        # Take everything queued as one batch. Concurrent barriers landing in
+        # the same cycle share a single fsync -- group commit, for free, as a
+        # consequence of batching.
+        batch = self._take()
+        if batch:
+            if self._fh is not None:
+                # fsync is a blocking syscall. Running it off the loop keeps it
+                # from stalling every other saga in the process, including
+                # REVERSIBLE steps that never asked to pay for disk.
+                await asyncio.to_thread(self._write_batch, batch)
+            self._durable_seq = batch[-1]["seq"]
+        self._resolve_waiters()
+
+    def _flush_sync(self) -> None:
+        batch = self._take()
+        if batch:
+            if self._fh is not None:
+                self._write_batch(batch)
+            self._durable_seq = batch[-1]["seq"]
 
     def _take(self) -> list[dict]:
         batch = []
@@ -131,7 +146,13 @@ class AsyncWAL:
 
     async def close(self) -> None:
         if self._task:
-            self._task.cancel()
+            # Graceful stop, not cancel: signal the loop and await it so any
+            # in-flight fsync worker finishes before we touch the handle.
+            # Cancelling mid-to_thread would detach that worker and we would
+            # close the file out from under a running write.
+            self._closing = True
+            if self._wake is not None:
+                self._wake.set()
             try:
                 await self._task
             except asyncio.CancelledError:

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentSaga · Time-Travel Debugger</title>
+<style>
+  :root {
+    --bg: #0f172a; --bg-2: #0b1220; --panel: #1e293b; --panel-2: #172033;
+    --border: #2b3a52; --border-2: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --faint: #64748b;
+    --accent: #6366f1; --accent-2: #818cf8;
+    --green: #22c55e; --red: #ef4444; --amber: #f59e0b; --gray: #64748b; --blue: #38bdf8;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--sans);
+    font-size: 14px; line-height: 1.45; overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  .app { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+
+  /* ---- header ---- */
+  header {
+    display: flex; align-items: center; gap: 20px; padding: 0 20px;
+    background: linear-gradient(180deg, #172033, #131b2c);
+    border-bottom: 1px solid var(--border); z-index: 30;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: .2px; }
+  .brand .mark {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: conic-gradient(from 140deg, var(--accent), var(--blue), var(--accent));
+    display: grid; place-items: center; font-size: 15px; box-shadow: 0 0 18px rgba(99,102,241,.45);
+  }
+  .brand small { color: var(--faint); font-weight: 500; letter-spacing: .5px; text-transform: uppercase; font-size: 10px; }
+  .spacer { flex: 1; }
+  .walstat { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted);
+    background: var(--panel-2); border: 1px solid var(--border); padding: 6px 11px; border-radius: 8px; max-width: 40vw; }
+  .walstat .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.bad { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .dot.warn { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  .ctrl { display: flex; align-items: center; gap: 10px; }
+  button.btn {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    padding: 7px 12px; border-radius: 8px; font: inherit; font-size: 13px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px; transition: .15s;
+  }
+  button.btn:hover { border-color: var(--accent); background: #1c2740; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
+  .switch { width: 34px; height: 19px; border-radius: 20px; background: var(--border-2); position: relative; transition: .2s; flex: none; }
+  .switch::after { content: ""; position: absolute; width: 15px; height: 15px; border-radius: 50%; background: #cbd5e1; top: 2px; left: 2px; transition: .2s; }
+  .toggle.on .switch { background: var(--accent); }
+  .toggle.on .switch::after { left: 17px; background: #fff; }
+
+  /* ---- body grid ---- */
+  .body { display: grid; grid-template-columns: 320px 1fr; min-height: 0; position: relative; }
+
+  /* ---- sidebar ---- */
+  aside { border-right: 1px solid var(--border); background: var(--bg-2); display: flex; flex-direction: column; min-height: 0; }
+  .filters { display: flex; gap: 6px; padding: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+  .chip { font-size: 11.5px; padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; background: transparent; transition: .12s; white-space: nowrap; }
+  .chip:hover { color: var(--text); border-color: var(--border-2); }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip .n { opacity: .7; margin-left: 4px; }
+  .runs { overflow-y: auto; padding: 8px; flex: 1; }
+  .run {
+    padding: 11px 12px; border-radius: 10px; border: 1px solid transparent; cursor: pointer;
+    margin-bottom: 6px; background: var(--panel-2); transition: .12s; position: relative; overflow: hidden;
+  }
+  .run::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--gray); }
+  .run:hover { border-color: var(--border-2); }
+  .run.sel { border-color: var(--accent); background: #1b2540; }
+  .run.s-SUCCESS::before { background: var(--green); }
+  .run.s-ROLLED_BACK::before { background: var(--blue); }
+  .run.s-FAILED::before { background: var(--red); }
+  .run.s-IN_PROGRESS::before { background: var(--amber); }
+  .run .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .run .sid { font-family: var(--mono); font-size: 12px; color: var(--text); }
+  .run .meta { display: flex; gap: 10px; margin-top: 5px; color: var(--faint); font-size: 11px; font-family: var(--mono); }
+  .pill { font-size: 10px; font-weight: 600; letter-spacing: .4px; padding: 2px 7px; border-radius: 5px; text-transform: uppercase; }
+  .pill.SUCCESS { background: rgba(34,197,94,.15); color: #4ade80; }
+  .pill.ROLLED_BACK { background: rgba(56,189,248,.15); color: #7dd3fc; }
+  .pill.FAILED { background: rgba(239,68,68,.15); color: #f87171; }
+  .pill.IN_PROGRESS { background: rgba(245,158,11,.15); color: #fbbf24; }
+
+  /* ---- main timeline ---- */
+  main { overflow-y: auto; min-height: 0; padding: 22px 26px; position: relative; }
+  .main-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 4px; flex-wrap: wrap; }
+  .main-head h2 { margin: 0; font-size: 16px; font-family: var(--mono); font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .sub b { color: var(--text); font-weight: 600; }
+
+  .lifo-note { font-size: 11px; color: var(--faint); border: 1px dashed var(--border-2); border-radius: 6px;
+    padding: 4px 9px; display: inline-flex; gap: 6px; align-items: center; margin-bottom: 18px; }
+
+  .timeline { position: relative; padding-left: 30px; }
+  .timeline::before { content: ""; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 2px;
+    background: linear-gradient(var(--border-2), transparent); }
+  .node { position: relative; margin-bottom: 12px; cursor: pointer; }
+  .node .knob { position: absolute; left: -30px; top: 15px; width: 20px; height: 20px; border-radius: 50%;
+    border: 3px solid var(--bg); background: var(--gray); box-shadow: 0 0 0 2px var(--border-2); z-index: 2; transition: .15s; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 11px; padding: 13px 15px;
+    display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; transition: .14s; align-items: center;
+  }
+  .node:hover .card { border-color: var(--border-2); transform: translateX(2px); }
+  .node.sel .card { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 8px 24px -10px rgba(99,102,241,.5); }
+  .card .tool { font-family: var(--mono); font-size: 13.5px; font-weight: 600; grid-column: 1; }
+  .card .row2 { grid-column: 1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .card .lat { grid-column: 2; grid-row: 1 / span 2; text-align: right; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .card .lat b { color: var(--text); font-size: 14px; }
+
+  /* status accents on knob + card left */
+  .n-COMMITTED .knob { background: var(--green); box-shadow: 0 0 0 2px rgba(34,197,94,.35), 0 0 12px rgba(34,197,94,.5); }
+  .n-COMPENSATED .knob { background: var(--gray); }
+  .n-COMPENSATION_FAILED .knob { background: var(--red); box-shadow: 0 0 0 2px rgba(239,68,68,.4), 0 0 12px rgba(239,68,68,.6); }
+  .n-ORPHANED .knob { background: var(--amber); box-shadow: 0 0 0 2px rgba(245,158,11,.4); }
+  .n-UNKNOWN .knob { background: var(--red); }
+  .n-GATED .knob { background: var(--border-2); }
+  .n-COMPENSATED .tool { text-decoration: line-through; color: var(--muted); text-decoration-color: var(--faint); }
+
+  .badge { font-size: 10px; font-weight: 600; letter-spacing: .4px; padding: 2px 7px; border-radius: 5px; font-family: var(--mono); }
+  .sem-REVERSIBLE { background: rgba(56,189,248,.14); color: #7dd3fc; }
+  .sem-COMPENSABLE { background: rgba(129,140,248,.16); color: #a5b4fc; }
+  .sem-IRREVERSIBLE { background: rgba(245,158,11,.16); color: #fbbf24; }
+  .st { font-size: 10.5px; font-weight: 600; letter-spacing: .3px; color: var(--muted); text-transform: uppercase; }
+  .st.COMMITTED { color: #4ade80; } .st.COMPENSATED { color: var(--faint); }
+  .st.COMPENSATION_FAILED, .st.UNKNOWN { color: #f87171; } .st.ORPHANED { color: #fbbf24; }
+  .st.GATED { color: var(--faint); }
+
+  .abort-marker { position: relative; margin: 4px 0 14px; }
+  .abort-marker .knob { position: absolute; left: -30px; top: 4px; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--red); border: 3px solid var(--bg); box-shadow: 0 0 0 2px rgba(239,68,68,.4), 0 0 14px rgba(239,68,68,.6); }
+  .abort-marker .txt { color: #f87171; font-size: 12.5px; font-weight: 600; padding: 3px 0; }
+  .abort-marker .txt span { color: var(--muted); font-weight: 400; }
+
+  .empty { display: grid; place-items: center; height: 70%; color: var(--faint); text-align: center; }
+  .empty .big { font-size: 44px; margin-bottom: 12px; opacity: .5; }
+
+  /* ---- inspector drawer ---- */
+  .drawer {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 440px; max-width: 92vw;
+    background: var(--panel-2); border-left: 1px solid var(--border); z-index: 20;
+    transform: translateX(100%); transition: transform .22s cubic-bezier(.4,0,.2,1);
+    display: flex; flex-direction: column; box-shadow: -20px 0 40px -20px rgba(0,0,0,.6);
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer .dh { padding: 16px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .drawer .dh .tool { font-family: var(--mono); font-size: 15px; font-weight: 600; }
+  .drawer .dh .x { cursor: pointer; color: var(--faint); font-size: 20px; line-height: 1; background: none; border: none; }
+  .drawer .dh .x:hover { color: var(--text); }
+  .drawer .dbody { overflow-y: auto; padding: 16px 18px; flex: 1; }
+  .field { margin-bottom: 16px; }
+  .field .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--faint); margin-bottom: 6px; }
+  .field .val { font-family: var(--mono); font-size: 12.5px; color: var(--text); word-break: break-all; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-family: var(--mono); font-size: 12px; }
+  .kv .k { color: var(--faint); } .kv .v { color: var(--text); text-align: right; word-break: break-all; }
+  .json { background: var(--bg-2); border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px;
+    font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; overflow-x: auto; color: #cbd5e1; }
+  .json .jk { color: #7dd3fc; } .json .js { color: #86efac; } .json .jn { color: #fca5a5; } .json .jb { color: #c4b5fd; } .json .jnull { color: var(--faint); }
+  .divider { height: 1px; background: var(--border); margin: 4px 0 16px; }
+  .sec-title { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--accent-2); margin-bottom: 12px; font-weight: 600; }
+  .flag { display: inline-flex; gap: 6px; align-items: center; font-size: 11.5px; padding: 3px 9px; border-radius: 6px; font-family: var(--mono); }
+  .flag.good { background: rgba(34,197,94,.13); color: #4ade80; }
+  .flag.bad { background: rgba(245,158,11,.14); color: #fbbf24; }
+  .loading { color: var(--faint); padding: 30px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="mark">⏱</div>
+      <div>AgentSaga <small>Time-Travel Debugger</small></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="walstat" id="walstat" title="">
+      <span class="dot warn" id="waldot"></span>
+      <span class="path" id="walpath">connecting…</span>
+    </div>
+    <div class="ctrl">
+      <div class="toggle" id="autotoggle" title="Auto-refresh every 4s">
+        <span class="switch"></span><span>Live</span>
+      </div>
+      <button class="btn" id="refresh">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside>
+      <div class="filters" id="filters"></div>
+      <div class="runs" id="runs"><div class="loading">Loading runs…</div></div>
+    </aside>
+
+    <main id="main">
+      <div class="empty"><div><div class="big">⏱</div>Select a saga run to inspect its timeline.</div></div>
+    </main>
+
+    <div class="drawer" id="drawer">
+      <div class="dh">
+        <div><div class="tool" id="d-tool">—</div><div id="d-status" class="st"></div></div>
+        <button class="x" id="d-close">✕</button>
+      </div>
+      <div class="dbody" id="d-body"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const STATUSES = [
+  ["all", "All"], ["ROLLED_BACK", "Rolled Back"], ["FAILED", "Failed"],
+  ["SUCCESS", "Succeeded"], ["IN_PROGRESS", "In Progress"],
+];
+let state = { sagas: [], filter: "all", selectedSaga: null, detail: null, selectedStep: null, auto: false, timer: null };
+
+// ---- fetch helpers ----
+async function api(path) {
+  const r = await fetch(path, { cache: "no-store" });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function shortId(id) { return id ? id.slice(0, 12) : "—"; }
+function fmtTs(ts) { if (!ts) return "—"; const d = new Date(ts * 1000); return d.toLocaleString(); }
+function fmtLat(ms) { if (ms == null) return "—"; return ms < 1 ? (ms*1000).toFixed(0)+"µs" : ms.toFixed(2)+"ms"; }
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+// ---- JSON pretty printer with syntax coloring ----
+function renderJSON(obj) {
+  if (obj == null || (typeof obj === "object" && !Object.keys(obj).length && !Array.isArray(obj)))
+    return '<span class="jnull">— none —</span>';
+  const json = JSON.stringify(obj, null, 2);
+  return json.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))
+    .replace(/"([^"]+)":/g, '<span class="jk">"$1"</span>:')
+    .replace(/: "([^"]*)"/g, ': <span class="js">"$1"</span>')
+    .replace(/: (true|false)/g, ': <span class="jb">$1</span>')
+    .replace(/: (null)/g, ': <span class="jnull">$1</span>')
+    .replace(/: (-?\d+\.?\d*)/g, ': <span class="jn">$1</span>');
+}
+
+// ---- meta / header ----
+async function loadMeta() {
+  try {
+    const m = await api("/api/meta");
+    $("#walpath").textContent = m.wal_path;
+    $("#walstat").title = m.wal_path;
+    $("#waldot").className = "dot " + (m.exists ? "ok" : "bad");
+    if (!m.exists) $("#walpath").textContent = m.wal_path + "  (not found)";
+  } catch (e) { $("#waldot").className = "dot bad"; $("#walpath").textContent = "server unreachable"; }
+}
+
+// ---- sagas list ----
+async function loadSagas() {
+  const data = await api("/api/sagas");
+  state.sagas = data.sagas;
+  renderFilters();
+  renderRuns();
+  if (data.corrupt_lines > 0) {
+    $("#waldot").className = "dot warn";
+    $("#walstat").title += `  · ${data.corrupt_lines} corrupt line(s) skipped`;
+  }
+}
+function countBy(status) {
+  return status === "all" ? state.sagas.length : state.sagas.filter(s => s.status === status).length;
+}
+function renderFilters() {
+  $("#filters").innerHTML = STATUSES.map(([k, label]) =>
+    `<button class="chip ${state.filter===k?'active':''}" data-f="${k}">${label}<span class="n">${countBy(k)}</span></button>`
+  ).join("");
+  document.querySelectorAll(".chip").forEach(c => c.onclick = () => { state.filter = c.dataset.f; renderFilters(); renderRuns(); });
+}
+function renderRuns() {
+  const list = state.sagas.filter(s => state.filter === "all" || s.status === state.filter);
+  if (!list.length) { $("#runs").innerHTML = `<div class="loading">No runs match this filter.</div>`; return; }
+  $("#runs").innerHTML = list.map(s => `
+    <div class="run s-${s.status} ${state.selectedSaga===s.saga_id?'sel':''}" data-id="${s.saga_id}">
+      <div class="top">
+        <span class="sid">${shortId(s.saga_id)}</span>
+        <span class="pill ${s.status}">${s.status.replace("_"," ")}</span>
+      </div>
+      <div class="meta">
+        <span title="${fmtTs(s.started_at)}">${fmtTs(s.started_at)}</span>
+        <span>· ${s.step_count} step${s.step_count===1?'':'s'}</span>
+        <span>· ${fmtLat(s.total_latency_ms)}</span>
+      </div>
+    </div>`).join("");
+  document.querySelectorAll(".run").forEach(r => r.onclick = () => selectSaga(r.dataset.id));
+}
+
+// ---- timeline ----
+async function selectSaga(id) {
+  state.selectedSaga = id; state.selectedStep = null; closeDrawer();
+  renderRuns();
+  $("#main").innerHTML = `<div class="loading">Loading timeline…</div>`;
+  try {
+    state.detail = await api("/api/sagas/" + encodeURIComponent(id));
+    renderTimeline();
+  } catch (e) { $("#main").innerHTML = `<div class="empty"><div>Failed to load saga.<br><small>${esc(e.message)}</small></div></div>`; }
+}
+function renderTimeline() {
+  const d = state.detail;
+  const rb = d.rollback_summary || {};
+  const parts = [];
+  parts.push(`<div class="main-head">
+      <h2>${shortId(d.saga_id)}</h2>
+      <span class="pill ${d.status}">${d.status.replace("_"," ")}</span>
+    </div>`);
+  parts.push(`<div class="sub">
+      <span>started <b>${fmtTs(d.started_at)}</b></span>
+      <span>duration <b>${fmtLat(d.total_latency_ms)}</b></span>
+      <span>steps <b>${d.step_count}</b></span>
+      ${d.pid?`<span>pid <b>${d.pid}</b></span>`:""}
+    </div>`);
+  parts.push(`<div class="lifo-note">↑ compensation runs bottom-to-top · LIFO (last-in, first-out)</div>`);
+
+  parts.push(`<div class="timeline">`);
+  d.steps.forEach((s, i) => {
+    const sem = `<span class="badge sem-${s.semantics}">${s.semantics}</span>`;
+    const st = `<span class="st ${s.status}">${s.status.replace("_"," ")}</span>`;
+    parts.push(`
+      <div class="node n-${s.status} ${state.selectedStep===s.step_id?'sel':''}" data-id="${s.step_id}">
+        <div class="knob"></div>
+        <div class="card">
+          <div class="tool">${esc(s.tool)}</div>
+          <div class="row2">${sem} ${st}</div>
+          <div class="lat"><b>${fmtLat(s.latency_ms)}</b></div>
+        </div>
+      </div>`);
+    // insert abort marker right after the last committed step, before compensations begin
+  });
+  // abort/rollback marker
+  if (d.status === "ROLLED_BACK" || d.status === "FAILED") {
+    const line = d.status === "ROLLED_BACK"
+      ? `compensated ${rb.compensated||0} · clean`
+      : `compensated ${rb.compensated||0} · failed ${rb.failed||0} · orphaned ${rb.orphaned||0} · unresolved ${rb.unresolved||0}${rb.halted?" · HALTED":""}`;
+    parts.push(`<div class="abort-marker">
+        <div class="knob"></div>
+        <div class="txt">✗ Saga aborted → rollback triggered <span>(${line})</span></div>
+      </div>`);
+  }
+  parts.push(`</div>`);
+  $("#main").innerHTML = parts.join("");
+  document.querySelectorAll(".node").forEach(n => n.onclick = () => openStep(n.dataset.id));
+}
+
+// ---- inspector drawer ----
+function openStep(stepId) {
+  const s = state.detail.steps.find(x => x.step_id === stepId);
+  if (!s) return;
+  state.selectedStep = stepId;
+  document.querySelectorAll(".node").forEach(n => n.classList.toggle("sel", n.dataset.id === stepId));
+  $("#d-tool").textContent = s.tool;
+  $("#d-status").className = "st " + s.status;
+  $("#d-status").textContent = s.status.replace("_", " ");
+
+  const comp = s.compensation;
+  const body = [];
+  body.push(`<div class="field"><div class="lbl">Semantics</div><span class="badge sem-${s.semantics}">${s.semantics}</span></div>`);
+  body.push(`<div class="field"><div class="lbl">Step ID</div><div class="val">${esc(s.step_id)}</div></div>`);
+  body.push(`<div class="field"><div class="kv">
+      <span class="k">intent</span><span class="v">${fmtTs(s.intent_ts)}</span>
+      <span class="k">committed</span><span class="v">${fmtTs(s.committed_ts)}</span>
+      <span class="k">latency</span><span class="v">${fmtLat(s.latency_ms)}</span>
+    </div></div>`);
+  if (s.error) body.push(`<div class="field"><div class="lbl">Error</div><div class="json" style="color:#fca5a5">${esc(s.error)}</div></div>`);
+  body.push(`<div class="field"><div class="lbl">Forward kwargs (pre-mutation)</div><div class="json">${renderJSON(s.forward_kwargs)}</div></div>`);
+
+  body.push(`<div class="divider"></div><div class="sec-title">Compensation</div>`);
+  if (comp) {
+    const flag = comp.recoverable
+      ? `<span class="flag good">✓ recoverable across processes</span>`
+      : `<span class="flag bad">⚠ in-process only — daemon will escalate</span>`;
+    body.push(`<div class="field">${flag}</div>`);
+    body.push(`<div class="field"><div class="kv">
+        <span class="k">handler</span><span class="v">${esc(comp.handler||"—")}</span>
+        <span class="k">idem key</span><span class="v">${esc(comp.idempotency_key||"—")}</span>
+      </div></div>`);
+    if (comp.description) body.push(`<div class="field"><div class="lbl">Description</div><div class="val">${esc(comp.description)}</div></div>`);
+    body.push(`<div class="field"><div class="lbl">Compensating kwargs</div><div class="json">${renderJSON(comp.kwargs)}</div></div>`);
+  } else {
+    body.push(`<div class="field"><span class="flag bad">no compensation recorded — orphaned on rollback</span></div>`);
+  }
+  $("#d-body").innerHTML = body.join("");
+  $("#drawer").classList.add("open");
+}
+function closeDrawer() { $("#drawer").classList.remove("open"); state.selectedStep = null;
+  document.querySelectorAll(".node.sel").forEach(n => n.classList.remove("sel")); }
+
+// ---- refresh / live ----
+async function refreshAll() {
+  await Promise.all([loadMeta(), loadSagas()]);
+  if (state.selectedSaga) {
+    try { state.detail = await api("/api/sagas/" + encodeURIComponent(state.selectedSaga)); renderTimeline();
+      if (state.selectedStep) openStep(state.selectedStep);
+    } catch (e) {}
+  }
+}
+function setAuto(on) {
+  state.auto = on;
+  $("#autotoggle").classList.toggle("on", on);
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  if (on) state.timer = setInterval(refreshAll, 4000);
+}
+
+// ---- wire up ----
+$("#refresh").onclick = refreshAll;
+$("#d-close").onclick = closeDrawer;
+$("#autotoggle").onclick = () => setAuto(!state.auto);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+
+refreshAll();
+</script>
+</body>
+</html>

@@ -3,5 +3,6 @@
 .pytest_cache/
 bench/results-*.json
 *.jsonl
+*.wal
 .claims/
 .venv/

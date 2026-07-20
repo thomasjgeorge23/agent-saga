@@ -16,8 +16,13 @@ dependencies = []
 dev = ["pytest>=7.4", "langchain-core>=0.3"]
 langgraph = ["langchain-core>=0.3", "langgraph>=0.2"]
 
+[project.scripts]
+agent-saga = "agent_saga.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["agent_saga"]
+# The dashboard is a data file, not a module -- ship it in the wheel.
+artifacts = ["agent_saga/ui/templates/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

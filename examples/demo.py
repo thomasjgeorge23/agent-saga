@@ -17,6 +17,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# Force UTF-8 output on Windows to prevent UnicodeEncodeError in standard console/Powershell
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 from agent_saga import (  # noqa: E402
     ActionSemantics,
     AsyncWAL,
@@ -118,23 +125,25 @@ async def scene_1_rollback(tmp: Path) -> None:
 
     wal = AsyncWAL(tmp / "scene1.jsonl")
     await wal.start()
-    ctx = SagaContext(wal=wal)
-    await ctx.begin()
-
     try:
-        await update_crm(ctx, "acct_42", {"status": "customer"})
-        await charge_card(ctx, "cus_7", 49900)
-        print(f"\n{DIM}mid-saga (two real side effects have landed){RESET}\n{world()}")
-        raise ValueError("model invented a field: 'contract_signed_at'")
-    except ValueError as exc:
-        print(f"\n{RED}    ✗ {exc}{RESET}")
-        report = await ctx.rollback()
-        await ctx.finish(aborted=True, clean=report.clean)
+        ctx = SagaContext(wal=wal)
+        await ctx.begin()
 
-    print(f"\n{DIM}after rollback{RESET}\n{world()}")
-    print(f"\n{GREEN}    ✓ {report.summary()}{RESET}")
-    print(f"{DIM}      compensated LIFO: {' -> '.join(s.tool for s in report.compensated)}{RESET}")
-    await wal.close()
+        try:
+            await update_crm(ctx, "acct_42", {"status": "customer"})
+            await charge_card(ctx, "cus_7", 49900)
+            print(f"\n{DIM}mid-saga (two real side effects have landed){RESET}\n{world()}")
+            raise ValueError("model invented a field: 'contract_signed_at'")
+        except ValueError as exc:
+            print(f"\n{RED}    ✗ {exc}{RESET}")
+            report = await ctx.rollback()
+            await ctx.finish(aborted=True, clean=report.clean)
+
+        print(f"\n{DIM}after rollback{RESET}\n{world()}")
+        print(f"\n{GREEN}    ✓ {report.summary()}{RESET}")
+        print(f"{DIM}      compensated LIFO: {' -> '.join(s.tool for s in report.compensated)}{RESET}")
+    finally:
+        await wal.close()
 
 
 async def scene_2_gate(tmp: Path) -> None:
@@ -142,29 +151,31 @@ async def scene_2_gate(tmp: Path) -> None:
 
     wal = AsyncWAL(tmp / "scene2.jsonl")
     await wal.start()
-    gate = PreFlightGate(rules=[
-        Rule("no-large-charges", arg_exceeds("amount", 100_000), Verdict.BLOCK,
-             "Charge exceeds the autonomous limit."),
-        Rule("irreversible-needs-human", semantics_is(ActionSemantics.IRREVERSIBLE),
-             Verdict.REQUIRE_APPROVAL, "Cannot be undone or compensated."),
-    ])
-    ctx = SagaContext(gate=gate, wal=wal)
-    await ctx.begin()
+    try:
+        gate = PreFlightGate(rules=[
+            Rule("no-large-charges", arg_exceeds("amount", 100_000), Verdict.BLOCK,
+                 "Charge exceeds the autonomous limit."),
+            Rule("irreversible-needs-human", semantics_is(ActionSemantics.IRREVERSIBLE),
+                 Verdict.REQUIRE_APPROVAL, "Cannot be undone or compensated."),
+        ])
+        ctx = SagaContext(gate=gate, wal=wal)
+        await ctx.begin()
 
-    for label, coro in (
-        ("charge $2,500.00", charge_card(ctx, "cus_7", 250_000)),
-        ("email the customer", send_email(ctx, "cfo@acme.com", "Your contract is signed.")),
-    ):
-        try:
-            await coro
-            print(f"{GREEN}    ✓ {label} -- allowed{RESET}")
-        except PreFlightViolation as exc:
-            print(f"{YELLOW}    ⛔ {label}{RESET}\n{DIM}       {exc}{RESET}")
+        for label, coro in (
+            ("charge $2,500.00", charge_card(ctx, "cus_7", 250_000)),
+            ("email the customer", send_email(ctx, "cfo@acme.com", "Your contract is signed.")),
+        ):
+            try:
+                await coro
+                print(f"{GREEN}    ✓ {label} -- allowed{RESET}")
+            except PreFlightViolation as exc:
+                print(f"{YELLOW}    ⛔ {label}{RESET}\n{DIM}       {exc}{RESET}")
 
-    print(f"\n{DIM}    inbox is still {WORLD['inbox']} -- nothing was sent, "
-          f"so nothing needs undoing.{RESET}")
-    await ctx.finish()
-    await wal.close()
+        print(f"\n{DIM}    inbox is still {WORLD['inbox']} -- nothing was sent, "
+              f"so nothing needs undoing.{RESET}")
+        await ctx.finish()
+    finally:
+        await wal.close()
 
 
 async def scene_3_crash(tmp: Path) -> None:
@@ -172,13 +183,15 @@ async def scene_3_crash(tmp: Path) -> None:
 
     wal = AsyncWAL(tmp / "scene3.jsonl")
     await wal.start()
-    ctx = SagaContext(wal=wal, lease_ttl=0.2)
-    await ctx.begin()
-    await charge_card(ctx, "cus_9", 12500)
-    print(f"{DIM}    a charge landed, then the process was killed:{RESET}")
-    print(f"    ledger = {WORLD['ledger']}")
-    # Simulate SIGKILL: stop renewing the lease, never roll back, never complete.
-    await wal.close()
+    try:
+        ctx = SagaContext(wal=wal, lease_ttl=0.2)
+        await ctx.begin()
+        await charge_card(ctx, "cus_9", 12500)
+        print(f"{DIM}    a charge landed, then the process was killed:{RESET}")
+        print(f"    ledger = {WORLD['ledger']}")
+        # Simulate SIGKILL: stop renewing the lease, never roll back, never complete.
+    finally:
+        await wal.close()
 
     print(f"\n{DIM}    ...lease expires; saga-recoveryd sweeps the WAL...{RESET}")
     await asyncio.sleep(0.6)

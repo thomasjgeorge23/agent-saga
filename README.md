@@ -142,6 +142,21 @@ result = await saga_run(graph, {"messages": [...]})
 # if any node raises, every tool that already ran is compensated LIFO
 ```
 
+## Time-travel debugger
+
+A zero-dependency visual debugger reads any WAL and reconstructs each run:
+
+```bash
+agent-saga ui --wal-path ./agent-saga.wal --port 8080
+# or: python -m agent_saga.ui --wal-path ./agent-saga.wal
+```
+
+Dark enterprise UI (no build step, no `node_modules`, stdlib HTTP server): a
+sidebar of runs filterable by status, a LIFO timeline colour-coded by outcome
+(committed / compensated / orphaned / failed), and an inspector showing each
+step's semantics, forward kwargs, and the exact compensation that ran — with
+credentials shown as references, never values. Binds to `127.0.0.1` by default.
+
 ## Status
 
 Pre-alpha. Core engine, recovery daemon, three reference connectors, and a
