@@ -120,11 +120,34 @@ flush window share a single fsync, so throughput scales ~linearly (measured 300 
 
 ---
 
+## LangGraph
+
+Drop it into an existing graph without rewriting anything. `wrap_tool` returns a
+`StructuredTool` with the same name, description, and args schema, so the model
+and `ToolNode` see no difference; `saga_run` makes the whole graph run one
+transaction.
+
+```python
+from agent_saga.adapters.langgraph import wrap_tool, saga_run
+from agent_saga import ActionSemantics, Compensation
+
+safe_charge = wrap_tool(
+    charge_tool,                       # your existing @tool
+    semantics=ActionSemantics.COMPENSABLE,
+    compensate=lambda r: Compensation(
+        fn=refund, handler="stripe.refund", kwargs={"charge_id": r["id"]}))
+
+# build your graph with safe_charge in place of charge_tool, then:
+result = await saga_run(graph, {"messages": [...]})
+# if any node raises, every tool that already ran is compensated LIFO
+```
+
 ## Status
 
-Pre-alpha. Core engine, recovery daemon, and three reference connectors are
-implemented and tested (72 tests, no external dependencies to run the suite).
-Not yet published to PyPI. Snapshot-based `REVERSIBLE` capture and framework
-adapters (LangGraph, CrewAI, OpenAI Agents SDK) are next.
+Pre-alpha. Core engine, recovery daemon, three reference connectors, and a
+LangGraph adapter are implemented and tested (82 tests; the suite runs with only
+`pytest`, and adapter integration tests additionally use `langchain-core`). Not
+yet published to PyPI. Snapshot-based `REVERSIBLE` capture and further framework
+adapters (CrewAI, OpenAI Agents SDK) are next.
 
 Apache 2.0.

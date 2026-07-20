@@ -10,7 +10,7 @@ The core of AgentRollback. Three ideas, in order of commercial importance:
 """
 
 from .context import RollbackReport, SagaAborted, SagaContext
-from .decorator import current_saga, saga, tool
+from .decorator import current_saga, saga, saga_scope, tool
 from .gate import (
     Decision,
     GateContext,
@@ -64,6 +64,7 @@ __all__ = [
     "arg_exceeds",
     "current_saga",
     "saga",
+    "saga_scope",
     "semantics_is",
     "tool",
     "__version__",

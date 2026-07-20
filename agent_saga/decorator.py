@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import contextvars
 import functools
 import inspect
-from typing import Any, Callable, Optional
+from typing import Any, AsyncIterator, Callable, Optional
 
 from .context import RollbackReport, SagaAborted, SagaContext
 from .gate import PreFlightGate
@@ -21,6 +22,45 @@ def current_saga() -> Optional[SagaContext]:
     """The active saga for this task, or None. contextvars rather than a global
     so concurrent agents in one process do not share a compensation stack."""
     return _current.get()
+
+
+@contextlib.asynccontextmanager
+async def saga_scope(
+    *,
+    gate: Optional[PreFlightGate] = None,
+    wal: Optional[AsyncWAL] = None,
+    halt_on_compensation_failure: bool = True,
+) -> AsyncIterator[SagaContext]:
+    """The one transactional boundary. `@saga`, `saga_run`, and any framework
+    adapter all go through here, so the begin/rollback/finish/lease lifecycle
+    lives in exactly one place.
+
+    On any exception inside the scope, compensations run LIFO and a `SagaAborted`
+    is raised carrying the `RollbackReport`. A caller that wants the report
+    instead of the exception catches `SagaAborted` and reads `.report`.
+    """
+    own_wal = wal is None
+    _wal = wal or AsyncWAL()
+    if own_wal:
+        await _wal.start()
+    ctx = SagaContext(gate=gate, wal=_wal,
+                      halt_on_compensation_failure=halt_on_compensation_failure)
+    token = _current.set(ctx)
+    await ctx.begin()
+    try:
+        yield ctx
+    except BaseException as exc:
+        report = await ctx.rollback()
+        # SAGA_ABORTED tells saga-recoveryd this saga was resolved in-process
+        # and must not be touched again.
+        await ctx.finish(aborted=True, clean=report.clean)
+        raise SagaAborted(exc, report) from exc
+    else:
+        await ctx.finish()
+    finally:
+        _current.reset(token)
+        if own_wal:
+            await _wal.close()
 
 
 def saga(
@@ -46,34 +86,16 @@ def saga(
 
         @functools.wraps(fn)
         async def wrapper(*args, **kwargs):
-            own_wal = wal is None
-            _wal = wal or AsyncWAL()
-            if own_wal:
-                await _wal.start()
-            ctx = SagaContext(
-                gate=gate,
-                wal=_wal,
-                halt_on_compensation_failure=halt_on_compensation_failure,
-            )
-            token = _current.set(ctx)
-            await ctx.begin()
             try:
-                result = await fn(*args, **kwargs)
-            except BaseException as exc:
-                report = await ctx.rollback()
-                # SAGA_ABORTED is what tells the recovery daemon this saga was
-                # resolved in-process and must not be touched again.
-                await ctx.finish(aborted=True, clean=report.clean)
+                async with saga_scope(
+                    gate=gate, wal=wal,
+                    halt_on_compensation_failure=halt_on_compensation_failure,
+                ):
+                    return await fn(*args, **kwargs)
+            except SagaAborted as aborted:
                 if reraise:
-                    raise SagaAborted(exc, report) from exc
-                return report
-            else:
-                await ctx.finish()
-                return result
-            finally:
-                _current.reset(token)
-                if own_wal:
-                    await _wal.close()
+                    raise
+                return aborted.report
 
         wrapper.__wrapped_saga__ = True  # type: ignore[attr-defined]
         return wrapper
@@ -119,4 +141,4 @@ def tool(
     return decorate
 
 
-__all__ = ["saga", "tool", "current_saga", "SagaAborted", "RollbackReport"]
+__all__ = ["saga", "saga_scope", "tool", "current_saga", "SagaAborted", "RollbackReport"]
