@@ -143,6 +143,10 @@
     background: var(--red); border: 3px solid var(--bg); box-shadow: 0 0 0 2px rgba(239,68,68,.4), 0 0 14px rgba(239,68,68,.6); }
   .abort-marker .txt { color: #f87171; font-size: 12.5px; font-weight: 600; padding: 3px 0; }
   .abort-marker .txt span { color: var(--muted); font-weight: 400; }
+  .abort-marker .cause { margin-top: 6px; font-family: var(--mono); font-size: 12px; color: #fca5a5;
+    background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.25); border-radius: 7px;
+    padding: 7px 11px; word-break: break-word; }
+  .abort-marker .cause b { color: #f87171; }
 
   .empty { display: grid; place-items: center; height: 70%; color: var(--faint); text-align: center; }
   .empty .big { font-size: 44px; margin-bottom: 12px; opacity: .5; }
@@ -344,9 +348,13 @@ function renderTimeline() {
     const line = d.status === "ROLLED_BACK"
       ? `compensated ${rb.compensated||0} · clean`
       : `compensated ${rb.compensated||0} · failed ${rb.failed||0} · orphaned ${rb.orphaned||0} · unresolved ${rb.unresolved||0}${rb.halted?" · HALTED":""}`;
+    const cause = d.abort_cause
+      ? `<div class="cause"><b>${esc(d.abort_cause.type)}</b>${d.abort_cause.message?": "+esc(d.abort_cause.message):""}</div>`
+      : "";
     parts.push(`<div class="abort-marker">
         <div class="knob"></div>
         <div class="txt">✗ Saga aborted → rollback triggered <span>(${line})</span></div>
+        ${cause}
       </div>`);
   }
   parts.push(`</div>`);

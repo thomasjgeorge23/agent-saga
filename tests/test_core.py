@@ -367,6 +367,56 @@ async def test_saga_decorator_rolls_back_on_exception_and_carries_the_report():
 
 
 @aio
+async def test_saga_records_the_abort_cause_before_rollback():
+    """The triggering exception is only known at the boundary; it is written to
+    the WAL there so a post-mortem can name the failure, not just see that one
+    happened."""
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as d:
+        w = AsyncWAL(Path(d) / "wal.jsonl")
+        await w.start()
+
+        @tool(semantics=C, compensate=lambda r: Compensation(fn=lambda: None, handler="h"))
+        def act():
+            return 1
+
+        @saga(wal=w, reraise=False)
+        async def run():
+            await act()
+            raise ValueError("model hallucinated a field")
+
+        await run()
+        await w.close()
+
+        recs = {r["event"]: r for r in w.records()}
+        assert recs["SAGA_ABORT_CAUSE"]["cause_type"] == "ValueError"
+        assert "hallucinated" in recs["SAGA_ABORT_CAUSE"]["cause"]
+
+        events = [r["event"] for r in w.records()]
+        assert events.index("SAGA_ABORT_CAUSE") < events.index("ROLLBACK_START")
+
+
+@aio
+async def test_successful_saga_records_no_abort_cause():
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as d:
+        w = AsyncWAL(Path(d) / "wal.jsonl")
+        await w.start()
+
+        @saga(wal=w)
+        async def run():
+            return "ok"
+
+        assert await run() == "ok"
+        await w.close()
+        assert "SAGA_ABORT_CAUSE" not in {r["event"] for r in w.records()}
+
+
+@aio
 async def test_tool_passes_through_outside_a_saga_boundary():
     @tool(semantics=C, compensate=lambda r: Compensation(fn=lambda: None))
     def touch():

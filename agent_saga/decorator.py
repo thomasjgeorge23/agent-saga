@@ -50,6 +50,9 @@ async def saga_scope(
     try:
         yield ctx
     except BaseException as exc:
+        # Capture *why* before unwinding -- this is the only place the trigger
+        # is known. Written ahead of ROLLBACK_START so the trace reads causally.
+        ctx.record_abort(exc)
         report = await ctx.rollback()
         # SAGA_ABORTED tells saga-recoveryd this saga was resolved in-process
         # and must not be touched again.

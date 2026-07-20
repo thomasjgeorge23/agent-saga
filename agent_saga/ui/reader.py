@@ -149,6 +149,8 @@ class _SagaAcc:
     pid: Optional[int] = None
     completed: bool = False
     aborted: bool = False
+    cause_type: Optional[str] = None
+    cause: Optional[str] = None
     rollback_started: bool = False
     rollback_clean: Optional[bool] = None
     rollback_summary: dict = field(default_factory=dict)
@@ -189,6 +191,9 @@ class _SagaAcc:
             self.completed = True
         elif ev == "SAGA_ABORTED":
             self.aborted = True
+        elif ev == "SAGA_ABORT_CAUSE":
+            self.cause_type = rec.get("cause_type")
+            self.cause = rec.get("cause")
         elif ev == "ROLLBACK_START":
             self.rollback_started = True
         elif ev == "ROLLBACK_END":
@@ -277,6 +282,13 @@ class _SagaAcc:
             "rollback_started": self.rollback_started,
             "rollback_clean": self.rollback_clean,
             "rollback_summary": self.rollback_summary,
+            # The triggering exception, when the saga ran through a boundary
+            # that recorded it. scrub() catches a message that is itself a bare
+            # secret; it cannot catch one embedded mid-sentence.
+            "abort_cause": (
+                {"type": self.cause_type, "message": scrub(self.cause)}
+                if self.cause_type else None
+            ),
             "steps": steps,
         })
         return d

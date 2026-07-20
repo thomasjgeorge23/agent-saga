@@ -197,6 +197,70 @@ async def test_secrets_never_appear_in_the_detail_payload():
 
 
 @aio
+async def test_abort_cause_surfaces_in_saga_detail():
+    """A saga run through the @saga boundary records why it aborted; the reader
+    exposes it as abort_cause for the timeline's failure marker."""
+    from agent_saga import saga, tool
+
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "wal.jsonl"
+        wal = AsyncWAL(p)
+        await wal.start()
+
+        @tool(semantics=C, compensate=lambda r: Compensation(fn=lambda **k: None, handler="h"))
+        def act():
+            return {"id": 1}
+
+        @saga(wal=wal, reraise=False)
+        async def run():
+            await act()
+            raise RuntimeError("downstream 500 from CRM")
+
+        await run()
+        await wal.close()
+
+        reader = SagaWALReader(p)
+        sid = reader.list_sagas()["sagas"][0]["saga_id"]
+        detail = reader.get_saga(sid)
+
+    assert detail["status"] == ROLLED_BACK
+    assert detail["abort_cause"]["type"] == "RuntimeError"
+    assert "downstream 500" in detail["abort_cause"]["message"]
+
+
+@aio
+async def test_successful_saga_has_no_abort_cause():
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "wal.jsonl"
+        sid = await _run_saga(p)
+        detail = SagaWALReader(p).get_saga(sid)
+    assert detail["abort_cause"] is None
+
+
+@aio
+async def test_abort_cause_message_is_scrubbed_if_it_is_a_bare_secret():
+    """A message that is itself a credential must not pass through to the UI."""
+    from agent_saga import saga
+
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "wal.jsonl"
+        wal = AsyncWAL(p)
+        await wal.start()
+
+        @saga(wal=wal, reraise=False)
+        async def run():
+            raise RuntimeError("sk_live_abcdefghij1234567890")
+
+        await run()
+        await wal.close()
+        reader = SagaWALReader(p)
+        sid = reader.list_sagas()["sagas"][0]["saga_id"]
+        detail = reader.get_saga(sid)
+
+    assert detail["abort_cause"]["message"] == REDACTED
+
+
+@aio
 async def test_list_sorts_newest_first():
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "wal.jsonl"

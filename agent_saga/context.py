@@ -133,6 +133,27 @@ class SagaContext:
                         {"saga_id": self.saga_id, "clean": clean})
         await self.wal.barrier()
 
+    def record_abort(self, exc: BaseException) -> None:
+        """Record what triggered the rollback.
+
+        The WAL otherwise knows only that a rollback *began*, not why -- the
+        triggering exception lives in the raised SagaAborted and never reaches
+        disk. This is the one point where the cause is known, so a post-mortem
+        (or the time-travel debugger) can name the failure without the live
+        stack. Written before ROLLBACK_START so it reads in causal order; the
+        rollback's own barrier makes it durable.
+
+        Only type and message are captured -- never a traceback, which is large
+        and far more likely to carry sensitive locals. The message is still
+        app-controlled text; treat it as potentially sensitive downstream.
+        """
+        message = str(exc)
+        self.wal.append("SAGA_ABORT_CAUSE", {
+            "saga_id": self.saga_id,
+            "cause_type": type(exc).__name__,
+            "cause": message if len(message) <= 2000 else message[:2000] + "…",
+        })
+
     # -- execution ---------------------------------------------------------
 
     async def execute(

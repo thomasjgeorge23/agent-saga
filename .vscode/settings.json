@@ -1,0 +1,7 @@
+{
+    "python.testing.pytestArgs": [
+        "agent_saga"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}
