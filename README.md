@@ -160,11 +160,11 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 ## Status
 
 Pre-alpha. Core engine, recovery daemon, three reference connectors, a
-LangGraph adapter, and the time-travel debugger are implemented and tested
-(100 tests; the suite runs with only `pytest`, and adapter integration tests
-additionally use `langchain-core`). Not yet published to PyPI. Snapshot-based
-`REVERSIBLE` capture and further framework adapters (CrewAI, OpenAI Agents SDK)
-are next.
+LangGraph adapter, the time-travel debugger, and snapshot-based `REVERSIBLE`
+capture are implemented and tested (123 tests; the suite runs with only
+`pytest`, and adapter integration tests additionally use `langchain-core`).
+Not yet published to PyPI. Durable-target snapshots and further framework
+adapters (CrewAI, OpenAI Agents SDK) are next.
 
 ## License
 

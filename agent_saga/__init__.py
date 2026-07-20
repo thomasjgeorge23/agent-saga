@@ -32,6 +32,15 @@ from .recovery import (
 )
 from .registry import compensator, registered, resolve
 from .semantics import ActionSemantics, Compensation, SagaStep, StepState
+from .snapshot import (
+    AttributeSnapshot,
+    MappingSnapshot,
+    SequenceSnapshot,
+    SetSnapshot,
+    SnapshotStrategy,
+    auto_strategy,
+    reversible,
+)
 from .wal import AsyncWAL
 
 __version__ = "0.1.0"
@@ -68,5 +77,12 @@ __all__ = [
     "saga_scope",
     "semantics_is",
     "tool",
+    "AttributeSnapshot",
+    "MappingSnapshot",
+    "SequenceSnapshot",
+    "SetSnapshot",
+    "SnapshotStrategy",
+    "auto_strategy",
+    "reversible",
     "__version__",
 ]
