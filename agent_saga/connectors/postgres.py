@@ -204,6 +204,10 @@ async def update_row(
         semantics=ActionSemantics.COMPENSABLE,
         forward=_forward,
         compensate=_compensate,
+        # A gate may restrict which tables an agent can mutate, or how many
+        # columns at once. The closure would otherwise hide all of it.
+        policy_args={"table": table, "pk_column": pk_column,
+                     "pk_value": pk_value, "columns": list(updates)},
     )
 
 

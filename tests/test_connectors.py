@@ -164,6 +164,36 @@ async def test_stripe_charge_rolls_back_with_a_deterministic_refund_key():
 
 
 @aio
+async def test_stripe_charge_amount_is_visible_to_the_gate():
+    """Regression: a connector that wraps its call in a closure passes
+    forward_kwargs={}, so a threshold rule saw nothing and silently allowed
+    every charge. The amount must reach the gate via policy_args."""
+    from agent_saga.connectors import stripe as sc
+    from agent_saga import PreFlightGate, PreFlightViolation, Rule, Verdict, arg_exceeds
+
+    gate = PreFlightGate(rules=[
+        Rule("cap", arg_exceeds("amount", 100_000), Verdict.BLOCK, "over limit")])
+
+    with tempfile.TemporaryDirectory() as d, credential("stripe_t", "sk_test_x"):
+        mod = fake_stripe()
+        with fake_module("stripe", mod):
+            wal = AsyncWAL(Path(d) / "wal.jsonl")
+            await wal.start()
+            ctx = SagaContext(gate=gate, wal=wal)
+
+            await sc.charge(ctx, customer_id="cus_1", amount=5_000,
+                            credential_ref="stripe_t")           # under the cap
+
+            with pytest.raises(PreFlightViolation):
+                await sc.charge(ctx, customer_id="cus_1", amount=250_000,
+                                credential_ref="stripe_t")       # over -> blocked
+            await wal.close()
+
+    # The blocked charge must never have executed.
+    assert [c[0] for c in mod.calls] == ["charge"]
+
+
+@aio
 async def test_stripe_already_refunded_is_success_not_failure():
     """Stripe drops idempotency keys after 24h. A daemon returning from a
     two-day outage gets a fresh key and must not loop forever on an error that

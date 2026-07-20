@@ -144,9 +144,23 @@ class SagaContext:
         compensate: Optional[CompensationFactory] = None,
         *,
         timeout: Optional[float] = None,
+        policy_args: Optional[dict] = None,
     ) -> Any:
+        """`policy_args` is what the gate evaluates, and it exists because
+        `forward_kwargs` is not trustworthy for policy.
+
+        A connector that wraps its call in a closure -- which is the natural way
+        to write one -- passes `forward_kwargs={}`. The amount, the table, the
+        recipient are all captured in the closure and completely invisible to
+        `arg_exceeds` and friends. The gate would silently pass everything.
+
+        So policy-relevant arguments are declared explicitly. Every connector in
+        this package does so, and any connector that does not is opting out of
+        threshold policy for its tool.
+        """
         forward_kwargs = forward_kwargs or {}
-        ctx = GateContext(tool=tool, semantics=semantics, kwargs=forward_kwargs)
+        ctx = GateContext(tool=tool, semantics=semantics,
+                          kwargs={**forward_kwargs, **(policy_args or {})})
 
         # 1. Gate first. Nothing has happened yet; this is the only point at
         #    which refusal is free.

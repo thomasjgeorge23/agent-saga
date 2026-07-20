@@ -127,6 +127,10 @@ async def charge(
         semantics=ActionSemantics.COMPENSABLE,
         forward=_forward,
         compensate=_compensate,
+        # Exposed to the gate so a rule like arg_exceeds("amount", 100_000) can
+        # actually see the amount. Without this the closure hides it.
+        policy_args={"amount": amount, "currency": currency,
+                     "customer_id": customer_id},
     )
 
 

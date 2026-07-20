@@ -179,6 +179,8 @@ async def patch_object(
         semantics=ActionSemantics.COMPENSABLE,
         forward=_forward,
         compensate=_compensate,
+        policy_args={"object_type": object_type, "object_id": object_id,
+                     "fields": sorted(patch)},
     )
 
 
