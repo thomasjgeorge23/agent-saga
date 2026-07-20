@@ -159,10 +159,18 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha. Core engine, recovery daemon, three reference connectors, and a
-LangGraph adapter are implemented and tested (82 tests; the suite runs with only
-`pytest`, and adapter integration tests additionally use `langchain-core`). Not
-yet published to PyPI. Snapshot-based `REVERSIBLE` capture and further framework
-adapters (CrewAI, OpenAI Agents SDK) are next.
+Pre-alpha. Core engine, recovery daemon, three reference connectors, a
+LangGraph adapter, and the time-travel debugger are implemented and tested
+(100 tests; the suite runs with only `pytest`, and adapter integration tests
+additionally use `langchain-core`). Not yet published to PyPI. Snapshot-based
+`REVERSIBLE` capture and further framework adapters (CrewAI, OpenAI Agents SDK)
+are next.
 
-Apache 2.0.
+## License
+
+Licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only).
+See [LICENSE](LICENSE). Copyright (c) 2026 Avertis Systems.
+
+The AGPL's network-use clause (section 13) means a hosted service built on this
+code must offer its users the corresponding source. If that does not fit your
+deployment, contact Avertis Systems about a commercial license.

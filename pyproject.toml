@@ -8,8 +8,14 @@ version = "0.1.0"
 description = "Transactional boundaries, typed compensation semantics, and a pre-flight safety gate for autonomous AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
+license = { text = "AGPL-3.0-only" }
 keywords = ["ai-agents", "saga", "rollback", "compensation", "llm", "observability"]
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
 dependencies = []
 
 [project.optional-dependencies]
