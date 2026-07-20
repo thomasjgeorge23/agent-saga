@@ -35,6 +35,7 @@ from .semantics import ActionSemantics, Compensation, SagaStep, StepState
 from .wal import AsyncWAL
 
 __version__ = "0.1.0"
+__author__ = "Avertis Systems"
 
 __all__ = [
     "ActionSemantics",

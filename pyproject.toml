@@ -9,6 +9,8 @@ description = "Transactional boundaries, typed compensation semantics, and a pre
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "AGPL-3.0-only" }
+authors = [{ name = "Avertis Systems" }]
+maintainers = [{ name = "Avertis Systems" }]
 keywords = ["ai-agents", "saga", "rollback", "compensation", "llm", "observability"]
 classifiers = [
     "License :: OSI Approved :: GNU Affero General Public License v3",
