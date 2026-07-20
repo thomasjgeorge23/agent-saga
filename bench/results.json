@@ -1,0 +1,128 @@
+{
+  "environment": {
+    "python": "3.12.10",
+    "os": "Windows",
+    "release": "11",
+    "machine": "AMD64"
+  },
+  "samples": 10000,
+  "profiles": [
+    {
+      "profile": "baseline (bare await, no saga)",
+      "samples": 10000,
+      "p50_ms": 0.0001,
+      "p95_ms": 0.0002,
+      "p99_ms": 0.0002,
+      "max_ms": 0.0009,
+      "mean_ms": 0.00012,
+      "overhead_p50_ms": null
+    },
+    {
+      "profile": "FAST PATH (REVERSIBLE)",
+      "samples": 10000,
+      "p50_ms": 0.0066,
+      "p95_ms": 0.0107,
+      "p99_ms": 0.0183,
+      "max_ms": 5.9961,
+      "mean_ms": 0.0081,
+      "overhead_p50_ms": 0.0065
+    },
+    {
+      "profile": "DURABLE PATH (COMPENSABLE)",
+      "samples": 10000,
+      "p50_ms": 2.9702,
+      "p95_ms": 4.8843,
+      "p99_ms": 22.255,
+      "max_ms": 40.473,
+      "mean_ms": 3.54303,
+      "overhead_p50_ms": 2.9701
+    }
+  ],
+  "telemetry": {
+    "fast_path": {
+      "wal_events": 21000,
+      "fsync_barriers": 0,
+      "backpressure_drops": 0
+    },
+    "durable_path": {
+      "wal_events": 21000,
+      "fsync_barriers": 10000,
+      "backpressure_drops": 0
+    }
+  },
+  "concurrency": [
+    {
+      "concurrency": 1,
+      "total_ops": 2500,
+      "elapsed_s": 7.75,
+      "ops_per_sec": 322.6,
+      "waiters": 2500,
+      "fsyncs": 2500,
+      "backpressure_drops": 0,
+      "group_commit_factor": 1.0,
+      "profile": "COMPENSABLE @ 1 concurrent sagas",
+      "samples": 2500,
+      "p50_ms": 2.9619,
+      "p95_ms": 3.9862,
+      "p99_ms": 5.8306,
+      "max_ms": 33.2855,
+      "mean_ms": 3.09865,
+      "overhead_p50_ms": null
+    },
+    {
+      "concurrency": 8,
+      "total_ops": 2496,
+      "elapsed_s": 0.991,
+      "ops_per_sec": 2517.6,
+      "waiters": 2496,
+      "fsyncs": 312,
+      "backpressure_drops": 0,
+      "group_commit_factor": 8.0,
+      "profile": "COMPENSABLE @ 8 concurrent sagas",
+      "samples": 2496,
+      "p50_ms": 3.0713,
+      "p95_ms": 4.0085,
+      "p99_ms": 4.8105,
+      "max_ms": 5.3143,
+      "mean_ms": 3.17536,
+      "overhead_p50_ms": null
+    },
+    {
+      "concurrency": 64,
+      "total_ops": 2496,
+      "elapsed_s": 0.167,
+      "ops_per_sec": 14990.1,
+      "waiters": 2496,
+      "fsyncs": 39,
+      "backpressure_drops": 0,
+      "group_commit_factor": 64.0,
+      "profile": "COMPENSABLE @ 64 concurrent sagas",
+      "samples": 2496,
+      "p50_ms": 4.1096,
+      "p95_ms": 4.8618,
+      "p99_ms": 5.4925,
+      "max_ms": 5.539,
+      "mean_ms": 4.24523,
+      "overhead_p50_ms": null
+    },
+    {
+      "concurrency": 256,
+      "total_ops": 5120,
+      "elapsed_s": 0.155,
+      "ops_per_sec": 33035.3,
+      "waiters": 5120,
+      "fsyncs": 20,
+      "backpressure_drops": 0,
+      "group_commit_factor": 256.0,
+      "profile": "COMPENSABLE @ 256 concurrent sagas",
+      "samples": 5120,
+      "p50_ms": 7.3901,
+      "p95_ms": 10.9755,
+      "p99_ms": 11.9497,
+      "max_ms": 11.9706,
+      "mean_ms": 7.63417,
+      "overhead_p50_ms": null
+    }
+  ],
+  "caveat": "fsync latency is hardware- and filesystem-specific. The durable path number is not portable and must be re-measured per deployment target before being quoted."
+}

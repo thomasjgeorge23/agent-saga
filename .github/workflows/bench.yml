@@ -1,0 +1,106 @@
+name: benchmark
+
+# The durable-path p99 is the number a bank's architect asks about first.
+# It cannot be measured on a developer laptop -- NTFS fsync tails on Windows
+# varied 22-33ms p99 and 40-202ms max across identical runs. This workflow
+# produces the number we are willing to publish.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: Samples per profile
+        default: "10000"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest
+      - run: python -m pytest -q
+
+  bench:
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        # Three runs of each so we report median-of-p99 rather than whichever
+        # single run happened to look best. One sample of a tail is not a
+        # measurement.
+        run: [1, 2, 3]
+        gc: [enabled, disabled]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Record hardware and filesystem
+        run: |
+          echo "## runner" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          lscpu | grep -E 'Model name|^CPU\(s\)|MHz' >> $GITHUB_STEP_SUMMARY || true
+          df -hT . >> $GITHUB_STEP_SUMMARY
+          # fsync cost is a property of the device, not of our code. Capture it
+          # so the durable-path number can be read in context.
+          lsblk -d -o NAME,ROTA,MODEL >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Baseline fsync cost of this runner
+        run: |
+          python - <<'PY'
+          import os, statistics, tempfile, time
+          with tempfile.TemporaryDirectory() as d:
+              p = os.path.join(d, "probe")
+              fh = open(p, "w")
+              lat = []
+              for _ in range(2000):
+                  fh.write("x" * 200 + "\n"); fh.flush()
+                  t0 = time.perf_counter_ns(); os.fsync(fh.fileno())
+                  lat.append(time.perf_counter_ns() - t0)
+              fh.close()
+              s = sorted(lat)
+              print(f"raw fsync p50={s[1000]/1e6:.4f}ms p95={s[1900]/1e6:.4f}ms "
+                    f"p99={s[1980]/1e6:.4f}ms max={s[-1]/1e6:.3f}ms")
+          PY
+
+      - name: Run benchmark
+        run: |
+          python bench/bench_core.py \
+            --samples ${{ github.event.inputs.samples || 10000 }} \
+            --label ${{ matrix.gc }}-${{ matrix.run }} \
+            ${{ matrix.gc == 'disabled' && '--no-gc' || '' }} \
+            | tee bench-output.txt
+          {
+            echo "## bench (gc ${{ matrix.gc }}, run ${{ matrix.run }})"
+            echo '```'
+            cat bench-output.txt
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.gc }}-${{ matrix.run }}
+          path: bench/results-*.json
+
+  report:
+    runs-on: ubuntu-latest
+    needs: bench
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Median-of-runs summary
+        run: python bench/summarize.py artifacts >> $GITHUB_STEP_SUMMARY
