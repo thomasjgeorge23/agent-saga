@@ -131,6 +131,7 @@ from .wal import (
     WALBackpressure,
     WALStalled,
 )
+from .serialization import SagaJSONEncoder, dumps as saga_dumps, loads as saga_loads
 
 __version__ = "0.1.1"
 __author__ = "SagaOps"
@@ -248,4 +249,7 @@ __all__ = [
     "SagaTracer",
     "NoOpTracer",
     "__version__",
+    "SagaJSONEncoder",
+    "saga_dumps",
+    "saga_loads",
 ]

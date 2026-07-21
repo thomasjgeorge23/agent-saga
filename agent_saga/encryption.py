@@ -104,7 +104,8 @@ def get_wal_encryptor() -> Optional[WALEncryptor]:
 # ---------------------------------------------------------------------------
 
 def encode_line(record: dict, encryptor: Optional[WALEncryptor]) -> str:
-    js = json.dumps(record, default=str)
+    from . import serialization
+    js = serialization.dumps(record)
     if encryptor is None:
         return js
     return _PREFIX + encryptor.encrypt(js.encode("utf-8")).decode("ascii")
@@ -113,6 +114,7 @@ def encode_line(record: dict, encryptor: Optional[WALEncryptor]) -> str:
 def decode_line(line: str, encryptor: Optional[WALEncryptor]) -> dict:
     """Parse one WAL line to a record. Raises EncryptedRecordError for an
     encrypted line with no key, ValueError/JSONDecodeError for corruption."""
+    from . import serialization
     line = line.strip()
     if line.startswith(_PREFIX):
         if encryptor is None:
@@ -131,8 +133,8 @@ def decode_line(line: str, encryptor: Optional[WALEncryptor]) -> dict:
             # rather than dying on an encryptor-specific exception type. The
             # corrupt-line counter surfaces it either way.
             raise ValueError(f"undecryptable WAL line: {exc}") from exc
-        return json.loads(plaintext)
-    return json.loads(line)
+        return serialization.loads(plaintext.decode("utf-8"))
+    return serialization.loads(line)
 
 
 def is_encrypted_line(line: str) -> bool:
