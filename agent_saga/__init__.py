@@ -74,7 +74,14 @@ from .snapshot import (
     auto_strategy,
     reversible,
 )
-from .wal import AsyncWAL, BackpressurePolicy, WALBackpressure
+from .wal import (
+    AsyncWAL,
+    BackpressurePolicy,
+    BaseWAL,
+    FileWAL,
+    WALBackpressure,
+    WALStalled,
+)
 
 __version__ = "0.1.0"
 __author__ = "SagaOps"
@@ -83,7 +90,10 @@ __all__ = [
     "ActionSemantics",
     "AsyncWAL",
     "BackpressurePolicy",
+    "BaseWAL",
+    "FileWAL",
     "WALBackpressure",
+    "WALStalled",
     "Compensation",
     "DanglingSaga",
     "DanglingStep",

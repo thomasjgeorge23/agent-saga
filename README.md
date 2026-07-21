@@ -159,7 +159,7 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (201 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (216 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
@@ -175,6 +175,15 @@ with only `pytest`; optional extras add their own SDKs):
   injected encryptor — a reader without the key fails loud, never silent).
 - Recovery locking: an injectable lock interface, defaulting to a local file
   lock (no Redis in-tree — supply a distributed backend if you run a fleet).
+- Pluggable WAL backends behind `BaseWAL`: `FileWAL` (the zero-dependency
+  default, fsync-durable) and `RedisWAL` for multi-node deployments
+  (`pip install agent-saga[redis]`). `barrier()` is part of the interface, not
+  an extra — a backend without a durability fence is fire-and-forget. Redis is
+  documented as a *weaker* durability class than fsync and supports `WAIT` for
+  replica acknowledgment; read that section before putting money through it.
+- No unbounded waits: `barrier()` raises `WALStalled` rather than hanging
+  forever on a wedged device, and a sink error fails pending fences immediately
+  with the real cause. `close()` is bounded too.
 - Thread isolation: each WAL owns a private flusher thread, so a burst of slow
   connector calls can never starve fsync and stall unrelated sagas. Blocking
   tool work runs on a bounded, resizable pool that reports its own saturation
