@@ -57,6 +57,7 @@ from .executors import (
     tool_executor_stats,
 )
 from .gc import GCReport, SnapshotGC
+from .idempotency import IdempotencyManager
 from .locks import FileLock, InProcessLock, RecoveryLock
 from .observability import (
     CorrelationFilter,
@@ -138,6 +139,7 @@ __all__ = [
     "snapshot_file",
     "GCReport",
     "SnapshotGC",
+    "IdempotencyManager",
     "BoundedExecutor",
     "configure_tool_executor",
     "get_tool_executor",
