@@ -52,6 +52,14 @@ from .integrity import (
     redact_where,
 )
 from .integrity import verify as verify_chain
+from .killswitch import (
+    FileSwitchStore,
+    Halted,
+    KillSwitch,
+    RedisSwitchStore,
+    get_kill_switch,
+    set_kill_switch,
+)
 from .approvals import (
     ApprovalGateway,
     ApprovalPolicy,
@@ -172,6 +180,12 @@ __all__ = [
     "arg_exceeds",
     "tool_is",
     "verify_chain",
+    "KillSwitch",
+    "Halted",
+    "FileSwitchStore",
+    "RedisSwitchStore",
+    "get_kill_switch",
+    "set_kill_switch",
     "ApprovalGateway",
     "ApprovalPolicy",
     "ApprovalRequest",

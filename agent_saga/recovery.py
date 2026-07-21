@@ -379,6 +379,21 @@ class RecoveryDaemon:
         if not pending and not pending_tentatives:
             return RecoveryOutcome(saga.saga_id, Resolution.NOTHING_TO_DO)
 
+        # Case B2: a quarantined saga is frozen for investigation. The daemon is
+        # the one thing that would undo that freeze -- it would compensate
+        # exactly the saga a human deliberately stopped, which is why the check
+        # belongs here and not only in the gate.
+        from .killswitch import get_kill_switch
+
+        switch = get_kill_switch()
+        if switch is not None and switch.is_quarantined(saga.saga_id):
+            await self._journal("RECOVERY_SKIPPED_QUARANTINED",
+                                {"saga_id": saga.saga_id})
+            return RecoveryOutcome(
+                saga.saga_id, Resolution.NEEDS_HUMAN,
+                reason=("saga is quarantined; automated recovery is suspended "
+                        "until a human releases it"))
+
         # Case C: fail closed on anything irreversible, before touching anything.
         irreversible = [s for s in pending if s.semantics is ActionSemantics.IRREVERSIBLE]
         if irreversible:

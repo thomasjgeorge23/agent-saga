@@ -124,6 +124,11 @@ class PreFlightGate:
         self.limits = list(limits)
 
     async def evaluate(self, ctx: GateContext) -> Decision:
+        # Phase 0: is this system allowed to do anything at all? First, so a
+        # halted system does not spend budget deciding to refuse, and does not
+        # wake a human to approve a call it will refuse regardless.
+        self._check_kill_switch(ctx)
+
         reservation = None
         if self.limits:
             reservation = await self._reserve(ctx)
@@ -136,6 +141,23 @@ class PreFlightGate:
             if reservation is not None:
                 await self._release(reservation)
             raise
+
+    # -- kill switch -------------------------------------------------------
+
+    def _check_kill_switch(self, ctx: GateContext) -> None:
+        from .killswitch import Halted, get_kill_switch
+        from .observability import current_correlation
+
+        switch = get_kill_switch()
+        if switch is None:
+            return
+        saga_id, _ = current_correlation()
+        try:
+            switch.check_step(tool=ctx.tool, saga_id=saga_id or "")
+        except Halted as exc:
+            raise PreFlightViolation(
+                Decision(Verdict.BLOCK, f"kill-switch:{exc.scope}", str(exc)),
+                ctx) from exc
 
     # -- limits ------------------------------------------------------------
 

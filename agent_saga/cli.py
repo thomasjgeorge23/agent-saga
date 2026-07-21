@@ -231,6 +231,73 @@ def _cmd_approvals(args: argparse.Namespace) -> int:
     return 0
 
 
+def _switch(args: argparse.Namespace):
+    from .killswitch import FileSwitchStore, KillSwitch
+
+    if getattr(args, "redis", None):
+        from .killswitch import RedisSwitchStore
+
+        return KillSwitch(RedisSwitchStore(args.redis))
+    return KillSwitch(FileSwitchStore(args.file))
+
+
+def _cmd_halt(args: argparse.Namespace) -> int:
+    if not args.by or not args.reason:
+        print("--by and --reason are required: an anonymous halt with no stated "
+              "cause is the hardest thing to safely lift later")
+        return 2
+    switch = _switch(args)
+    result = switch.halt(scope=args.scope, reason=args.reason, by=args.by,
+                         ttl=args.ttl, drain=args.drain)
+    print(result.summary())
+    if not getattr(switch.store, "distributed", False):
+        print("\nWARNING: this store is not distributed. Other processes will "
+              "keep running. Use --redis for a fleet.")
+    return 0
+
+
+def _cmd_resume(args: argparse.Namespace) -> int:
+    if _switch(args).resume(scope=args.scope, by=args.by):
+        print(f"resumed {args.scope}")
+        return 0
+    print(f"nothing halted at scope {args.scope}")
+    return 1
+
+
+def _cmd_status(args: argparse.Namespace) -> int:
+    status = _switch(args).status()
+    print(f"store       : {status['store']} "
+          f"({'distributed' if status['distributed'] else 'LOCAL ONLY'})")
+    print(f"reachable   : {status['reachable']}"
+          + (f" (degraded {status['degraded_for']}s)" if status["degraded_for"] else ""))
+    if not status["switches"] and not status["quarantined"]:
+        print("state       : RUNNING (nothing halted)")
+        return 0
+    for line in status["switches"]:
+        print(f"halt        : {line}")
+    for saga_id, info in status["quarantined"].items():
+        print(f"quarantined : {saga_id} by {info.get('by', '-')}: {info.get('reason', '')}")
+    return 0
+
+
+def _cmd_quarantine(args: argparse.Namespace) -> int:
+    switch = _switch(args)
+    if args.release:
+        if switch.release(args.saga_id, by=args.by):
+            print(f"released {args.saga_id}")
+            return 0
+        print(f"{args.saga_id} was not quarantined")
+        return 1
+    if not args.by or not args.reason:
+        print("--by and --reason are required")
+        return 2
+    switch.quarantine(args.saga_id, reason=args.reason, by=args.by)
+    print(f"quarantined {args.saga_id}. It will make no further calls and the "
+          f"recovery daemon will not touch it.")
+    print("This is a freeze, not a rollback -- nothing has been undone.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="agent-saga", description="agent-saga tooling")
     sub = p.add_subparsers(dest="command", required=True)
@@ -301,6 +368,43 @@ def build_parser() -> argparse.ArgumentParser:
     appr.add_argument("--redis", default=None,
                       help="use a Redis store instead, e.g. redis://localhost:6379/0")
     appr.set_defaults(func=_cmd_approvals)
+
+    def _switch_args(sp):
+        sp.add_argument("--file", default="./.agent-saga-switch.json",
+                        help="switch file (default: ./.agent-saga-switch.json)")
+        sp.add_argument("--redis", default=None,
+                        help="use a Redis store instead -- required for a fleet")
+        return sp
+
+    halt = _switch_args(sub.add_parser(
+        "halt", help="stop agents performing side effects, now"))
+    halt.add_argument("--scope", default="*",
+                      help="'*', 'tool:<name>', 'tool:<prefix>.*' or 'tag:<name>' "
+                           "(default: everything)")
+    halt.add_argument("--reason", default="", help="why; recorded and shown")
+    halt.add_argument("--by", default="", help="who; recorded and shown")
+    halt.add_argument("--ttl", type=float, default=0.0,
+                      help="auto-lift after N seconds (a halt nobody lifts is "
+                           "its own outage)")
+    halt.add_argument("--drain", action="store_true",
+                      help="let running sagas finish, start no new ones")
+    halt.set_defaults(func=_cmd_halt)
+
+    resume = _switch_args(sub.add_parser("resume", help="lift a halt"))
+    resume.add_argument("--scope", default="*")
+    resume.add_argument("--by", default="")
+    resume.set_defaults(func=_cmd_resume)
+
+    status = _switch_args(sub.add_parser("status", help="what is halted right now"))
+    status.set_defaults(func=_cmd_status)
+
+    quar = _switch_args(sub.add_parser(
+        "quarantine", help="freeze one saga for investigation (not a rollback)"))
+    quar.add_argument("saga_id")
+    quar.add_argument("--reason", default="")
+    quar.add_argument("--by", default="")
+    quar.add_argument("--release", action="store_true", help="un-quarantine it")
+    quar.set_defaults(func=_cmd_quarantine)
     return p
 
 

@@ -273,6 +273,54 @@ async def checkout():
 
 During shutdown, the lifespan manager gracefully cancels the recovery daemon, awaits any pending compensations for active sagas, releases held semantic locks, and flushes the write-ahead log.
 
+## Kill switch and quarantine
+
+The first question in an incident is *"how do I make it stop"*, and nothing else
+here answers it. Limits cap a rate; the gate refuses a category. Neither helps at
+03:00 when an agent is doing something nobody predicted.
+
+```bash
+agent-saga halt --scope tool:wire.send --reason "fraud pattern" --by soc@corp
+agent-saga halt --drain --reason "deploying" --by ci@corp --ttl 600
+agent-saga quarantine saga-8f3c --reason "suspected duplicate charges" --by soc@corp
+agent-saga status
+agent-saga resume --scope tool:wire.send --by soc@corp
+```
+
+Four levers, because "stop" isn't one thing:
+
+- **HALT** — refuse new side effects immediately, globally or scoped to
+  `tool:wire.send`, `tool:stripe.*`, or `tag:eu`. An operator who can *only* stop
+  everything will hesitate to stop anything.
+- **DRAIN** — start no new sagas, let running ones finish. Blocking their
+  remaining steps would strand every one half-done, which is the opposite of
+  draining.
+- **QUARANTINE** — freeze one saga. Explicitly **not** a rollback: during an
+  incident, automatically reversing a hundred sagas can be far worse than leaving
+  them still. The saga stops, *the recovery daemon skips it*, and a human decides.
+- **TTL** — a halt nobody remembers to lift is its own outage.
+
+Checked before limits and approvals, so a halted system doesn't spend budget
+deciding to refuse or wake a human to approve a call it will reject anyway. Who
+halted it, why, and when all land in the hash-chained WAL.
+
+> **The one place this library deliberately does not fail closed.** Everywhere
+> else, an unreachable backend refuses. Applied here that would make the kill
+> switch the largest availability risk you own — a Redis blip halting every agent
+> everywhere, the control installed to contain an incident causing one. Failing
+> open instead lets anyone who can take the store down bypass the switch. So
+> neither: the last known state is cached and honoured for a bounded `grace`
+> window. A blip is survived; an outage is not a bypass, because once grace
+> expires it fails closed. Set `grace=0` for maximum safety and accept that a
+> store outage becomes a fleet outage — that tradeoff is yours to own, which is
+> why it's a constructor argument and not a hidden default.
+
+`FileSwitchStore` is the zero-setup default and warns loudly at install time that
+it only stops *this process*. A kill switch that stops one pod is not a kill
+switch — use `RedisSwitchStore` for a fleet, and name it in your runbook.
+
+---
+
 ## Human approvals
 
 The gate can refuse. Refusing is often the wrong answer — what a bank actually

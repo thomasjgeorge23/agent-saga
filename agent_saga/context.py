@@ -236,6 +236,16 @@ class SagaContext:
     # a PID is not, because PIDs are reused.
 
     async def begin(self) -> None:
+        # A draining system lets running sagas finish but starts no new ones.
+        # Checked here rather than in the gate because the gate sees steps, and
+        # refusing a *step* mid-saga would strand it half-done -- the opposite
+        # of draining.
+        from .killswitch import get_kill_switch
+
+        switch = get_kill_switch()
+        if switch is not None:
+            switch.check_start()
+
         # Bind the correlation id for the whole saga, so every log line emitted
         # under this context -- forward calls, the failure, all compensations --
         # carries the same saga_id an operator can grep on.
