@@ -269,7 +269,7 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (287 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (332 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
@@ -297,6 +297,11 @@ with only `pytest`; optional extras add their own SDKs):
   like a fresh refund). The key is auto-injected into handlers that accept it,
   and an execution ledger reads both the daemon journal and the crashed
   process's own WAL, so completed work is skipped rather than repeated.
+- Bounded over time on **both** backends: `FileWAL.compact()` rewrites the log
+  keeping only unresolved sagas (atomic temp-file + `os.replace`, serialised
+  against the flusher so a swap cannot lose a record), and
+  `RecoveryDaemon.compact()` computes the keep-set for you with a grace period.
+  A backend that cannot compact raises rather than silently no-opping.
 - Bounded over time, not just correct on day one: a recovery sweep reads the
   log once (it used to re-read it per saga -- quadratic), `read_all()` pages in
   chunks, `read_since(gseq)` gives a cursor, the Redis ledger answers
