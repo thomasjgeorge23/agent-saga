@@ -32,6 +32,15 @@ from .recovery import (
 )
 from .registry import compensator, registered, resolve
 from .semantics import ActionSemantics, Compensation, SagaStep, StepState
+from .durable import (
+    FileSnapshotStore,
+    SnapshotStore,
+    StaleFile,
+    get_snapshot_store,
+    restore_file,
+    set_snapshot_store,
+    snapshot_file,
+)
 from .snapshot import (
     AttributeSnapshot,
     MappingSnapshot,
@@ -84,5 +93,12 @@ __all__ = [
     "SnapshotStrategy",
     "auto_strategy",
     "reversible",
+    "FileSnapshotStore",
+    "SnapshotStore",
+    "StaleFile",
+    "get_snapshot_store",
+    "restore_file",
+    "set_snapshot_store",
+    "snapshot_file",
     "__version__",
 ]
