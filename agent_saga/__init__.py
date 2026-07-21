@@ -132,7 +132,7 @@ from .wal import (
     WALStalled,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "SagaOps"
 
 __all__ = [
