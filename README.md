@@ -159,19 +159,28 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Core engine, recovery daemon (truncation-tolerant),
-three reference connectors, adapters for LangGraph, CrewAI, and the OpenAI
-Agents SDK, the time-travel debugger, in-process (`REVERSIBLE`) and durable
-crash-recoverable (`COMPENSABLE`) snapshot capture, a snapshot-store GC sweep,
-and a configurable WAL backpressure policy (`RAISE` by default — never silently
-drops a record) are implemented and tested (158 tests; the suite runs with only
-`pytest`, and each adapter's integration tests use its own SDK when installed).
+Pre-alpha, by SagaOps. Implemented and tested (176 tests; the base suite runs
+with only `pytest`; optional extras add their own SDKs):
+
+- Core engine, recovery daemon (truncation-tolerant), time-travel debugger.
+- Connectors: Stripe, Postgres (full CRUD — update/insert/delete with compound
+  primary keys), Salesforce.
+- Adapters: LangGraph, CrewAI, OpenAI Agents SDK.
+- Snapshot capture: in-process (`REVERSIBLE`) and durable crash-recoverable
+  (`COMPENSABLE`), with a conservative store GC sweep.
+- Durability & safety: configurable WAL backpressure (`RAISE` by default —
+  never silently drops a record), and optional BYOK WAL-at-rest encryption
+  (`pip install agent-saga[encryption]`; key via `AGENT_SAGA_WAL_KEY` or an
+  injected encryptor — a reader without the key fails loud, never silent).
+- Recovery locking: an injectable lock interface, defaulting to a local file
+  lock (no Redis in-tree — supply a distributed backend if you run a fleet).
+
 Not yet published to PyPI.
 
-Known-pending hardening, tracked openly (see [SECURITY.md](SECURITY.md)):
-WAL-at-rest encryption, authentication on the debugger UI, a distributed
-(non-filesystem) recovery lock, async-native connectors, full CRUD/compound-key
-Postgres coverage, and LlamaIndex / AutoGen adapters.
+Known-pending, tracked openly (see [SECURITY.md](SECURITY.md)): a shipped
+distributed lock backend, authentication on the debugger UI, async-native
+connectors, and LlamaIndex / AutoGen adapters. KMS/Vault key resolution is an
+intended Enterprise-tier feature, deliberately absent from this BYOK core.
 
 ## License
 

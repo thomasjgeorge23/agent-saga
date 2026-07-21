@@ -211,4 +211,194 @@ async def update_row(
     )
 
 
-__all__ = ["update_row", "restore_row", "ConcurrentModification"]
+# ==========================================================================
+# INSERT -> DELETE
+# ==========================================================================
+
+@compensator("postgres.delete_inserted_row")
+def delete_inserted_row(table: str, pk: dict, credential_ref: str) -> dict:
+    """Undo an insert by deleting the row we created. Idempotent: zero rows
+    affected means it is already gone, which is success, not failure."""
+    tbl = _qualified(table)
+    where = " AND ".join(f"{_ident(c, kind='column')} = %s" for c in pk)
+    conn, driver = _connect(credential_ref)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"DELETE FROM {tbl} WHERE {where}", list(pk.values()))
+            affected = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    logger.info("deleted inserted %s row pk=%r (%d row(s), driver=%s)",
+                table, pk, affected, driver)
+    return {"table": table, "pk": pk, "deleted": affected}
+
+
+async def insert_row(
+    ctx,
+    *,
+    pool,
+    table: str,
+    values: dict,
+    pk_columns: list[str],
+    credential_ref: str,
+) -> dict:
+    """Insert a row inside a saga, registering a DELETE of exactly that row as
+    the inverse. `pk_columns` names the primary key (compound keys allowed); the
+    inserted PK is read back via RETURNING so a serial/identity key is known."""
+    if not values:
+        raise ValueError("values must not be empty")
+
+    tbl = _qualified(table)
+    cols = list(values)
+    col_sql = ", ".join(_ident(c, kind="column") for c in cols)
+    placeholders = ", ".join(f"${i + 1}" for i in range(len(cols)))
+    returning = ", ".join(_ident(c, kind="column") for c in pk_columns)
+
+    async def _forward():
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"INSERT INTO {tbl} ({col_sql}) VALUES ({placeholders}) RETURNING {returning}",
+                *[values[c] for c in cols],
+            )
+            return dict(row)
+
+    def _compensate(pk_row: Any) -> Optional[Compensation]:
+        if pk_row is None:
+            # UNKNOWN. If the PK was caller-supplied we can still delete by it;
+            # a serial key we never read back cannot be targeted -> escalate.
+            if all(c in values for c in pk_columns):
+                pk = {c: values[c] for c in pk_columns}
+            else:
+                logger.error(
+                    "insert into %s had an UNKNOWN outcome and the PK is "
+                    "server-generated; cannot target a delete. Reconcile by hand.",
+                    table)
+                return None
+        else:
+            pk = dict(pk_row)
+
+        kwargs = {"table": table, "pk": pk, "credential_ref": credential_ref}
+        assert_no_secrets(kwargs, where="postgres.insert_row")
+        return Compensation(
+            fn=delete_inserted_row,
+            handler="postgres.delete_inserted_row",
+            kwargs=kwargs,
+            description=f"delete inserted {table} row pk={pk!r}",
+        )
+
+    return await ctx.execute(
+        tool="postgres.insert_row",
+        semantics=ActionSemantics.COMPENSABLE,
+        forward=_forward,
+        compensate=_compensate,
+        policy_args={"table": table, "columns": cols},
+    )
+
+
+# ==========================================================================
+# DELETE -> REINSERT
+# ==========================================================================
+
+@compensator("postgres.reinsert_row")
+def reinsert_row(table: str, row: dict, pk_columns: list, credential_ref: str) -> dict:
+    """Undo a delete by re-inserting the captured row -- unless a row with the
+    same key already exists, which means the delete never landed (UNKNOWN) or
+    someone recreated it. Reinserting then would either duplicate or overwrite,
+    so we refuse and escalate."""
+    tbl = _qualified(table)
+    where = " AND ".join(f"{_ident(c, kind='column')} = %s" for c in pk_columns)
+    cols = list(row)
+    col_sql = ", ".join(_ident(c, kind="column") for c in cols)
+    placeholders = ", ".join("%s" for _ in cols)
+
+    conn, driver = _connect(credential_ref)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT 1 FROM {tbl} WHERE {where}",
+                        [row[c] for c in pk_columns])
+            if cur.fetchone() is not None:
+                raise ConcurrentModification(
+                    f"{table} row with pk {{{', '.join(pk_columns)}}} already "
+                    f"exists; the delete did not land or the row was recreated. "
+                    f"Refusing to reinsert."
+                )
+            cur.execute(
+                f"INSERT INTO {tbl} ({col_sql}) VALUES ({placeholders})",
+                [row[c] for c in cols],
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    logger.info("reinserted %s row (%d column(s), driver=%s)", table, len(cols), driver)
+    return {"table": table, "reinserted": True}
+
+
+async def delete_row(
+    ctx,
+    *,
+    pool,
+    table: str,
+    pk: dict,
+    credential_ref: str,
+) -> dict:
+    """Delete a row inside a saga, capturing the whole row first so the inverse
+    is a re-insert. `pk` maps primary-key column(s) to value(s); compound keys
+    are supported.
+
+    The snapshot is taken before the DELETE and held in a closure, so the row is
+    reversible even on an UNKNOWN outcome (a timed-out DELETE). The reinsert
+    guard makes that safe: if the delete never landed, the row still exists and
+    the guard refuses rather than duplicating it.
+    """
+    if not pk:
+        raise ValueError("pk must not be empty")
+
+    tbl = _qualified(table)
+    where_sql = " AND ".join(f"{_ident(c, kind='column')} = ${i + 1}"
+                             for i, c in enumerate(pk))
+    pk_values = list(pk.values())
+    captured: dict = {}
+
+    async def _forward():
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(f"SELECT * FROM {tbl} WHERE {where_sql}", *pk_values)
+            if row is None:
+                raise LookupError(f"no row in {table} where pk={pk!r}")
+            captured["row"] = dict(row)   # before the delete, for UNKNOWN safety
+            await conn.execute(f"DELETE FROM {tbl} WHERE {where_sql}", *pk_values)
+            return dict(row)
+
+    def _compensate(row_snapshot: Any) -> Optional[Compensation]:
+        row = row_snapshot if row_snapshot is not None else captured.get("row")
+        if row is None:
+            logger.error(
+                "delete from %s (pk=%r) had an UNKNOWN outcome before the row "
+                "could be read; cannot reinsert. Reconcile by hand.", table, pk)
+            return None
+
+        kwargs = {"table": table, "row": row, "pk_columns": list(pk),
+                  "credential_ref": credential_ref}
+        assert_no_secrets(kwargs, where="postgres.delete_row")
+        return Compensation(
+            fn=reinsert_row,
+            handler="postgres.reinsert_row",
+            kwargs=kwargs,
+            description=f"reinsert deleted {table} row pk={pk!r}",
+        )
+
+    return await ctx.execute(
+        tool="postgres.delete_row",
+        semantics=ActionSemantics.COMPENSABLE,
+        forward=_forward,
+        compensate=_compensate,
+        policy_args={"table": table, "pk": pk},
+    )
+
+
+__all__ = [
+    "update_row", "restore_row",
+    "insert_row", "delete_inserted_row",
+    "delete_row", "reinsert_row",
+    "ConcurrentModification",
+]

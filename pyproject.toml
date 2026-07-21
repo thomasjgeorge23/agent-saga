@@ -28,9 +28,10 @@ openai-agents = ["openai-agents"]
 postgres = ["psycopg>=3.1"]
 stripe = ["stripe>=5.0"]
 salesforce = ["httpx>=0.24"]
+encryption = ["cryptography>=41.0"]
 all = [
     "langchain-core>=0.3", "langgraph>=0.2", "crewai", "openai-agents",
-    "psycopg>=3.1", "stripe>=5.0", "httpx>=0.24",
+    "psycopg>=3.1", "stripe>=5.0", "httpx>=0.24", "cryptography>=41.0",
 ]
 
 [project.scripts]

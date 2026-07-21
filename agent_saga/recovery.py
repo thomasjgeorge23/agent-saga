@@ -169,11 +169,19 @@ class RecoveryDaemon:
         claims_dir: Optional[str | Path] = None,
         daemon_id: Optional[str] = None,
         dry_run: bool = False,
+        lock: Optional["RecoveryLock"] = None,
     ):
         self.wal_path = Path(wal_path)
         self.journal_path = Path(journal_path) if journal_path else self.wal_path.with_suffix(".recovery.jsonl")
         self.claims_dir = Path(claims_dir) if claims_dir else self.wal_path.parent / ".claims"
         self.daemon_id = daemon_id or f"{os.getpid()}-{os.urandom(4).hex()}"
+        # Default to a local file lock; inject a Redis/DB lock for a multi-host
+        # fleet. The lock is a tidiness guard -- deterministic tokens + journal
+        # are what actually prevent double-compensation, so a weaker lock costs
+        # throughput, never safety.
+        from .locks import FileLock
+
+        self.lock = lock or FileLock(self.claims_dir, owner_id=self.daemon_id)
         self.dry_run = dry_run
         """Enterprises will not point this at production until they have watched
         it narrate what it *would* do for a week. Make that the easy path."""
@@ -202,23 +210,12 @@ class RecoveryDaemon:
         return done
 
     def _claim(self, saga_id: str) -> bool:
-        """O_EXCL create is atomic on POSIX and Windows alike. This is the
-        mutual exclusion; the journal is the audit trail."""
-        self.claims_dir.mkdir(parents=True, exist_ok=True)
-        path = self.claims_dir / f"{saga_id}.claim"
-        try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            return False
-        with os.fdopen(fd, "w") as fh:
-            fh.write(json.dumps({"daemon_id": self.daemon_id, "ts": time.time()}))
-        return True
+        """Take the recovery lock for this saga. Delegates to the injected lock
+        backend; the journal remains the audit trail regardless of backend."""
+        return self.lock.acquire(saga_id)
 
     def _release(self, saga_id: str) -> None:
-        try:
-            (self.claims_dir / f"{saga_id}.claim").unlink()
-        except FileNotFoundError:
-            pass
+        self.lock.release(saga_id)
 
     # -- scanning ----------------------------------------------------------
 
@@ -232,6 +229,15 @@ class RecoveryDaemon:
 
         self.parse_stats = ParseStats()
         records = list(iter_records(self.wal_path, self.parse_stats))
+        if self.parse_stats.encrypted_skipped:
+            # Fail loud: a daemon that read an encrypted WAL as empty would
+            # silently abandon every crashed saga in it.
+            raise RuntimeError(
+                f"{self.wal_path} contains {self.parse_stats.encrypted_skipped} "
+                f"encrypted record(s) but no WAL key is configured. Set "
+                f"AGENT_SAGA_WAL_KEY (or set_wal_encryptor) with the writer's key "
+                f"before running recovery."
+            )
         if self.parse_stats.corrupt_lines:
             logger.warning(
                 "WAL %s had %d unparseable line(s) (likely a truncated final "

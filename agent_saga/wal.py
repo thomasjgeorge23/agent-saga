@@ -57,6 +57,10 @@ class WALBackpressure(RuntimeError):
 DROPPED = -1
 """append() sentinel: the record was NOT written. Never a valid seq."""
 
+_UNSET = object()
+"""Distinguishes 'no encryptor argument given' (resolve from env) from an
+explicit None (force plaintext)."""
+
 
 class AsyncWAL:
     def __init__(
@@ -65,8 +69,14 @@ class AsyncWAL:
         *,
         max_buffer: int = 100_000,
         backpressure: BackpressurePolicy = BackpressurePolicy.RAISE,
+        encryptor: Any = _UNSET,
     ):
         self.path = Path(path) if path else None
+        # _UNSET -> resolve from the environment/module at start(); an explicit
+        # value (including None) overrides. None means plaintext even if a key
+        # is set in the environment.
+        self._encryptor_arg = encryptor
+        self._encryptor = None
         self._buf: deque = deque()
         self._seq = 0
         self._durable_seq = 0
@@ -88,6 +98,10 @@ class AsyncWAL:
         durable path scales with concurrency instead of collapsing."""
 
     async def start(self) -> None:
+        from .encryption import get_wal_encryptor
+
+        self._encryptor = (get_wal_encryptor() if self._encryptor_arg is _UNSET
+                           else self._encryptor_arg)
         if self.path:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self._fh = open(self.path, "a", encoding="utf-8")
@@ -194,8 +208,10 @@ class AsyncWAL:
 
     def _write_batch(self, batch: list[dict]) -> None:
         """Runs on a worker thread. Single writer, so no lock is required."""
+        from .encryption import encode_line
+
         assert self._fh is not None
-        self._fh.write("".join(json.dumps(r, default=str) + "\n" for r in batch))
+        self._fh.write("".join(encode_line(r, self._encryptor) + "\n" for r in batch))
         self._fh.flush()
         os.fsync(self._fh.fileno())
         self.flush_cycles += 1
@@ -229,11 +245,22 @@ class AsyncWAL:
 
     def records(self) -> list[dict]:
         """Replay support. Reads what is durable on disk, not what is buffered --
-        deliberately, so tests assert on crash-survivable state only."""
+        deliberately, so tests assert on crash-survivable state only. Decrypts
+        with the configured key; a truncated final line is skipped."""
+        from .encryption import decode_line
+
         if not self.path or not self.path.exists():
             return []
+        out = []
         with open(self.path, encoding="utf-8") as fh:
-            return [json.loads(line) for line in fh if line.strip()]
+            for line in fh:
+                if not line.strip():
+                    continue
+                try:
+                    out.append(decode_line(line, self._encryptor))
+                except (json.JSONDecodeError, ValueError):
+                    continue  # truncated/corrupt tail
+        return out
 
 
-__all__ = ["AsyncWAL"]
+__all__ = ["AsyncWAL", "BackpressurePolicy", "WALBackpressure", "DROPPED"]

@@ -35,6 +35,9 @@ from typing import Any, Iterator, Optional
 
 from ..connectors._secrets import _PATTERNS, _SUSPICIOUS_KEYS
 
+_UNSET = object()
+"""Sentinel: resolve the encryptor from the environment when not passed."""
+
 REDACTED = "« redacted »"
 _MAX_STR = 2000  # keep a runaway kwarg from bloating the API response
 
@@ -74,15 +77,27 @@ def scrub(value: Any, *, key: Optional[str] = None) -> Any:
 class ParseStats:
     total_lines: int = 0
     corrupt_lines: int = 0
+    encrypted_skipped: int = 0
+    """Encrypted lines that could not be read because no key was configured.
+    Distinct from corrupt: this is a misconfiguration to surface loudly, not
+    garbage to shrug off. The recovery daemon refuses to run when it is non-zero."""
 
 
-def iter_records(path: Path, stats: Optional[ParseStats] = None) -> Iterator[dict]:
-    """Yield one parsed JSON object per line, skipping unparseable lines.
+def iter_records(
+    path: Path,
+    stats: Optional[ParseStats] = None,
+    *,
+    encryptor: Any = _UNSET,
+) -> Iterator[dict]:
+    """Yield one parsed record per line, skipping unparseable lines.
 
-    Only a partial final line is expected in practice, but any bad line is
-    tolerated -- the alternative is a viewer that dies on the exact corruption
-    it exists to investigate.
+    A partial final line (crash mid-write) is the expected bad case and is
+    tolerated. An *encrypted* line with no key is counted separately, because a
+    reader that silently dropped it would misreport an encrypted WAL as empty.
     """
+    from ..encryption import EncryptedRecordError, decode_line, get_wal_encryptor
+
+    enc = get_wal_encryptor() if encryptor is _UNSET else encryptor
     if not path.exists():
         return
     with open(path, "r", encoding="utf-8") as fh:
@@ -93,7 +108,11 @@ def iter_records(path: Path, stats: Optional[ParseStats] = None) -> Iterator[dic
             if stats is not None:
                 stats.total_lines += 1
             try:
-                rec = json.loads(line)
+                rec = decode_line(line, enc)
+            except EncryptedRecordError:
+                if stats is not None:
+                    stats.encrypted_skipped += 1
+                continue
             except (json.JSONDecodeError, ValueError):
                 if stats is not None:
                     stats.corrupt_lines += 1

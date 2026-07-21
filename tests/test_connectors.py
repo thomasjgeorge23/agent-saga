@@ -313,6 +313,7 @@ def fake_psycopg(rowcount=1, executed=None):
         def __enter__(self): return self
         def __exit__(self, *a): return False
         def execute(self, sql, params): executed.append((sql, params))
+        def fetchone(self): return None   # reinsert guard: no existing row
 
     class Conn:
         def cursor(self): return Cur()
@@ -394,6 +395,126 @@ def test_postgres_accepts_schema_qualified_names():
     from agent_saga.connectors import postgres as pg
 
     assert pg._qualified("crm.leads") == '"crm"."leads"'
+
+
+@aio
+async def test_postgres_insert_rolls_back_with_a_delete_of_the_returned_pk():
+    from agent_saga.connectors import postgres as pg
+
+    class InsertPool:
+        def __init__(self): self.q = []
+        @contextlib.asynccontextmanager
+        async def acquire(self):
+            yield self
+        async def fetchrow(self, sql, *args):
+            self.q.append((sql, args))
+            return {"id": 501}          # serial PK read back via RETURNING
+    pool = InsertPool()
+    mod = fake_psycopg(rowcount=1)
+
+    with tempfile.TemporaryDirectory() as d, credential("pg_t", "postgresql://h/db"):
+        with fake_module("psycopg", mod):
+            ctx, wal = await _ctx(Path(d))
+            await pg.insert_row(ctx, pool=pool, table="leads",
+                                values={"name": "Ada"}, pk_columns=["id"],
+                                credential_ref="pg_t")
+            assert "RETURNING" in pool.q[0][0]
+            report = await ctx.rollback()
+            await wal.close()
+
+    assert report.clean
+    sql, params = mod.executed[0]
+    assert sql.startswith("DELETE FROM")
+    assert params == [501]              # deletes exactly the inserted row
+
+
+@aio
+async def test_postgres_delete_rolls_back_by_reinserting_the_captured_row():
+    from agent_saga.connectors import postgres as pg
+
+    class DeletePool:
+        def __init__(self): self.q = []
+        @contextlib.asynccontextmanager
+        async def acquire(self):
+            yield self
+        async def fetchrow(self, sql, *args):
+            self.q.append((sql, args))
+            return {"id": 7, "name": "Ada", "status": "won"}   # SELECT * snapshot
+        async def execute(self, sql, *args):
+            self.q.append((sql, args))
+    pool = DeletePool()
+    mod = fake_psycopg(rowcount=1)
+
+    with tempfile.TemporaryDirectory() as d, credential("pg_t", "postgresql://h/db"):
+        with fake_module("psycopg", mod):
+            ctx, wal = await _ctx(Path(d))
+            await pg.delete_row(ctx, pool=pool, table="leads", pk={"id": 7},
+                                credential_ref="pg_t")
+            report = await ctx.rollback()
+            await wal.close()
+
+    assert report.clean
+    # reinsert_row first checks existence (guard), then INSERTs the whole row.
+    kinds = [q[0].split()[0] for q in mod.executed]
+    assert kinds == ["SELECT", "INSERT"]
+    insert_sql, insert_params = mod.executed[1]
+    assert set(insert_params) == {7, "Ada", "won"}
+
+
+def test_postgres_reinsert_refuses_when_the_row_already_exists():
+    """UNKNOWN delete (or a recreated row): the guard must refuse rather than
+    duplicate or overwrite."""
+    from agent_saga.connectors import postgres as pg
+
+    class ExistsCursor:
+        def __init__(self): self.rowcount = 1
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def execute(self, sql, params): self._sql = sql
+        def fetchone(self): return (1,)   # row already present
+
+    class Conn:
+        def cursor(self): return ExistsCursor()
+        def commit(self): pass
+        def close(self): pass
+
+    mod = types.ModuleType("psycopg")
+    mod.connect = lambda dsn: Conn()
+
+    with credential("pg_t", "postgresql://h/db"):
+        with fake_module("psycopg", mod):
+            with pytest.raises(pg.ConcurrentModification, match="already"):
+                pg.reinsert_row(table="leads", row={"id": 7, "name": "Ada"},
+                                pk_columns=["id"], credential_ref="pg_t")
+
+
+@aio
+async def test_postgres_delete_supports_compound_primary_keys():
+    from agent_saga.connectors import postgres as pg
+
+    class DeletePool:
+        def __init__(self): self.q = []
+        @contextlib.asynccontextmanager
+        async def acquire(self):
+            yield self
+        async def fetchrow(self, sql, *args):
+            self.q.append((sql, args))
+            return {"org": "acme", "user": "ada", "role": "admin"}
+        async def execute(self, sql, *args):
+            self.q.append((sql, args))
+    pool = DeletePool()
+
+    with tempfile.TemporaryDirectory() as d, credential("pg_t", "postgresql://h/db"):
+        with fake_module("psycopg", fake_psycopg()):
+            ctx, wal = await _ctx(Path(d))
+            await pg.delete_row(ctx, pool=pool, table="memberships",
+                                pk={"org": "acme", "user": "ada"},
+                                credential_ref="pg_t")
+            await wal.close()
+
+    select_sql, select_args = pool.q[0]
+    assert '"org" = $1' in select_sql and '"user" = $2' in select_sql
+    assert select_args == ("acme", "ada")
 
 
 @aio

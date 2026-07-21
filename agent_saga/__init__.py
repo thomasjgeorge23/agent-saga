@@ -41,7 +41,16 @@ from .durable import (
     set_snapshot_store,
     snapshot_file,
 )
+from .encryption import (
+    EncryptedRecordError,
+    FernetEncryptor,
+    WALEncryptor,
+    generate_key,
+    get_wal_encryptor,
+    set_wal_encryptor,
+)
 from .gc import GCReport, SnapshotGC
+from .locks import FileLock, InProcessLock, RecoveryLock
 from .snapshot import (
     AttributeSnapshot,
     MappingSnapshot,
@@ -105,5 +114,14 @@ __all__ = [
     "snapshot_file",
     "GCReport",
     "SnapshotGC",
+    "EncryptedRecordError",
+    "FernetEncryptor",
+    "WALEncryptor",
+    "generate_key",
+    "get_wal_encryptor",
+    "set_wal_encryptor",
+    "FileLock",
+    "InProcessLock",
+    "RecoveryLock",
     "__version__",
 ]
