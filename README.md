@@ -1,8 +1,9 @@
 # agent-saga
 
 **The undo button for AI agents.** Transactional boundaries, typed compensation
-semantics, and a pre-flight safety gate for autonomous agents that call real
-APIs, mutate real databases, and move real money.
+semantics, and a pre-flight safety gate for autonomous agents that provision
+infrastructure, write to vector stores, open tickets and PRs, message people —
+and, yes, move money.
 
 When an agent hallucinates halfway through a multi-step task, the side effects
 it already caused are still real. `agent-saga` wraps each tool call, records a
@@ -10,7 +11,8 @@ runtime-derived inverse action, and unwinds the whole transaction — in-process
 on failure, or from a separate recovery daemon if the process itself dies.
 
 ```bash
-python examples/demo.py   # no credentials, no database, no network required
+python examples/multi_domain.py   # 5 systems, 1 transaction, no network needed
+python examples/chaos_demo.py     # optimistic vs. transactional, side by side
 ```
 
 ---
@@ -19,11 +21,16 @@ python examples/demo.py   # no credentials, no database, no network required
 
 **Undo is not one thing.** Every side effect is classified:
 
-| Semantics | Meaning | Example |
+| Semantics | Meaning | Examples across domains |
 |---|---|---|
-| `REVERSIBLE` | Restored exactly; no observer can tell | in-memory cache write |
-| `COMPENSABLE` | Offset by an inverse, but the trace is permanent | Stripe refund, CRM field revert |
-| `IRREVERSIBLE` | No automated undo exists | outbound email, wire transfer |
+| `REVERSIBLE` | Restored exactly; no observer can tell | scratch file the saga created, in-process cache, a Terraform plan not yet applied |
+| `COMPENSABLE` | Offset by an inverse, but the trace is permanent | terminate an EC2 instance, delete a Pinecone namespace, close a Jira ticket, close a GitHub PR, delete a Slack message, Stripe refund |
+| `IRREVERSIBLE` | No automated undo exists | Twilio SMS, SendGrid email, `DROP TABLE` with no snapshot, a wire transfer, a Cloudflare purge that already served stale content |
+
+The classification is the point. Deleting a Slack message is *compensable*; a
+push notification already on someone's phone is not. Terminating an instance is
+compensable; the hour you were billed for is not. The engine makes you say which
+one you have, and refuses to start the third kind without a human.
 
 **The compensation is derived at runtime, not declared up front.** A workflow
 engine makes you hard-code the compensating step when you write the code. But an
@@ -37,21 +44,90 @@ boundary without a human on the hook. The gate runs *before* any side effect —
 the only point at which refusal is free.
 
 ```python
-from agent_saga import saga, tool, ActionSemantics, Compensation
+from agent_saga import saga_scope, ActionSemantics, Compensation
 
-@tool(semantics=ActionSemantics.COMPENSABLE,
-      compensate=lambda result: Compensation(
-          fn=refund, handler="stripe.refund",
-          kwargs={"charge_id": result["id"]}))
-def charge_customer(customer_id, amount):
-    return stripe.Charge.create(customer=customer_id, amount=amount)
+C = ActionSemantics.COMPENSABLE
 
-@saga
-async def agent_run():
-    await charge_customer(customer_id="cus_1", amount=4200)
-    await update_crm(record_id="acct_1", status="customer")
-    # any exception here rolls back the charge (refund) AND the CRM edit, LIFO
+async with saga_scope() as saga:
+    # 1. infrastructure
+    box = await saga.execute(
+        tool="aws.run_instances", semantics=C,
+        forward=lambda: ec2.run_instances(ImageId=ami, InstanceType="m6i.large"),
+        compensate=lambda r: Compensation(
+            fn=terminate, handler="aws.terminate_instance",
+            kwargs={"instance_id": r["Instances"][0]["InstanceId"]}))
+
+    # 2. vector store
+    await saga.execute(
+        tool="pinecone.create_namespace", semantics=C,
+        forward=lambda: index.create_namespace("acme"),
+        compensate=lambda r: Compensation(
+            fn=drop_ns, handler="pinecone.delete_namespace",
+            kwargs={"namespace": r["namespace"]}))
+
+    # 3. ticket
+    await saga.execute(
+        tool="jira.create_issue", semantics=C,
+        forward=lambda: jira.create_issue(project="ONB", summary="Onboard acme"),
+        compensate=lambda r: Compensation(
+            fn=close, handler="jira.close_issue",
+            kwargs={"issue_key": r["key"]}))
+
+    # the agent hallucinates a region here and raises →
+    # PR closed, ticket closed, namespace dropped, instance terminated. LIFO.
 ```
+
+The compensating action is a *factory over the forward result*, because you
+cannot terminate an `instance_id` you have not seen yet — the same reason you
+cannot refund a `charge_id` you have not seen yet.
+
+---
+
+## Spend and rate limits
+
+A per-call threshold is not a spending control. `arg_exceeds("amount", 1000)`
+inspects one call, so an agent issuing 1,000 charges of $999 satisfies it every
+single time and moves $999,000. "No more than $50k a day" is a statement about a
+*window*, and answering it requires state.
+
+```python
+from agent_saga import PreFlightGate, BudgetLimit, RateLimit, by_arg, combine, by_tool
+
+gate = PreFlightGate(limits=[
+    BudgetLimit("daily-spend", arg="amount", max_total=50_000, window=86_400),
+    BudgetLimit("per-customer", arg="amount", max_total=1_000, window=86_400,
+                scope=by_arg("customer_id")),
+    RateLimit("velocity", max_calls=20, window=60, scope=by_tool),
+    # Over budget doesn't have to mean refused — it can mean "ask a director".
+    BudgetLimit("wire-ceiling", arg="amount", max_total=250_000, window=86_400,
+                escalate_to_human=True),
+])
+```
+
+The semantics that matter, all of them deliberate:
+
+- **Limits are checked before rules.** A call already over budget is refused
+  without spending a human's attention approving something that cannot proceed.
+- **All-or-nothing.** A call refused by the third limit leaves the first two
+  undebited.
+- **A refusal hands the budget back** — refusal is the one outcome where we
+  *know* the effect did not happen.
+- **An authorization is permanent.** If the step then fails, the budget stays
+  spent: a timed-out charge may well have reached the card network (the same
+  position `STEP_UNKNOWN` takes). A compensated charge does not earn its budget
+  back either, because an agent looping charge → refund → charge is precisely
+  what a limit exists to stop. The meter measures **gross authorized outflow**,
+  not net balance.
+- **Fails closed.** An unreachable store, a limit that cannot read the amount it
+  was told to police, or an exhausted budget with no approver all `BLOCK`. A
+  limiter that passes calls through when its backend is down is not a limiter.
+
+> **A local budget fails *open* across a fleet.** Unlike a lock, which merely
+> fails to coordinate, ten pods with the default in-process store each grant the
+> full allowance — the effective cap is 10×, silently. Set
+> `set_limit_store(RedisLimitStore(...))` for anything running more than one
+> process. The check-and-debit is a single Lua script, because GET-then-SET
+> would let two nodes both read $49k, both decide $1k fits, and both spend.
 
 ---
 
@@ -78,7 +154,11 @@ process resolves it. `saga-recoveryd` scans the WAL, and:
 
 ## Connectors
 
-Reference implementations, each honest about what it cannot undo:
+Three reference connectors ship today. They are *worked examples* of the three
+compensation classes, not the limit of what the engine covers — any tool call
+you can write an inverse for works the same way (see
+`examples/multi_domain.py`, which spans AWS, Pinecone, Jira, GitHub and Twilio
+with no connector at all).
 
 - **Stripe** (`COMPENSABLE`) — charge with a deterministic refund key; treats
   `charge_already_refunded` as success so a late-returning daemon doesn't loop.
@@ -87,6 +167,10 @@ Reference implementations, each honest about what it cannot undo:
   time), and restores only if no concurrent writer touched the row.
 - **Salesforce** (`COMPENSABLE`) — reverts only the patched fields, filtered to
   writable ones, guarded by `LastModifiedDate`.
+
+Writing your own is the same three lines every time: pick the semantics, give
+`compensate` a factory over the forward result, and register the handler by name
+so `saga-recoveryd` can replay it after a crash.
 
 **Credentials never enter the WAL.** Compensation kwargs are fsynced in plaintext
 and read by another process, so connectors pass a credential *reference*
@@ -120,26 +204,52 @@ flush window share a single fsync, so throughput scales ~linearly (measured 300 
 
 ---
 
-## LangGraph
+## Framework adapters
 
-Drop it into an existing graph without rewriting anything. `wrap_tool` returns a
-`StructuredTool` with the same name, description, and args schema, so the model
-and `ToolNode` see no difference; `saga_run` makes the whole graph run one
+Drop into an existing graph, crew, or agent without rewriting it. `wrap_tool`
+keeps the original name, description, and args schema, so the model and the
+router see no difference; the `saga_run` helper makes the whole run one
 transaction.
 
 ```python
 from agent_saga.adapters.langgraph import wrap_tool, saga_run
 from agent_saga import ActionSemantics, Compensation
 
-safe_charge = wrap_tool(
-    charge_tool,                       # your existing @tool
-    semantics=ActionSemantics.COMPENSABLE,
-    compensate=lambda r: Compensation(
-        fn=refund, handler="stripe.refund", kwargs={"charge_id": r["id"]}))
+C = ActionSemantics.COMPENSABLE
 
-# build your graph with safe_charge in place of charge_tool, then:
+# a DevOps agent: cluster + index + ticket, each with its inverse
+safe_scale = wrap_tool(
+    k8s_scale_deployment,                     # your existing @tool
+    semantics=C,
+    compensate=lambda r: Compensation(
+        fn=scale_back, handler="k8s.scale_deployment",
+        kwargs={"deploy": r["name"], "replicas": r["previous_replicas"]}))
+
+safe_upsert = wrap_tool(
+    qdrant_upsert_points, semantics=C,
+    compensate=lambda r: Compensation(
+        fn=delete_points, handler="qdrant.delete_points",
+        kwargs={"collection": r["collection"], "ids": r["ids"]}))
+
+safe_ticket = wrap_tool(
+    zendesk_create_ticket, semantics=C,
+    compensate=lambda r: Compensation(
+        fn=close_ticket, handler="zendesk.close_ticket",
+        kwargs={"ticket_id": r["id"]}))
+
+# build the graph with the wrapped tools, then:
 result = await saga_run(graph, {"messages": [...]})
 # if any node raises, every tool that already ran is compensated LIFO
+```
+
+The same shape works for **CrewAI**, **AutoGen**, **LlamaIndex**, and the
+**OpenAI Agents SDK** — see `agent_saga/adapters/`. AutoGen wraps a plain
+callable, so it fits whichever of its tool APIs you are on.
+
+```python
+from agent_saga.adapters.autogen  import wrap_tool as autogen_tool
+from agent_saga.adapters.crewai   import wrap_tool as crew_tool
+from agent_saga.adapters.llamaindex import wrap_tool as llama_tool
 ```
 
 ## Time-travel debugger
