@@ -51,6 +51,16 @@ from .integrity import (
     redact_where,
 )
 from .integrity import verify as verify_chain
+from .approvals import (
+    ApprovalGateway,
+    ApprovalPolicy,
+    ApprovalRequest,
+    ConsoleNotifier,
+    EscalationLevel,
+    FileApprovalStore,
+    RedisApprovalStore,
+    WebhookNotifier,
+)
 from .registry import compensator, registered, resolve
 from .semantics import ActionSemantics, Compensation, SagaStep, StepState
 from .durable import (
@@ -158,6 +168,14 @@ __all__ = [
     "arg_exceeds",
     "tool_is",
     "verify_chain",
+    "ApprovalGateway",
+    "ApprovalPolicy",
+    "ApprovalRequest",
+    "EscalationLevel",
+    "FileApprovalStore",
+    "RedisApprovalStore",
+    "WebhookNotifier",
+    "ConsoleNotifier",
     "ChainReport",
     "export_worm",
     "redact_record",

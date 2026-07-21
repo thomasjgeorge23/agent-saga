@@ -183,6 +183,54 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def _approval_store(args: argparse.Namespace):
+    from .approvals import FileApprovalStore
+
+    if getattr(args, "redis", None):
+        from .approvals import RedisApprovalStore
+
+        return RedisApprovalStore(args.redis)
+    return FileApprovalStore(args.dir)
+
+
+def _cmd_approvals(args: argparse.Namespace) -> int:
+    store = _approval_store(args)
+
+    if args.action == "list":
+        pending = store.pending()
+        if not pending:
+            print("no pending approvals")
+            return 0
+        for request in pending:
+            print(request.summary())
+            for key, value in request.context.items():
+                print(f"      {key}: {value}")
+        return 0
+
+    if not args.approver:
+        # An approval with no named approver is an audit trail that proves
+        # nothing, which is the only thing this record exists for.
+        print("--approver is required: an anonymous approval is not an approval")
+        return 2
+
+    granted = args.action == "approve"
+    if args.break_glass and not granted:
+        print("--break-glass only applies to approve")
+        return 2
+
+    request = store.decide(args.id, granted=granted, approver=args.approver,
+                           note=args.note or "", break_glass=args.break_glass)
+    if request is None:
+        print(f"no such approval: {args.id}")
+        return 2
+    if request.decided_at and request.approver != args.approver:
+        print(f"already {request.status} by {request.approver} -- first decision wins")
+        return 1
+    print(f"{request.status} by {request.approver}"
+          + (" (BREAK-GLASS: requires post-hoc review)" if request.break_glass else ""))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="agent-saga", description="agent-saga tooling")
     sub = p.add_subparsers(dest="command", required=True)
@@ -236,6 +284,23 @@ def build_parser() -> argparse.ArgumentParser:
     mcp.add_argument("server", nargs=argparse.REMAINDER,
                      help="the upstream server command, after --")
     mcp.set_defaults(func=_cmd_mcp)
+
+    appr = sub.add_parser(
+        "approvals", help="list and answer pending human approvals")
+    appr.add_argument("action", choices=["list", "approve", "deny"])
+    appr.add_argument("id", nargs="?", default="",
+                      help="approval id (for approve/deny)")
+    appr.add_argument("--approver", default="",
+                      help="who is deciding; required, and recorded")
+    appr.add_argument("--note", default="", help="reason, recorded with the decision")
+    appr.add_argument("--break-glass", action="store_true",
+                      help="emergency override; recorded distinctly and flagged "
+                           "for post-hoc review")
+    appr.add_argument("--dir", default="./.agent-saga-approvals",
+                      help="approval directory (default: ./.agent-saga-approvals)")
+    appr.add_argument("--redis", default=None,
+                      help="use a Redis store instead, e.g. redis://localhost:6379/0")
+    appr.set_defaults(func=_cmd_approvals)
     return p
 
 

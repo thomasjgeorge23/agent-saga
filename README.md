@@ -252,6 +252,68 @@ from agent_saga.adapters.crewai   import wrap_tool as crew_tool
 from agent_saga.adapters.llamaindex import wrap_tool as llama_tool
 ```
 
+## Human approvals
+
+The gate can refuse. Refusing is often the wrong answer — what a bank actually
+wants is *a named human on the hook*, which means a real approval lifecycle, not
+a callback returning a bool.
+
+```python
+from agent_saga import (PreFlightGate, ApprovalGateway, ApprovalPolicy,
+                        EscalationLevel, FileApprovalStore, WebhookNotifier)
+
+gate = PreFlightGate(approval_provider=ApprovalGateway(
+    store=FileApprovalStore(),                       # RedisApprovalStore for a fleet
+    notifier=WebhookNotifier(os.environ["SLACK_WEBHOOK"]),
+    wal=wal,
+    policy=ApprovalPolicy(timeout=900, levels=(
+        EscalationLevel(targets=("@oncall",)),
+        EscalationLevel(targets=("@head-of-risk",), after_seconds=300))),
+))
+```
+
+```bash
+agent-saga approvals list
+  [PENDING] wire.send -- Action cannot be undone (rule irreversible, 42s old, id af83c011)
+        amount: 80000
+        to: acct_9
+agent-saga approvals approve af83c011... --approver risk@corp --note "verified by phone"
+```
+
+What the callback couldn't do, and each is a way a real approval goes wrong:
+
+- **Survive a crash.** Requests are written to a shared store *and the WAL*
+  before anyone is asked, so a dead process doesn't strand an approver's "yes".
+- **Be answered from elsewhere.** The human clicks in Slack, which reaches some
+  web process — not the agent. The decision lands in the store; the waiting saga
+  observes it there. No inbound connectivity to the agent, because agents run in
+  places that have none.
+- **Time out.** Mandatory deadline, and **expiry denies**. An unanswered prompt
+  would otherwise hold the saga's lease, semantic locks and tentative resources
+  open indefinitely.
+- **Escalate.** One person is asleep; the chain asks the next and records that
+  it did.
+- **Not ask twice.** The request id is derived from `(saga, step, tool, rule)`,
+  so a retried step finds its existing decision instead of re-prompting a human
+  whose second answer would authorize a second effect.
+- **Break-glass.** Emergency override grants — and writes a distinct
+  `APPROVAL_BREAK_GLASS` record flagged `requires_review`. A break-glass that
+  looks like a normal approval in the log defeats the point of having one.
+
+Every path fails closed: timeout denies, unreachable store denies, broken Slack
+webhook denies. A failed integration must never authorize spending — and unlike
+a limiter, what an approval control lets through is precisely the action a human
+was meant to see.
+
+The approver, the note, the amount and the timestamp all land in the
+hash-chained WAL, so *"prove no agent moved money without a named human"* is
+answerable by reading the log — and rewriting who approved it breaks the chain.
+
+The CLI refuses an approval with no `--approver`: an anonymous approval is an
+audit trail that proves nothing, which is the only thing the record is for.
+
+---
+
 ## MCP proxy — no change to the agent
 
 Wrapping tools asks the agent's author to refactor the thing they're already
