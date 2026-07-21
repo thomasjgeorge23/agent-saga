@@ -1,0 +1,7 @@
+# Legal texts must stay byte-identical to their canonical upstream form.
+# LICENSE is the unmodified Apache-2.0 text (sha256 cfc7749b96f63bd31c3c...);
+# with core.autocrlf=true a Windows checkout would rewrite it to CRLF, changing
+# that hash and defeating the exact-match detection SPDX scanners and corporate
+# license-compliance tooling rely on. Pin them to LF regardless of platform.
+LICENSE   text eol=lf
+NOTICE    text eol=lf

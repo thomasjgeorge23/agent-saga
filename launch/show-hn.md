@@ -60,7 +60,7 @@ saga pattern in a decorator":
    crash, runs the compensations by name (idempotency-keyed, so no double
    refund), and fails closed to a human queue for anything it can't resolve.
 
-It's Apache-free — licensed AGPL-3.0 with a commercial option. The core has zero
+Apache-2.0, no commercial-license asterisk. The core has zero
 dependencies (`pip install agent-saga`); connectors and framework adapters
 (LangGraph, CrewAI, OpenAI Agents SDK) are opt-in extras. There's also a
 zero-dependency time-travel debugger that renders the WAL.
@@ -136,12 +136,20 @@ and refuses to *start* them inside a saga without explicit human approval — an
 if one somehow executed, it's reported as ORPHANED, loudly. The value for a
 regulated buyer is the refusal up front, not a magic rewind.
 
-### "Why AGPL? That kills adoption at companies that ban it."
+### "What's the license catch?"
 
-Fair, and it's a real tradeoff. The core is AGPL so a cloud can't take it and
-resell a managed version without contributing back; there's a commercial license
-for teams that can't take an AGPL dependency. If AGPL is a blocker for you
-specifically, open an issue on the repo — I'd rather hear the use case than lose it silently.
+There isn't one. Apache-2.0, explicit patent grant, no network-use clause, no
+open-core feature gating in the repo. It started out AGPL and that was a
+mistake: this is a library you `import` into the process that moves your money,
+and a copyleft dependency on that path doesn't clear legal review at exactly the
+companies that most need the guarantee. Shipping a control you can't adopt is
+not a control.
+
+The one reservation is the **name**, not the code — Apache-2.0 section 6 grants
+no trademark rights, and TRADEMARKS.md spells out what that does and doesn't
+mean. Fork it, ship it in a closed product, run it as a service; just don't ship
+a modified build as "agent-saga", because the whole point is that the name
+identifies an implementation an auditor can rely on.
 
 ### "What happens if the recovery daemon itself is wrong / double-compensates?"
 
@@ -164,7 +172,8 @@ reproduce in front of you).
 ## Pre-launch checklist
 
 - [x] GitHub URL filled; repo public at github.com/thomasjgeorge23/agent-saga.
-- [ ] Add a commercial-license contact (email or a pinned GitHub issue).
+- [x] Licensing settled: Apache-2.0 + a published trademark policy. No
+      "contact us for a commercial license" friction anywhere in the funnel.
 - [ ] README front-and-center: the `saga_scope` example, install, and the
       typed-semantics explanation in the first screen.
 - [ ] The Linux CI benchmark has run and the median-of-p99 numbers are ready to

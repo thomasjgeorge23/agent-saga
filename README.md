@@ -240,9 +240,20 @@ is an intended Enterprise-tier feature, deliberately absent from this BYOK core.
 
 ## License
 
-Licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only).
-See [LICENSE](LICENSE). Copyright (c) 2026 SagaOps.
+Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Copyright 2026 SagaOps.
 
-The AGPL's network-use clause (section 13) means a hosted service built on this
-code must offer its users the corresponding source. If that does not fit your
-deployment, contact SagaOps about a commercial license.
+Permissive on purpose. This library is `import`ed directly into the process that
+moves your money, and a copyleft dependency on that path is something most legal
+teams will not clear — so the thing designed to be trusted with production
+traffic is licensed so that it can actually reach production. Apache-2.0 also
+carries an **explicit patent grant** (section 3), which is the clause enterprise
+review actually looks for.
+
+- **Use it in a closed-source product.** No obligation to publish anything.
+- **Run it as a service.** No network-use clause, no source-offer requirement.
+- **Fork it.** Genuinely — just rename it, per [TRADEMARKS.md](TRADEMARKS.md).
+
+The code is open; the **name** is not (Apache-2.0 section 6 grants no trademark
+rights). SagaOps' commercial products are separate hosted components — they are
+not a license upgrade, and nothing in this repository is gated behind one.

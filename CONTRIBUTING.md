@@ -56,3 +56,25 @@ A connector is the real product surface, so it carries the most responsibility:
 ## Reporting security issues
 
 Not here — see [SECURITY.md](SECURITY.md) for the private channel.
+
+## Licensing of contributions
+
+Inbound equals outbound: your contribution is licensed under **Apache-2.0**, the
+same license the project ships under. Nothing more is asked of you.
+
+**There is no CLA, and there will not be one.** A CLA exists so a maintainer can
+relicense your code into a proprietary edition later. That can't happen here,
+because SagaOps' commercial work is *separate hosted software*, not a closed
+build of this repository — so there is no proprietary edition for your patch to
+be pulled into, and no reason to ask you to sign away the right. If that ever
+changed, it would require asking every contributor, in public.
+
+Sign off your commits to certify you have the right to submit the work, under
+the [Developer Certificate of Origin](https://developercertificate.org/):
+
+```bash
+git commit -s -m "your message"
+```
+
+Apache-2.0 section 5 already places inbound contributions under the project
+license; the sign-off is the auditable record that you meant to.

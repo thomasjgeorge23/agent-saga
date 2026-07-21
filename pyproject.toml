@@ -1,5 +1,8 @@
 [build-system]
-requires = ["hatchling"]
+# >=1.27 is the floor for PEP 639 (SPDX `license` expression + `license-files`,
+# metadata 2.4). An older hatchling silently ignores both and ships a wheel with
+# no declared license at all.
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,12 +11,16 @@ version = "0.1.0"
 description = "Transactional boundaries, typed compensation semantics, and a pre-flight safety gate for autonomous AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "AGPL-3.0-only" }
+license = "Apache-2.0"
+# NOTICE is required downstream by Apache-2.0 section 4(d); TRADEMARKS.md states
+# the section 6 carve-out. Both travel with the wheel, not just the repo.
+license-files = ["LICENSE", "NOTICE", "TRADEMARKS.md"]
 authors = [{ name = "SagaOps" }]
 maintainers = [{ name = "SagaOps" }]
 keywords = ["ai-agents", "saga", "rollback", "compensation", "llm", "observability"]
 classifiers = [
-    "License :: OSI Approved :: GNU Affero General Public License v3",
+    # No `License ::` classifier: PEP 639 deprecates it in favour of the SPDX
+    # expression above, and PyPI rejects a distribution that carries both.
     "Programming Language :: Python :: 3",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
