@@ -252,6 +252,67 @@ from agent_saga.adapters.crewai   import wrap_tool as crew_tool
 from agent_saga.adapters.llamaindex import wrap_tool as llama_tool
 ```
 
+## MCP proxy — no change to the agent
+
+Wrapping tools asks the agent's author to refactor the thing they're already
+nervous about. An MCP client talks to servers over a socket, so a proxy can sit
+in that socket and give the same guarantees to an agent that has no idea it's
+there.
+
+```bash
+# 1. Learn what your agent actually calls, changing nothing.
+agent-saga mcp --observe --emit-policy saga-policy.json -- python -m my_mcp_server
+
+# 2. Classify what it found (everything arrives IRREVERSIBLE with a TODO), then:
+agent-saga mcp --policy saga-policy.json -- python -m my_mcp_server
+```
+
+```json
+{
+  "mode": "enforce",
+  "tools": {
+    "stripe__create_charge": {
+      "semantics": "COMPENSABLE",
+      "compensate": {"tool": "stripe__create_refund", "args": {"charge": "$.id"}},
+      "policy_args": {"amount": "$.amount"}
+    },
+    "search_docs": {"semantics": "REVERSIBLE"}
+  }
+}
+```
+
+The inverse still has to be declared — it just moves from code to a file. That's
+the enterprise feature, not a compromise: the person who should decide whether
+`create_charge` needs a human is not the person who wrote the agent, and a file
+is something a security team can review, diff, and sign off.
+
+**Undeclared tools are refused.** Not allowed-with-a-warning: if nobody has said
+whether a tool can be undone, it doesn't reach a real system. Observe mode is
+the ramp — it forwards everything, records the real tool surface, and emits a
+skeleton. Every entry comes back `IRREVERSIBLE` with a TODO, deliberately: a
+generator that guessed `COMPENSABLE` and invented an inverse would be asserting
+that a real financial operation is undoable on the evidence of a tool *name*,
+which is the one guess this project exists to refuse. Reviewers downgrade what's
+safe; the file never upgrades itself.
+
+**The boundary problem, stated plainly.** MCP is request/response and has no
+notion of a transaction — nothing in the protocol says "this run failed, undo
+it," and a single `tools/call` can't roll itself back. So `--boundary` picks
+where the boundary comes from: `session` (the connection is the transaction;
+clean disconnect commits, dropped connection is a crash the daemon already
+handles), `explicit` (injects `saga_commit`/`saga_rollback` into the tool list
+for the model or app to drive), or `none` (gate, limits and audit, no rollback).
+An agent that never signals failure gets a durable, gated, audited log and no
+rollback. That's a real limit of proxying — the proxy cannot infer that a model
+regretted something.
+
+Zero dependencies: it speaks JSON-RPC directly rather than through an MCP SDK,
+so it works against any server regardless of which SDK that server was built
+with. Only `tools/list` and `tools/call` are interpreted; everything else is
+forwarded verbatim, so protocol features added later keep working.
+
+---
+
 ## Tamper-evident audit log
 
 A WAL is already the record of what an agent did with real money. Chained, it

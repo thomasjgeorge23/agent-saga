@@ -10,6 +10,7 @@ discipline.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import secrets
@@ -143,6 +144,45 @@ def _cmd_export(args: argparse.Namespace) -> int:
     return 0 if manifest["intact"] else 1
 
 
+def _cmd_mcp(args: argparse.Namespace) -> int:
+    """Run the saga proxy in front of an MCP server, over stdio."""
+    import asyncio
+
+    from .mcp import SagaMCPProxy, load_policy_file
+    from .mcp.policy import PolicyError, ProxyPolicy
+    from .mcp.stdio import UpstreamServer, serve_stdio
+    from .wal import FileWAL
+
+    if not args.server:
+        print("nothing to proxy: pass the upstream server command after --")
+        return 2
+    try:
+        policy = (ProxyPolicy(mode="observe") if args.observe
+                  else load_policy_file(args.policy))
+    except (PolicyError, OSError) as exc:
+        print(f"policy error: {exc}")
+        return 2
+
+    async def run() -> int:
+        upstream = UpstreamServer(list(args.server))
+        await upstream.start()
+        wal = FileWAL(args.wal_path)
+        await wal.start()
+        proxy = SagaMCPProxy(policy, upstream.call_tool, wal=wal,
+                             boundary=args.boundary,
+                             server_name=args.server[0])
+        try:
+            return await serve_stdio(proxy, upstream)
+        finally:
+            if args.observe and args.emit_policy:
+                with open(args.emit_policy, "w", encoding="utf-8") as fh:
+                    json.dump(proxy.policy_skeleton(), fh, indent=2, sort_keys=True)
+            await wal.close()
+            await upstream.close()
+
+    return asyncio.run(run())
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="agent-saga", description="agent-saga tooling")
     sub = p.add_subparsers(dest="command", required=True)
@@ -177,6 +217,25 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--allow-broken", action="store_true",
                         help="export even if verification fails (labelled broken)")
     export.set_defaults(func=_cmd_export)
+
+    mcp = sub.add_parser(
+        "mcp", help="run the saga proxy in front of an MCP server")
+    mcp.add_argument("--policy", default="./saga-policy.json",
+                     help="tool policy file (default: ./saga-policy.json)")
+    mcp.add_argument("--observe", action="store_true",
+                     help="forward everything and classify nothing, recording "
+                          "which tools are actually called; use with "
+                          "--emit-policy to generate a skeleton to review")
+    mcp.add_argument("--emit-policy", default=None,
+                     help="with --observe, write a policy skeleton here on exit")
+    mcp.add_argument("--boundary", default="session",
+                     choices=["session", "explicit", "none"],
+                     help="what a transaction is (default: session)")
+    mcp.add_argument("--wal-path", default="./agent-saga.wal",
+                     help="path to the WAL file (default: ./agent-saga.wal)")
+    mcp.add_argument("server", nargs=argparse.REMAINDER,
+                     help="the upstream server command, after --")
+    mcp.set_defaults(func=_cmd_mcp)
     return p
 
 
