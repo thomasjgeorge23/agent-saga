@@ -317,3 +317,70 @@ async def test_http_endpoints_serve_dashboard_and_api():
         finally:
             httpd.shutdown()
             httpd.server_close()
+
+
+@aio
+async def test_http_token_auth_gates_every_route():
+    import urllib.error
+
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "wal.jsonl"
+        await _run_saga(p, fail=True)
+
+        httpd = make_server(str(p), host="127.0.0.1", port=0, token="s3cr3t")
+        httpd.daemon_threads = False
+        httpd.block_on_close = True
+        port = httpd.server_address[1]
+        t = threading.Thread(target=httpd.serve_forever, daemon=True)
+        t.start()
+        base = f"http://127.0.0.1:{port}"
+
+        def get(path, headers=None):
+            req = urllib.request.Request(base + path, headers=headers or {})
+            with urllib.request.urlopen(req) as r:
+                return r.status, r.read().decode()
+
+        try:
+            # No token -> 401 on both the dashboard and the API.
+            for path in ("/", "/api/sagas"):
+                with pytest.raises(urllib.error.HTTPError) as exc:
+                    get(path)
+                assert exc.value.code == 401
+                assert exc.value.headers.get("WWW-Authenticate", "").startswith("Bearer")
+                exc.value.close()
+
+            # Wrong token -> 401.
+            with pytest.raises(urllib.error.HTTPError) as exc:
+                get("/api/sagas", {"Authorization": "Bearer nope"})
+            assert exc.value.code == 401
+            exc.value.close()
+
+            # Correct token via header -> 200.
+            status, body = get("/api/sagas", {"Authorization": "Bearer s3cr3t"})
+            assert status == 200 and json.loads(body)["total"] == 1
+
+            # Correct token via query param -> 200 (the browser-open path).
+            status, _ = get("/api/meta?token=s3cr3t")
+            assert status == 200
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
+@aio
+async def test_http_no_token_configured_stays_open():
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "wal.jsonl"
+        await _run_saga(p, fail=False)
+        httpd = make_server(str(p), host="127.0.0.1", port=0)   # no token
+        httpd.daemon_threads = False
+        httpd.block_on_close = True
+        port = httpd.server_address[1]
+        t = threading.Thread(target=httpd.serve_forever, daemon=True)
+        t.start()
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/meta") as r:
+                assert r.status == 200
+        finally:
+            httpd.shutdown()
+            httpd.server_close()

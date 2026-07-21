@@ -13,12 +13,13 @@ deliberate choice -- the CLI warns when you make it.
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from .reader import SagaWALReader
 
@@ -27,7 +28,7 @@ logger = logging.getLogger("agent_saga.ui")
 _TEMPLATE = Path(__file__).parent / "templates" / "dashboard.html"
 
 
-def build_handler(reader: SagaWALReader):
+def build_handler(reader: SagaWALReader, token: Optional[str] = None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "agent-saga-ui"
         # HTTP/1.0: one request per connection. Over loopback the handshake is
@@ -55,8 +56,34 @@ def build_handler(reader: SagaWALReader):
 
         # -- routing -----------------------------------------------------
 
+        def _authorized(self) -> bool:
+            """Bearer token via `Authorization: Bearer <t>` or a `?token=` query
+            param (so a browser can open one URL). Constant-time compared. When
+            no token is configured, everything is allowed -- the local default."""
+            if not token:
+                return True
+            provided = None
+            auth = self.headers.get("Authorization", "")
+            if auth.startswith("Bearer "):
+                provided = auth[len("Bearer "):].strip()
+            if provided is None:
+                qs = parse_qs(urlparse(self.path).query)
+                vals = qs.get("token")
+                provided = vals[0] if vals else None
+            return provided is not None and hmac.compare_digest(provided, token)
+
         def do_GET(self) -> None:  # noqa: N802 (stdlib naming)
             try:
+                if not self._authorized():
+                    self.send_response(401)
+                    self.send_header("WWW-Authenticate", 'Bearer realm="agent-saga-ui"')
+                    body = b'{"error": "unauthorized"}'
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    if self.command != "HEAD":
+                        self.wfile.write(body)
+                    return
                 self._route()
             except BrokenPipeError:
                 pass  # client navigated away mid-response; not our problem
@@ -102,14 +129,15 @@ def build_handler(reader: SagaWALReader):
     return Handler
 
 
-def make_server(wal_path: str, host: str = "127.0.0.1",
-                port: int = 8080) -> ThreadingHTTPServer:
+def make_server(wal_path: str, host: str = "127.0.0.1", port: int = 8080,
+                *, token: Optional[str] = None) -> ThreadingHTTPServer:
     reader = SagaWALReader(wal_path)
-    return ThreadingHTTPServer((host, port), build_handler(reader))
+    return ThreadingHTTPServer((host, port), build_handler(reader, token))
 
 
-def serve(wal_path: str, host: str = "127.0.0.1", port: int = 8080) -> None:
-    httpd = make_server(wal_path, host, port)
+def serve(wal_path: str, host: str = "127.0.0.1", port: int = 8080,
+          *, token: Optional[str] = None) -> None:
+    httpd = make_server(wal_path, host, port, token=token)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

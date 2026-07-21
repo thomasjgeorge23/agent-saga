@@ -159,13 +159,14 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (176 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (185 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
-- Core engine, recovery daemon (truncation-tolerant), time-travel debugger.
+- Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
+  with optional bearer-token auth for shared environments.
 - Connectors: Stripe, Postgres (full CRUD — update/insert/delete with compound
   primary keys), Salesforce.
-- Adapters: LangGraph, CrewAI, OpenAI Agents SDK.
+- Adapters: LangGraph, CrewAI, OpenAI Agents SDK, LlamaIndex, AutoGen.
 - Snapshot capture: in-process (`REVERSIBLE`) and durable crash-recoverable
   (`COMPENSABLE`), with a conservative store GC sweep.
 - Durability & safety: configurable WAL backpressure (`RAISE` by default —
@@ -178,9 +179,8 @@ with only `pytest`; optional extras add their own SDKs):
 Not yet published to PyPI.
 
 Known-pending, tracked openly (see [SECURITY.md](SECURITY.md)): a shipped
-distributed lock backend, authentication on the debugger UI, async-native
-connectors, and LlamaIndex / AutoGen adapters. KMS/Vault key resolution is an
-intended Enterprise-tier feature, deliberately absent from this BYOK core.
+distributed lock backend and async-native connectors. KMS/Vault key resolution
+is an intended Enterprise-tier feature, deliberately absent from this BYOK core.
 
 ## License
 

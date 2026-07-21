@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -20,6 +22,12 @@ def _cmd_ui(args: argparse.Namespace) -> int:
 
     wal = Path(args.wal_path)
     host, port = args.host, args.port
+
+    # Token auth for shared/team environments. --token takes a literal; --auth
+    # mints one; AGENT_SAGA_UI_TOKEN is the env fallback. None -> open (local).
+    token = args.token or os.environ.get("AGENT_SAGA_UI_TOKEN")
+    if args.auth and not token:
+        token = secrets.token_urlsafe(24)
 
     # ASCII only: this prints to consoles whose encoding is not UTF-8 (Windows
     # cp1252), where box-drawing characters or emoji raise UnicodeEncodeError.
@@ -33,17 +41,25 @@ def _cmd_ui(args: argparse.Namespace) -> int:
         f"    Serving : http://{host}:{port}",
         "",
     ]
+    if token:
+        banner.append(f"    Auth    : bearer token required")
+        banner.append(f"    Open    : http://{host}:{port}/?token={token}\n")
     if host not in ("127.0.0.1", "localhost", "::1"):
         banner.append(
             f"    !  Bound to {host}, not localhost. A WAL can contain business\n"
             f"       data (ids, amounts). Expose beyond this machine deliberately.\n"
         )
+        if not token:
+            banner.append(
+                "    !  No --token set. Anyone who can reach this port can read the\n"
+                "       WAL. Use --auth (or --token) on a shared network.\n"
+            )
     banner.append("    Ctrl-C to stop.\n")
     print("\n".join(banner), flush=True)
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     try:
-        httpd = make_server(str(wal), host=host, port=port)
+        httpd = make_server(str(wal), host=host, port=port, token=token)
     except OSError as exc:
         print(f"error: could not bind {host}:{port} — {exc}", file=sys.stderr)
         return 1
@@ -66,6 +82,10 @@ def build_parser() -> argparse.ArgumentParser:
     ui.add_argument("--port", type=int, default=8080, help="port (default: 8080)")
     ui.add_argument("--host", default="127.0.0.1",
                     help="bind host (default: 127.0.0.1; use 0.0.0.0 to expose)")
+    ui.add_argument("--token", default=None,
+                    help="require this bearer token (or set AGENT_SAGA_UI_TOKEN)")
+    ui.add_argument("--auth", action="store_true",
+                    help="mint a random bearer token and print the URL to open")
     ui.set_defaults(func=_cmd_ui)
     return p
 

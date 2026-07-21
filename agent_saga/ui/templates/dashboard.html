@@ -230,8 +230,13 @@ const STATUSES = [
 let state = { sagas: [], filter: "all", selectedSaga: null, detail: null, selectedStep: null, auto: false, timer: null };
 
 // ---- fetch helpers ----
+// If the dashboard was opened with ?token=..., forward it on every API call
+// (as a Bearer header) so token-protected servers work from the browser.
+const AUTH_TOKEN = new URLSearchParams(window.location.search).get("token");
 async function api(path) {
-  const r = await fetch(path, { cache: "no-store" });
+  const opts = { cache: "no-store" };
+  if (AUTH_TOKEN) opts.headers = { "Authorization": "Bearer " + AUTH_TOKEN };
+  const r = await fetch(path, opts);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
