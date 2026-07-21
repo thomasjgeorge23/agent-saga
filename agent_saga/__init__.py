@@ -11,6 +11,7 @@ The core of AgentRollback. Three ideas, in order of commercial importance:
 
 from .context import RollbackReport, SagaAborted, SagaContext
 from .decorator import current_saga, saga, saga_scope, tool
+from .retry import RetryPolicy
 from .gate import (
     Decision,
     GateContext,
@@ -254,4 +255,5 @@ __all__ = [
     "saga_dumps",
     "saga_loads",
     "saga_lifespan",
+    "RetryPolicy",
 ]

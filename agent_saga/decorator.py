@@ -1,17 +1,21 @@
-"""The `@saga` boundary and the `@tool` registration decorator."""
-
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import contextvars
 import functools
 import inspect
+import logging
 from typing import Any, AsyncIterator, Callable, Optional
 
 from .context import RollbackReport, SagaAborted, SagaContext
 from .gate import PreFlightGate
 from .semantics import ActionSemantics, CompensationFactory
 from .wal import AsyncWAL
+from .retry import RetryPolicy
+
+logger = logging.getLogger("agent_saga.decorator")
+
 
 _current: contextvars.ContextVar[Optional[SagaContext]] = contextvars.ContextVar(
     "agent_saga_current", default=None
@@ -128,6 +132,7 @@ def tool(
     semantics: ActionSemantics,
     compensate: Optional[CompensationFactory] = None,
     timeout: Optional[float] = None,
+    retry_policy: Optional[RetryPolicy] = None,
 ):
     """Registers a function as a saga-aware tool.
 
@@ -141,14 +146,31 @@ def tool(
         @functools.wraps(fn)
         async def wrapper(**kwargs) -> Any:
             ctx = current_saga()
-            if ctx is None:
-                from .context import _invoke
 
-                return await _invoke(fn, kwargs, timeout)
+            async def retrying_forward(**f_kwargs):
+                attempt = 0
+                while True:
+                    try:
+                        from .context import _invoke
+                        return await _invoke(fn, f_kwargs, timeout)
+                    except Exception as exc:
+                        if retry_policy is not None and attempt < retry_policy.max_retries:
+                            delay = retry_policy.calculate_delay(attempt)
+                            logger.warning(
+                                "Step %s failed with exception: %r. Retrying in %.2fs (attempt %d/%d)...",
+                                tool_name, exc, delay, attempt + 1, retry_policy.max_retries
+                            )
+                            await asyncio.sleep(delay)
+                            attempt += 1
+                        else:
+                            raise
+
+            if ctx is None:
+                return await retrying_forward(**kwargs)
             return await ctx.execute(
                 tool=tool_name,
                 semantics=semantics,
-                forward=fn,
+                forward=retrying_forward,
                 forward_kwargs=kwargs,
                 compensate=compensate,
                 timeout=timeout,
@@ -160,4 +182,6 @@ def tool(
     return decorate
 
 
-__all__ = ["saga", "saga_scope", "tool", "current_saga", "SagaAborted", "RollbackReport"]
+saga.step = tool
+
+__all__ = ["saga", "saga_scope", "tool", "current_saga", "SagaAborted", "RollbackReport", "RetryPolicy"]
