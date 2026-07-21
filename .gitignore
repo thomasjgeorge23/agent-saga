@@ -6,3 +6,8 @@ bench/results-*.json
 *.wal
 .claims/
 .venv/
+
+# build artifacts
+dist/
+build/
+*.egg-info/

@@ -65,7 +65,7 @@ dependencies (`pip install agent-saga`); connectors and framework adapters
 (LangGraph, CrewAI, OpenAI Agents SDK) are opt-in extras. There's also a
 zero-dependency time-travel debugger that renders the WAL.
 
-Repo: ⟨GITHUB URL⟩
+Repo: https://github.com/thomasjgeorge23/agent-saga
 
 It's pre-alpha and I'd genuinely like the scrutiny — especially on the recovery
 and idempotency logic, and on where the compensation model breaks down. Happy to
@@ -141,7 +141,7 @@ regulated buyer is the refusal up front, not a magic rewind.
 Fair, and it's a real tradeoff. The core is AGPL so a cloud can't take it and
 resell a managed version without contributing back; there's a commercial license
 for teams that can't take an AGPL dependency. If AGPL is a blocker for you
-specifically, email ⟨CONTACT⟩ — I'd rather hear the use case than lose it silently.
+specifically, open an issue on the repo — I'd rather hear the use case than lose it silently.
 
 ### "What happens if the recovery daemon itself is wrong / double-compensates?"
 
@@ -163,7 +163,8 @@ reproduce in front of you).
 
 ## Pre-launch checklist
 
-- [ ] Fill ⟨GITHUB URL⟩ and ⟨CONTACT⟩ everywhere; make the repo public.
+- [x] GitHub URL filled; repo public at github.com/thomasjgeorge23/agent-saga.
+- [ ] Add a commercial-license contact (email or a pinned GitHub issue).
 - [ ] README front-and-center: the `saga_scope` example, install, and the
       typed-semantics explanation in the first screen.
 - [ ] The Linux CI benchmark has run and the median-of-p99 numbers are ready to

@@ -20,6 +20,11 @@ classifiers = [
 ]
 dependencies = []
 
+[project.urls]
+Homepage = "https://sagaops.dev"
+Repository = "https://github.com/thomasjgeorge23/agent-saga"
+Issues = "https://github.com/thomasjgeorge23/agent-saga/issues"
+
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "langchain-core>=0.3"]
 langgraph = ["langchain-core>=0.3", "langgraph>=0.2"]
