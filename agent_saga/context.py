@@ -389,7 +389,12 @@ async def _invoke(fn: Callable[..., Any], kwargs: dict, timeout: Optional[float]
     if inspect.iscoroutinefunction(fn):
         coro = fn(**kwargs)
     else:
-        coro = asyncio.to_thread(lambda: fn(**kwargs))
+        # The bounded, instrumented tool pool -- never the default executor, which
+        # the WAL flusher would otherwise be competing for. Contextvars (and so
+        # the saga correlation id) are propagated into the worker.
+        from .executors import get_tool_executor
+
+        coro = get_tool_executor().run(fn, kwargs)
     if timeout is not None:
         return await asyncio.wait_for(coro, timeout)
     return await coro

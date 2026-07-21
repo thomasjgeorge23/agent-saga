@@ -77,6 +77,7 @@ class AsyncWAL:
         # is set in the environment.
         self._encryptor_arg = encryptor
         self._encryptor = None
+        self._flush_pool = None
         self._buf: deque = deque()
         self._seq = 0
         self._durable_seq = 0
@@ -99,9 +100,13 @@ class AsyncWAL:
 
     async def start(self) -> None:
         from .encryption import get_wal_encryptor
+        from .executors import new_wal_executor
 
         self._encryptor = (get_wal_encryptor() if self._encryptor_arg is _UNSET
                            else self._encryptor_arg)
+        # Private to this WAL. See executors.new_wal_executor for why isolation
+        # here is a correctness property, not a tuning choice.
+        self._flush_pool = new_wal_executor()
         if self.path:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self._fh = open(self.path, "a", encoding="utf-8")
@@ -186,10 +191,13 @@ class AsyncWAL:
         batch = self._take()
         if batch:
             if self._fh is not None:
-                # fsync is a blocking syscall. Running it off the loop keeps it
-                # from stalling every other saga in the process, including
-                # REVERSIBLE steps that never asked to pay for disk.
-                await asyncio.to_thread(self._write_batch, batch)
+                # fsync is a blocking syscall, so it runs off the loop. It runs on
+                # this WAL's *private* single-thread pool, never the shared tool
+                # pool: a burst of slow connector calls must never be able to
+                # starve the flusher, because a stalled fsync blocks every
+                # barrier() in the process and therefore every durable saga.
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(self._flush_pool, self._write_batch, batch)
             self._durable_seq = batch[-1]["seq"]
         self._resolve_waiters()
 
@@ -242,6 +250,12 @@ class AsyncWAL:
         if self._fh:
             self._fh.close()
             self._fh = None
+        if self._flush_pool is not None:
+            # wait=True: the flush task above has already finished, so nothing is
+            # queued; this just joins the idle worker so the thread does not
+            # outlive the WAL (tests run with filterwarnings=error).
+            self._flush_pool.shutdown(wait=True)
+            self._flush_pool = None
 
     def records(self) -> list[dict]:
         """Replay support. Reads what is durable on disk, not what is buffered --

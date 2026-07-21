@@ -371,7 +371,9 @@ async def _call(fn: Any, kwargs: dict) -> Any:
 
     if inspect.iscoroutinefunction(fn):
         return await fn(**kwargs)
-    return await asyncio.to_thread(lambda: fn(**kwargs))
+    from .executors import get_tool_executor
+
+    return await get_tool_executor().run(fn, kwargs)
 
 
 __all__ = ["RecoveryDaemon", "DanglingSaga", "DanglingStep", "Resolution",

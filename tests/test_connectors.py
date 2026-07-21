@@ -304,6 +304,24 @@ class FakePool:
         self.queries.append((sql, args))
 
 
+@contextlib.contextmanager
+def sync_pg_driver():
+    """Pin the sync driver for tests that fake psycopg.
+
+    asyncpg is often present transitively (crewai pulls it here), so without
+    pinning, 'auto' would pick asyncpg and these tests would attempt a real
+    network connection.
+    """
+    from agent_saga.connectors import postgres as pg
+
+    previous = pg.get_pg_driver()
+    pg.set_pg_driver("sync")
+    try:
+        yield
+    finally:
+        pg.set_pg_driver(previous)
+
+
 def fake_psycopg(rowcount=1, executed=None):
     executed = executed if executed is not None else []
     mod = types.ModuleType("psycopg")
@@ -351,12 +369,12 @@ async def test_postgres_restore_refuses_to_clobber_a_concurrent_writer():
     from agent_saga.connectors import postgres as pg
 
     with credential("pg_t", "postgresql://h/db"):
-        with fake_module("psycopg", fake_psycopg(rowcount=0)):
+        with sync_pg_driver(), fake_module("psycopg", fake_psycopg(rowcount=0)):
             with pytest.raises(pg.ConcurrentModification, match="another writer"):
-                pg.restore_row(table="leads", pk_column="id", pk_value=7,
-                               previous_state={"status": "open"},
-                               expected_current={"status": "won"},
-                               credential_ref="pg_t")
+                await pg.restore_row(table="leads", pk_column="id", pk_value=7,
+                                     previous_state={"status": "open"},
+                                     expected_current={"status": "won"},
+                                     credential_ref="pg_t")
 
 
 @aio
@@ -365,11 +383,11 @@ async def test_postgres_restore_guards_on_the_values_we_wrote():
 
     mod = fake_psycopg(rowcount=1)
     with credential("pg_t", "postgresql://h/db"):
-        with fake_module("psycopg", mod):
-            pg.restore_row(table="leads", pk_column="id", pk_value=7,
-                           previous_state={"status": "open"},
-                           expected_current={"status": "won"},
-                           credential_ref="pg_t")
+        with sync_pg_driver(), fake_module("psycopg", mod):
+            await pg.restore_row(table="leads", pk_column="id", pk_value=7,
+                                 previous_state={"status": "open"},
+                                 expected_current={"status": "won"},
+                                 credential_ref="pg_t")
 
     sql, params = mod.executed[0]
     assert "IS NOT DISTINCT FROM" in sql
@@ -413,7 +431,7 @@ async def test_postgres_insert_rolls_back_with_a_delete_of_the_returned_pk():
     mod = fake_psycopg(rowcount=1)
 
     with tempfile.TemporaryDirectory() as d, credential("pg_t", "postgresql://h/db"):
-        with fake_module("psycopg", mod):
+        with sync_pg_driver(), fake_module("psycopg", mod):
             ctx, wal = await _ctx(Path(d))
             await pg.insert_row(ctx, pool=pool, table="leads",
                                 values={"name": "Ada"}, pk_columns=["id"],
@@ -446,7 +464,7 @@ async def test_postgres_delete_rolls_back_by_reinserting_the_captured_row():
     mod = fake_psycopg(rowcount=1)
 
     with tempfile.TemporaryDirectory() as d, credential("pg_t", "postgresql://h/db"):
-        with fake_module("psycopg", mod):
+        with sync_pg_driver(), fake_module("psycopg", mod):
             ctx, wal = await _ctx(Path(d))
             await pg.delete_row(ctx, pool=pool, table="leads", pk={"id": 7},
                                 credential_ref="pg_t")
@@ -461,7 +479,8 @@ async def test_postgres_delete_rolls_back_by_reinserting_the_captured_row():
     assert set(insert_params) == {7, "Ada", "won"}
 
 
-def test_postgres_reinsert_refuses_when_the_row_already_exists():
+@aio
+async def test_postgres_reinsert_refuses_when_the_row_already_exists():
     """UNKNOWN delete (or a recreated row): the guard must refuse rather than
     duplicate or overwrite."""
     from agent_saga.connectors import postgres as pg
@@ -482,10 +501,10 @@ def test_postgres_reinsert_refuses_when_the_row_already_exists():
     mod.connect = lambda dsn: Conn()
 
     with credential("pg_t", "postgresql://h/db"):
-        with fake_module("psycopg", mod):
+        with sync_pg_driver(), fake_module("psycopg", mod):
             with pytest.raises(pg.ConcurrentModification, match="already"):
-                pg.reinsert_row(table="leads", row={"id": 7, "name": "Ada"},
-                                pk_columns=["id"], credential_ref="pg_t")
+                await pg.reinsert_row(table="leads", row={"id": 7, "name": "Ada"},
+                                      pk_columns=["id"], credential_ref="pg_t")
 
 
 @aio
@@ -505,7 +524,7 @@ async def test_postgres_delete_supports_compound_primary_keys():
     pool = DeletePool()
 
     with tempfile.TemporaryDirectory() as d, credential("pg_t", "postgresql://h/db"):
-        with fake_module("psycopg", fake_psycopg()):
+        with sync_pg_driver(), fake_module("psycopg", fake_psycopg()):
             ctx, wal = await _ctx(Path(d))
             await pg.delete_row(ctx, pool=pool, table="memberships",
                                 pk={"org": "acme", "user": "ada"},
@@ -558,21 +577,29 @@ class FakeAsyncClient:
 
 
 def fake_httpx(sync_get=None, sync_calls=None):
+    """Stands in for httpx.
+
+    `AsyncClient` here is what the *compensation* (revert_object) constructs.
+    It is async-native now -- the compensator awaits the API directly instead of
+    parking on a worker thread -- so the fake must support `async with` and
+    accept the client kwargs (timeout) the connector passes.
+    """
     sync_calls = sync_calls if sync_calls is not None else []
     mod = types.ModuleType("httpx")
 
-    class Client:
-        def __init__(self, **kw): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def get(self, url, headers=None, params=None):
+    class RevertAsyncClient:
+        def __init__(self, **kw): self.kwargs = kw
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, url, headers=None, params=None):
             sync_calls.append(("get", params))
             return FakeResponse(sync_get or {})
-        def patch(self, url, json=None, headers=None):
+        async def patch(self, url, json=None, headers=None):
             sync_calls.append(("patch", json))
             return FakeResponse({})
+        async def aclose(self): pass
 
-    mod.Client, mod.AsyncClient, mod.calls = Client, FakeAsyncClient, sync_calls
+    mod.AsyncClient, mod.calls = RevertAsyncClient, sync_calls
     return mod
 
 
@@ -621,10 +648,10 @@ async def test_salesforce_refuses_to_revert_a_record_edited_after_us():
     with credential("sf_t", "tok"):
         with fake_module("httpx", fake_httpx(sync_get={"LastModifiedDate": "T9"})):
             with pytest.raises(sf.StaleObject, match="modified after this saga"):
-                sf.revert_object(instance_url="https://acme.my.salesforce.com",
-                                 object_type="Lead", object_id="00Q1",
-                                 previous_values={"Status": "Open"},
-                                 expected_modstamp="T2", credential_ref="sf_t")
+                await sf.revert_object(instance_url="https://acme.my.salesforce.com",
+                                       object_type="Lead", object_id="00Q1",
+                                       previous_values={"Status": "Open"},
+                                       expected_modstamp="T2", credential_ref="sf_t")
 
 
 @aio

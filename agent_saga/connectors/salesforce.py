@@ -53,7 +53,7 @@ def writable(payload: dict) -> dict:
 
 
 @compensator("salesforce.revert_object")
-def revert_object(
+async def revert_object(
     instance_url: str,
     object_type: str,
     object_id: str,
@@ -68,6 +68,11 @@ def revert_object(
     If it has moved, someone edited the record after us and a blind revert
     would destroy their edit -- so we refuse and escalate. Only a human knows
     whose version should win.
+
+    Async-native: the engine awaits a coroutine compensation directly instead of
+    parking it on a worker thread. At fleet scale that is the difference between
+    a rollback storm being bounded by the thread pool and being bounded by the
+    remote API.
     """
     import httpx  # lazy: the daemon may not ship every connector's deps
 
@@ -78,9 +83,10 @@ def revert_object(
     if not body:
         return {"object_id": object_id, "status": "nothing_writable_to_restore"}
 
-    with httpx.Client(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         if expected_modstamp:
-            current = client.get(url, headers=headers, params={"fields": "LastModifiedDate"})
+            current = await client.get(url, headers=headers,
+                                       params={"fields": "LastModifiedDate"})
             current.raise_for_status()
             actual = current.json().get("LastModifiedDate")
             if actual and actual != expected_modstamp:
@@ -90,7 +96,7 @@ def revert_object(
                     f"Refusing to revert and discard that change."
                 )
 
-        resp = client.patch(url, json=body, headers=headers)
+        resp = await client.patch(url, json=body, headers=headers)
         resp.raise_for_status()
 
     logger.info("reverted %s %s (%d field(s))", object_type, object_id, len(body))

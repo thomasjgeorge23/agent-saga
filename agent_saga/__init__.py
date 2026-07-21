@@ -49,6 +49,13 @@ from .encryption import (
     get_wal_encryptor,
     set_wal_encryptor,
 )
+from .executors import (
+    BoundedExecutor,
+    configure_tool_executor,
+    get_tool_executor,
+    set_tool_executor,
+    tool_executor_stats,
+)
 from .gc import GCReport, SnapshotGC
 from .locks import FileLock, InProcessLock, RecoveryLock
 from .observability import (
@@ -121,6 +128,11 @@ __all__ = [
     "snapshot_file",
     "GCReport",
     "SnapshotGC",
+    "BoundedExecutor",
+    "configure_tool_executor",
+    "get_tool_executor",
+    "set_tool_executor",
+    "tool_executor_stats",
     "EncryptedRecordError",
     "FernetEncryptor",
     "WALEncryptor",

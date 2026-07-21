@@ -21,6 +21,7 @@ exists to catch.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Any, Optional, Sequence
 
@@ -72,8 +73,137 @@ def _connect(credential_ref: str):
         return psycopg2.connect(dsn), "psycopg2"
 
 
+# ---------------------------------------------------------------------------
+# Driver dispatch: async-native when asyncpg is available, else the sync driver
+# on the bounded tool pool.
+#
+# The two drivers disagree on placeholder syntax ($1 vs %s), so every statement
+# below is built once by a helper that takes the style. Writing each query twice
+# would be the obvious way to introduce a divergence between the path that is
+# tested and the path that runs in production.
+# ---------------------------------------------------------------------------
+
+def _ph(style: str, index: int) -> str:
+    """Positional placeholder for the driver in use. `index` is 1-based."""
+    return f"${index}" if style == "asyncpg" else "%s"
+
+
+_DRIVER_PREFERENCE = os.environ.get("AGENT_SAGA_PG_DRIVER", "auto").lower()
+"""Which driver the compensators use: 'auto' (asyncpg when importable, else the
+sync driver), 'asyncpg', or 'sync'.
+
+Explicit because 'auto' alone is a footgun: asyncpg is a common *transitive*
+dependency, so installing an unrelated package could silently change which
+driver runs your rollbacks. Anyone who cares can pin it, via
+AGENT_SAGA_PG_DRIVER or set_pg_driver()."""
+
+
+def set_pg_driver(preference: str) -> None:
+    global _DRIVER_PREFERENCE
+    if preference not in ("auto", "asyncpg", "sync"):
+        raise ValueError("preference must be 'auto', 'asyncpg' or 'sync'")
+    _DRIVER_PREFERENCE = preference
+
+
+def get_pg_driver() -> str:
+    return _DRIVER_PREFERENCE
+
+
+def _asyncpg_or_none():
+    if _DRIVER_PREFERENCE == "sync":
+        return None
+    try:
+        import asyncpg  # noqa: F401
+
+        return asyncpg
+    except ImportError:
+        if _DRIVER_PREFERENCE == "asyncpg":
+            raise
+        return None
+
+
+def _rowcount(status: str) -> int:
+    """asyncpg returns a command tag such as 'UPDATE 3'; the count is the tail."""
+    try:
+        return int(str(status).strip().rsplit(" ", 1)[-1])
+    except (ValueError, AttributeError):
+        return 0
+
+
+async def _run(credential_ref: str, plan) -> Any:
+    """Execute `plan` against Postgres on whichever driver is installed.
+
+    `plan(style, execute, fetchone)` is called with helpers bound to a single
+    connection, so a check-then-write (reinsert's existence guard) stays inside
+    one connection and cannot interleave with another writer.
+    """
+    dsn = resolve_credential(credential_ref)
+    asyncpg = _asyncpg_or_none()
+
+    if asyncpg is not None:
+        conn = await asyncpg.connect(dsn)
+        try:
+            async def execute(sql, params):
+                return _rowcount(await conn.execute(sql, *params))
+
+            async def fetchone(sql, params):
+                return await conn.fetchrow(sql, *params)
+
+            return await plan("asyncpg", execute, fetchone), "asyncpg"
+        finally:
+            await conn.close()
+
+    # No asyncpg: run the blocking driver on the bounded tool pool, which is
+    # isolated from the WAL flusher so a slow rollback cannot stall fsyncs.
+    from ..executors import get_tool_executor
+
+    def _sync_plan():
+        conn, driver = _connect(credential_ref)
+        try:
+            with conn.cursor() as cur:
+                def execute(sql, params):
+                    cur.execute(sql, list(params))
+                    return cur.rowcount
+
+                def fetchone(sql, params):
+                    cur.execute(sql, list(params))
+                    return cur.fetchone()
+
+                result = _drive_sync(plan, execute, fetchone)
+            conn.commit()
+            return result, driver
+        finally:
+            conn.close()
+
+    return await get_tool_executor().run(_sync_plan)
+
+
+def _drive_sync(plan, execute, fetchone):
+    """Run an async `plan` whose awaits are all our own sync helpers.
+
+    The plan is written once, in async form, for both drivers. On the sync path
+    its awaits resolve immediately, so stepping the coroutine by hand runs it to
+    completion without an event loop -- and without a second copy of the plan.
+    """
+    async def _sync_execute(sql, params):
+        return execute(sql, params)
+
+    async def _sync_fetchone(sql, params):
+        return fetchone(sql, params)
+
+    coro = plan("psycopg", _sync_execute, _sync_fetchone)
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    raise RuntimeError(
+        "postgres plan awaited something other than its own driver helpers; "
+        "plans must only await execute()/fetchone()"
+    )
+
+
 @compensator("postgres.restore_row")
-def restore_row(
+async def restore_row(
     table: str,
     pk_column: str,
     pk_value: Any,
@@ -92,23 +222,29 @@ def restore_row(
     tbl = _qualified(table)
     pk = _ident(pk_column, kind="column")
     cols = list(previous_state)
+    guard_cols = list(expected_current)
 
-    set_sql = ", ".join(f"{_ident(c, kind='column')} = %s" for c in cols)
-    guard_sql = " AND ".join(
-        f"{_ident(c, kind='column')} IS NOT DISTINCT FROM %s" for c in expected_current
-    )
-    sql = f"UPDATE {tbl} SET {set_sql} WHERE {pk} = %s AND {guard_sql}"
-    params = [previous_state[c] for c in cols] + [pk_value] + \
-             [expected_current[c] for c in expected_current]
+    async def plan(style, execute, _fetchone):
+        n = 0
+        set_parts = []
+        for c in cols:
+            n += 1
+            set_parts.append(f"{_ident(c, kind='column')} = {_ph(style, n)}")
+        n += 1
+        pk_ph = _ph(style, n)
+        guard_parts = []
+        for c in guard_cols:
+            n += 1
+            guard_parts.append(
+                f"{_ident(c, kind='column')} IS NOT DISTINCT FROM {_ph(style, n)}")
 
-    conn, driver = _connect(credential_ref)
-    try:
-        with conn.cursor() as cur:
-            cur.execute(sql, params)
-            affected = cur.rowcount
-        conn.commit()
-    finally:
-        conn.close()
+        sql = (f"UPDATE {tbl} SET {', '.join(set_parts)} "
+               f"WHERE {pk} = {pk_ph} AND {' AND '.join(guard_parts)}")
+        params = ([previous_state[c] for c in cols] + [pk_value] +
+                  [expected_current[c] for c in guard_cols])
+        return await execute(sql, params)
+
+    affected, driver = await _run(credential_ref, plan)
 
     if affected == 0:
         raise ConcurrentModification(
@@ -216,19 +352,20 @@ async def update_row(
 # ==========================================================================
 
 @compensator("postgres.delete_inserted_row")
-def delete_inserted_row(table: str, pk: dict, credential_ref: str) -> dict:
+async def delete_inserted_row(table: str, pk: dict, credential_ref: str) -> dict:
     """Undo an insert by deleting the row we created. Idempotent: zero rows
     affected means it is already gone, which is success, not failure."""
     tbl = _qualified(table)
-    where = " AND ".join(f"{_ident(c, kind='column')} = %s" for c in pk)
-    conn, driver = _connect(credential_ref)
-    try:
-        with conn.cursor() as cur:
-            cur.execute(f"DELETE FROM {tbl} WHERE {where}", list(pk.values()))
-            affected = cur.rowcount
-        conn.commit()
-    finally:
-        conn.close()
+    pk_cols = list(pk)
+
+    async def plan(style, execute, _fetchone):
+        where = " AND ".join(
+            f"{_ident(c, kind='column')} = {_ph(style, i)}"
+            for i, c in enumerate(pk_cols, start=1))
+        return await execute(f"DELETE FROM {tbl} WHERE {where}",
+                             [pk[c] for c in pk_cols])
+
+    affected, driver = await _run(credential_ref, plan)
     logger.info("deleted inserted %s row pk=%r (%d row(s), driver=%s)",
                 table, pk, affected, driver)
     return {"table": table, "pk": pk, "deleted": affected}
@@ -301,35 +438,40 @@ async def insert_row(
 # ==========================================================================
 
 @compensator("postgres.reinsert_row")
-def reinsert_row(table: str, row: dict, pk_columns: list, credential_ref: str) -> dict:
+async def reinsert_row(table: str, row: dict, pk_columns: list, credential_ref: str) -> dict:
     """Undo a delete by re-inserting the captured row -- unless a row with the
     same key already exists, which means the delete never landed (UNKNOWN) or
     someone recreated it. Reinserting then would either duplicate or overwrite,
-    so we refuse and escalate."""
-    tbl = _qualified(table)
-    where = " AND ".join(f"{_ident(c, kind='column')} = %s" for c in pk_columns)
-    cols = list(row)
-    col_sql = ", ".join(_ident(c, kind="column") for c in cols)
-    placeholders = ", ".join("%s" for _ in cols)
+    so we refuse and escalate.
 
-    conn, driver = _connect(credential_ref)
-    try:
-        with conn.cursor() as cur:
-            cur.execute(f"SELECT 1 FROM {tbl} WHERE {where}",
-                        [row[c] for c in pk_columns])
-            if cur.fetchone() is not None:
-                raise ConcurrentModification(
-                    f"{table} row with pk {{{', '.join(pk_columns)}}} already "
-                    f"exists; the delete did not land or the row was recreated. "
-                    f"Refusing to reinsert."
-                )
-            cur.execute(
-                f"INSERT INTO {tbl} ({col_sql}) VALUES ({placeholders})",
-                [row[c] for c in cols],
-            )
-        conn.commit()
-    finally:
-        conn.close()
+    The existence check and the insert share one connection, so no other writer
+    can slip between them.
+    """
+    tbl = _qualified(table)
+    cols = list(row)
+    pk_cols = list(pk_columns)
+
+    async def plan(style, execute, fetchone):
+        where = " AND ".join(
+            f"{_ident(c, kind='column')} = {_ph(style, i)}"
+            for i, c in enumerate(pk_cols, start=1))
+        existing = await fetchone(f"SELECT 1 FROM {tbl} WHERE {where}",
+                                  [row[c] for c in pk_cols])
+        if existing is not None:
+            return "exists"
+
+        col_sql = ", ".join(_ident(c, kind="column") for c in cols)
+        placeholders = ", ".join(_ph(style, i) for i in range(1, len(cols) + 1))
+        await execute(f"INSERT INTO {tbl} ({col_sql}) VALUES ({placeholders})",
+                      [row[c] for c in cols])
+        return "inserted"
+
+    outcome, driver = await _run(credential_ref, plan)
+    if outcome == "exists":
+        raise ConcurrentModification(
+            f"{table} row with pk {{{', '.join(pk_cols)}}} already exists; the "
+            f"delete did not land or the row was recreated. Refusing to reinsert."
+        )
     logger.info("reinserted %s row (%d column(s), driver=%s)", table, len(cols), driver)
     return {"table": table, "reinserted": True}
 
@@ -397,6 +539,7 @@ async def delete_row(
 
 
 __all__ = [
+    "set_pg_driver", "get_pg_driver",
     "update_row", "restore_row",
     "insert_row", "delete_inserted_row",
     "delete_row", "reinsert_row",
