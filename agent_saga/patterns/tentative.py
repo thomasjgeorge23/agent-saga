@@ -62,11 +62,37 @@ class TentativeResource:
     saga_id: Optional[str] = None
     on_commit: Optional[Callable[[], Any]] = None
     on_rollback: Optional[Callable[[], Any]] = None
+    rollback_handler: Optional[str] = None
+    """Name in the compensation registry, for crash recovery.
+
+    `on_rollback` is a closure: perfect in-process, and completely invisible to a
+    daemon in another process. Without a named handler a SIGKILL strands this
+    resource in PENDING forever, which is the failure this whole engine exists
+    to prevent -- so the absence is warned about, loudly."""
+    rollback_kwargs: dict = field(default_factory=dict)
     metadata: dict = field(default_factory=dict)
 
     @property
     def resolved(self) -> bool:
         return self.status is not TentativeStatus.PENDING
+
+    @property
+    def recoverable(self) -> bool:
+        """Can a different process, reading only the WAL, roll this back?"""
+        from ..registry import json_roundtrips
+
+        return bool(self.rollback_handler) and json_roundtrips(self.rollback_kwargs)
+
+    def describe(self) -> dict:
+        """WAL projection. Callables are not serializable; their intent is."""
+        return {
+            "resource_id": self.resource_id,
+            "status": self.status.value,
+            "rollback_handler": self.rollback_handler,
+            "recoverable": self.recoverable,
+            "rollback_kwargs": self.rollback_kwargs if self.recoverable else {},
+            "metadata": self.metadata,
+        }
 
     @property
     def is_pending(self) -> bool:
