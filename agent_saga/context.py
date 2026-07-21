@@ -170,7 +170,7 @@ class SagaContext:
         return resource
 
     async def acquire_semantic_lock(self, resource_id: str, *,
-                                    timeout: float = 0.0) -> None:
+                                    timeout: float = 5.0) -> None:
         """Claim a business resource for this saga. Released automatically when
         the saga finishes, however it finishes."""
         from .locks import get_semantic_locks

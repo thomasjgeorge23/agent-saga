@@ -109,6 +109,18 @@ class SemanticLockConflictError(RuntimeError):
         )
 
 
+class LockAcquisitionTimeoutError(SemanticLockConflictError):
+    """Raised when a lock cannot be acquired within the specified timeout."""
+
+    def __init__(self, resource_id: str, owner: str, waiter: str, timeout: float):
+        super().__init__(resource_id, owner, waiter)
+        self.timeout = timeout
+        self.args = (
+            f"Failed to acquire semantic lock for resource {resource_id!r} within {timeout} seconds. "
+            f"Lock is currently semantically locked by saga {owner} (requested by saga {waiter}).",
+        )
+
+
 class SemanticLockManager:
     """Application-level locks over business resources, held for a saga's life.
 
@@ -142,7 +154,7 @@ class SemanticLockManager:
             return owner == saga_id            # re-entrant for the same saga
 
     async def acquire(self, resource_id: str, saga_id: str, *,
-                      timeout: float = 0.0, poll: float = 0.01) -> None:
+                      timeout: float = 5.0, poll: float = 0.01) -> None:
         """Claim a resource for a saga.
 
         `timeout=0` fails fast, which is usually right for an agent: blocking a
@@ -157,7 +169,7 @@ class SemanticLockManager:
                 await asyncio.sleep(poll)
                 if self.try_acquire(resource_id, saga_id):
                     return
-        raise SemanticLockConflictError(resource_id, self.owner(resource_id) or "?", saga_id)
+        raise LockAcquisitionTimeoutError(resource_id, self.owner(resource_id) or "?", saga_id, timeout)
 
     def release(self, resource_id: str, saga_id: str) -> bool:
         """Release one resource, but only if this saga actually holds it --
@@ -280,7 +292,7 @@ class RedisSemanticLocks:
         )
 
     async def acquire(self, resource_id: str, saga_id: str, *,
-                      timeout: float = 0.0, poll: float = 0.05) -> None:
+                      timeout: float = 5.0, poll: float = 0.05) -> None:
         conn = await self._conn()
         key = self._key(resource_id)
         deadline = time.monotonic() + timeout
@@ -299,7 +311,7 @@ class RedisSemanticLocks:
                 self._ensure_renewer()
                 return
             if timeout <= 0 or time.monotonic() >= deadline:
-                raise SemanticLockConflictError(resource_id, current or "?", saga_id)
+                raise LockAcquisitionTimeoutError(resource_id, current or "?", saga_id, timeout)
             await asyncio.sleep(poll)
 
     async def release(self, resource_id: str, saga_id: str) -> bool:
@@ -376,5 +388,5 @@ def set_semantic_locks(manager: SemanticLockManager) -> None:
 
 __all__ = ["RecoveryLock", "FileLock", "InProcessLock",
            "SemanticLockManager", "RedisSemanticLocks",
-           "SemanticLockConflictError",
+           "SemanticLockConflictError", "LockAcquisitionTimeoutError",
            "get_semantic_locks", "set_semantic_locks"]

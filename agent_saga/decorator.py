@@ -13,6 +13,7 @@ from .gate import PreFlightGate
 from .semantics import ActionSemantics, CompensationFactory
 from .wal import AsyncWAL
 from .retry import RetryPolicy
+from .locks import LockAcquisitionTimeoutError
 
 logger = logging.getLogger("agent_saga.decorator")
 
@@ -68,6 +69,12 @@ async def saga_scope(
     await ctx.begin()
     try:
         yield ctx
+    except LockAcquisitionTimeoutError as exc:
+        logger.warning(f"[DEADLOCK RESOLUTION] Saga {ctx.saga_id} aborted due to lock timeout. Retrying later.")
+        ctx.record_abort(exc)
+        report = await ctx.rollback()
+        await ctx.finish(aborted=True, clean=report.clean)
+        raise SagaAborted(exc, report) from exc
     except BaseException as exc:
         # Capture *why* before unwinding -- this is the only place the trigger
         # is known. Written ahead of ROLLBACK_START so the trace reads causally.
