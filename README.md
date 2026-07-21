@@ -159,7 +159,7 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (185 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (193 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
@@ -175,6 +175,10 @@ with only `pytest`; optional extras add their own SDKs):
   injected encryptor — a reader without the key fails loud, never silent).
 - Recovery locking: an injectable lock interface, defaulting to a local file
   lock (no Redis in-tree — supply a distributed backend if you run a fleet).
+- Observability: `saga_id` / `step_id` correlation ids stamped on every log
+  record via contextvars (concurrent sagas never bleed ids), with a text
+  formatter for incidents and a JSON one for log pipelines. `configure_logging()`
+  is opt-in and never touches the root logger.
 
 Not yet published to PyPI.
 

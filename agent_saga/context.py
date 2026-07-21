@@ -351,8 +351,10 @@ class SagaContext:
                      "error": repr(exc),
                      "idempotency_key": step.compensation.idempotency_key},
                 )
+                # ASCII only: these lines print to consoles whose encoding is not
+                # UTF-8 (Windows cp1252), where a dash or arrow becomes mojibake.
                 logger.error("compensation FAILED for %r: %r%s", step.tool, exc,
-                             " — halting rollback" if self.halt_on_compensation_failure else "")
+                             " - halting rollback" if self.halt_on_compensation_failure else "")
                 if self.halt_on_compensation_failure:
                     report.halted = True
                 continue
@@ -376,7 +378,7 @@ class SagaContext:
         )
         await self.wal.barrier()
         # The one-line verdict an on-call engineer needs: clean or not, and why.
-        (logger.info if report.clean else logger.error)("rollback complete — %s",
+        (logger.info if report.clean else logger.error)("rollback complete: %s",
                                                          report.summary())
         return report
 
