@@ -284,3 +284,127 @@ async def test_barrier_timeout_can_be_disabled_explicitly():
             assert wal.barrier_timeout is None
         finally:
             await wal.close()
+
+
+# ==========================================================================
+# Global sequence numbering across nodes
+# ==========================================================================
+
+class CountingRedis(FakeRedis):
+    """FakeRedis plus INCRBY, i.e. what a real server provides."""
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.counters: dict[str, int] = {}
+
+    async def incrby(self, key, amount):
+        self.calls.append(("incrby", key, amount))
+        self.counters[key] = self.counters.get(key, 0) + amount
+        return self.counters[key]
+
+    async def delete(self, key):
+        self.counters.pop(key, None)
+        return await super().delete(key)
+
+
+@aio
+async def test_two_nodes_sharing_a_key_get_unique_monotonic_global_seqs():
+    """The per-process counter restarts at 1 on every node, so a shared log ends
+    up full of duplicate seqs: seq stops identifying a record, cross-saga order
+    becomes meaningless, and cursor reads are impossible. A shared INCRBY
+    counter fixes all three."""
+    shared = CountingRedis()
+    a = RedisWAL(client=shared, key="fleet")
+    b = RedisWAL(client=shared, key="fleet")
+    await a.start()
+    await b.start()
+    try:
+        a.append("SAGA_START", {"saga_id": "A"}); await a.barrier()
+        b.append("SAGA_START", {"saga_id": "B"}); await b.barrier()
+        a.append("STEP_COMMITTED", {"saga_id": "A", "step_id": "a1"}); await a.barrier()
+        b.append("STEP_COMMITTED", {"saga_id": "B", "step_id": "b1"}); await b.barrier()
+
+        reader = RedisWAL(client=shared, key="fleet")
+        await reader.start()
+        recs = await reader.read_all()
+        await reader.close()
+    finally:
+        await a.close()
+        await b.close()
+
+    local = [r["seq"] for r in recs]
+    glob = [r["gseq"] for r in recs]
+    assert len(set(local)) < len(local), "local seqs collide, as expected"
+    assert len(set(glob)) == len(glob), "global seqs must be unique"
+    assert glob == sorted(glob), "global seqs must be monotonic in append order"
+
+
+@aio
+async def test_one_incrby_per_batch_not_per_record():
+    """Group commit must amortise the counter round trip the same way it
+    amortises the write."""
+    shared = CountingRedis()
+    wal = RedisWAL(client=shared, key="k")
+    await wal.start()
+    try:
+        for i in range(6):
+            wal.append("E", {"saga_id": "s", "i": i})
+        await wal.barrier()
+        incrs = [c for c in shared.calls if c[0] == "incrby"]
+        assert len(incrs) == 1 and incrs[0][2] == 6
+    finally:
+        await wal.close()
+
+
+@aio
+async def test_the_local_seq_is_untouched_so_fences_still_work():
+    """Overwriting `seq` with the global value would make barrier() compare a
+    global number against the local counter and resolve every fence instantly."""
+    shared = CountingRedis()
+    shared.counters["k:seq"] = 10_000        # global counter already far ahead
+    wal = RedisWAL(client=shared, key="k")
+    await wal.start()
+    try:
+        seq = wal.append("E", {"saga_id": "s"})
+        assert seq == 1                       # local counter, not the global one
+        await wal.barrier(seq)                # must actually wait for the flush
+        assert wal._durable_seq == 1
+        stored = await wal.read_all()
+        assert stored[0]["gseq"] > 10_000     # global stamped separately
+    finally:
+        await wal.close()
+
+
+@aio
+async def test_parse_wal_orders_by_the_global_seq_when_present():
+    from agent_saga.recovery import parse_wal
+
+    # Interleaved arrival: local seqs collide, gseq carries the true order.
+    records = [
+        {"seq": 1, "gseq": 1, "event": "SAGA_START", "saga_id": "A"},
+        {"seq": 1, "gseq": 2, "event": "SAGA_START", "saga_id": "B"},
+        {"seq": 2, "gseq": 3, "event": "STEP_COMMITTED", "saga_id": "A",
+         "step_id": "a1", "tool": "A.first", "semantics": "COMPENSABLE"},
+        {"seq": 2, "gseq": 4, "event": "STEP_COMMITTED", "saga_id": "B",
+         "step_id": "b1", "tool": "B.first", "semantics": "COMPENSABLE"},
+        {"seq": 3, "gseq": 5, "event": "STEP_COMMITTED", "saga_id": "A",
+         "step_id": "a2", "tool": "A.second", "semantics": "COMPENSABLE"},
+    ]
+    sagas = parse_wal(records)
+    assert [s.tool for s in sagas["A"].steps] == ["A.first", "A.second"]
+    assert [s.tool for s in sagas["B"].steps] == ["B.first"]
+
+
+def test_file_wal_records_have_no_gseq_and_still_order_correctly():
+    """A single-writer file log needs no global counter; parse_wal falls back to
+    `seq`, so nothing changes for the default backend."""
+    from agent_saga.recovery import parse_wal
+
+    records = [
+        {"seq": 1, "event": "SAGA_START", "saga_id": "s"},
+        {"seq": 2, "event": "STEP_COMMITTED", "saga_id": "s", "step_id": "x",
+         "tool": "first", "semantics": "COMPENSABLE"},
+        {"seq": 3, "event": "STEP_COMMITTED", "saga_id": "s", "step_id": "y",
+         "tool": "second", "semantics": "COMPENSABLE"},
+    ]
+    assert [s.tool for s in parse_wal(records)["s"].steps] == ["first", "second"]

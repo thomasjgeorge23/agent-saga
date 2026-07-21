@@ -27,6 +27,7 @@ Requires the optional dependency:  pip install agent-saga[redis]
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Optional
 
 from .base import (
@@ -36,6 +37,8 @@ from .base import (
     DEFAULT_BARRIER_TIMEOUT,
     WALStalled,
 )
+
+logger = logging.getLogger("agent_saga.wal.redis")
 
 _IMPORT_HINT = (
     "RedisWAL needs the 'redis' package, which is an optional dependency.\n"
@@ -59,6 +62,7 @@ class RedisWAL(BufferedWAL):
         url: str = "redis://localhost:6379/0",
         *,
         key: str = "agent-saga:wal",
+        seq_key: Optional[str] = None,
         client: Any = None,
         wait_replicas: int = 0,
         wait_timeout_ms: int = 1000,
@@ -71,6 +75,9 @@ class RedisWAL(BufferedWAL):
                          encryptor=encryptor, barrier_timeout=barrier_timeout)
         self.url = url
         self.key = key
+        # Global sequence counter, shared by every node writing this log. See
+        # _flush_batch for why the per-process counter is not enough.
+        self.seq_key = seq_key or f"{key}:seq"
         self.wait_replicas = wait_replicas
         self.wait_timeout_ms = wait_timeout_ms
         self._client = client
@@ -108,6 +115,35 @@ class RedisWAL(BufferedWAL):
         from ..encryption import encode_line
 
         assert self._client is not None
+
+        # Stamp a GLOBAL sequence number.
+        #
+        # `seq` is a per-process counter, so every node writing this shared key
+        # starts again at 1 and the log ends up full of duplicates. That does not
+        # break per-saga rollback order (within one saga the local seqs are still
+        # monotonic, so a stable sort keeps that saga's steps in order), but it
+        # does destroy three things that matter: seq stops being a unique id,
+        # cross-saga ordering becomes meaningless, and cursor reads ("everything
+        # after N") become impossible.
+        #
+        # INCRBY reserves a contiguous range for this batch in one round trip, so
+        # the cost is per-flush rather than per-record, and group commit amortises
+        # it exactly like the write itself. `seq` is deliberately left untouched:
+        # the barrier bookkeeping compares against the local counter, and
+        # overwriting it here would make every fence resolve instantly.
+        try:
+            end = int(await self._client.incrby(self.seq_key, len(batch)))
+            start = end - len(batch) + 1
+            for offset, record in enumerate(batch):
+                record["gseq"] = start + offset
+        except AttributeError:
+            # A client without INCRBY (an old stub). Degrade to local ordering
+            # rather than refusing to write -- but say so, because the log's
+            # global ordering guarantee is then not being met.
+            logger.warning(
+                "Redis client has no INCRBY; records will carry only a "
+                "process-local seq, so cross-node ordering is not guaranteed.")
+
         lines = [encode_line(r, self._encryptor) for r in batch]
         await self._client.rpush(self.key, *lines)
 
@@ -152,6 +188,10 @@ class RedisWAL(BufferedWAL):
         self._seq = 0
         self._durable_seq = 0
         await self._client.delete(self.key)
+        try:
+            await self._client.delete(self.seq_key)
+        except Exception:
+            pass
 
 
 __all__ = ["RedisWAL"]

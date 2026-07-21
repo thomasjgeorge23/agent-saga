@@ -106,7 +106,10 @@ def parse_wal(records: Iterable[dict]) -> dict[str, DanglingSaga]:
     def get(sid: str) -> DanglingSaga:
         return sagas.setdefault(sid, DanglingSaga(saga_id=sid))
 
-    for rec in sorted(records, key=lambda r: r.get("seq", 0)):
+    # Order by the global sequence when the backend supplies one (RedisWAL
+    # stamps `gseq` from a shared counter); fall back to the local `seq` for
+    # a single-writer file log, where the two are identical.
+    for rec in sorted(records, key=lambda r: (r.get("gseq") or r.get("seq", 0))):
         sid = rec.get("saga_id")
         if not sid:
             continue

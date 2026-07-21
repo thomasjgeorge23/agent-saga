@@ -159,7 +159,7 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (263 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (268 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
@@ -187,6 +187,9 @@ with only `pytest`; optional extras add their own SDKs):
   like a fresh refund). The key is auto-injected into handlers that accept it,
   and an execution ledger reads both the daemon journal and the crashed
   process's own WAL, so completed work is skipped rather than repeated.
+- `RedisWAL` stamps a global sequence (`gseq`) from a shared Redis counter, one
+  INCRBY per batch, so records on a multi-node log are uniquely identified and
+  globally ordered. The per-process `seq` is left intact for fence bookkeeping.
 - OpenTelemetry spans (`pip install agent-saga[opentelemetry]`): a root
   `saga.execute` span with `saga.status` (COMPLETED / ROLLED_BACK / FAILED),
   child `saga.step.<tool>` and `saga.rollback.<tool>` spans, exceptions
