@@ -87,6 +87,30 @@ def test_reference_suffixed_names_are_allowed():
                        "auth_token_ref": "sf_sandbox"}, where="test")
 
 
+def test_secret_nested_in_a_dict_is_caught():
+    """A row snapshot or Stripe metadata dict can smuggle a live key past a
+    top-level-only check. It must not."""
+    with pytest.raises(SecretLeak, match="Stripe secret key"):
+        assert_no_secrets(
+            {"previous_state": {"id": 7, "api_key": "sk_live_abcdefghij1234567890"}},
+            where="postgres.update_row")
+
+
+def test_secret_nested_in_a_list_is_caught():
+    with pytest.raises(SecretLeak, match="GitHub token"):
+        assert_no_secrets(
+            {"rows": [{"ok": 1}, {"blob": "ghp_abcdefghijklmnopqrstuvwxyz"}]},
+            where="test")
+
+
+def test_nested_business_column_named_token_is_not_a_false_positive():
+    """Key-name matching is deliberately NOT recursed into user data: a CRM
+    column literally named `token` with an innocent value is not a leak."""
+    assert_no_secrets(
+        {"previous_state": {"token": "just-a-normal-string", "auth_provider": "okta"}},
+        where="salesforce.patch_object")
+
+
 def test_credential_resolves_from_env_and_from_a_custom_store():
     with credential("stripe_prod", "sk_live_xyz"):
         assert resolve_credential("stripe_prod") == "sk_live_xyz"

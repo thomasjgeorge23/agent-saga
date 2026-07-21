@@ -328,3 +328,33 @@ async def test_real_crashed_process_with_closure_compensation_escalates():
         outcome = (await RecoveryDaemon(wal).recover_all())[0]
         assert outcome.resolution is Resolution.NEEDS_HUMAN
         assert "in-process only" in outcome.reason
+
+
+# --------------------------------------------------------------------------
+# Truncation tolerance -- the daemon must survive the crash it exists to fix
+# --------------------------------------------------------------------------
+
+@aio
+async def test_recovery_survives_a_truncated_final_wal_line():
+    """A SIGKILL mid-write leaves a partial last line. A bare json.loads over the
+    file would raise and take recovery down with it -- on exactly the crash it is
+    supposed to resolve."""
+    CALLS.clear()
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "wal.jsonl"
+        recs = _saga_records(ts=OLD)
+        with open(path, "w", encoding="utf-8") as fh:
+            for i, r in enumerate(recs, start=1):
+                fh.write(json.dumps({"seq": i, **r}) + "\n")
+            # a torn final write: valid JSON prefix, no newline, cut off
+            fh.write('{"seq": 99, "event": "STEP_INTENT", "saga_id": "s1", "to')
+
+        daemon = RecoveryDaemon(path)
+        # scan must not raise, and must still see the good records
+        sagas = daemon.scan()
+        assert "s1" in sagas
+        assert daemon.parse_stats.corrupt_lines == 1
+
+        outcome = (await daemon.recover_all())[0]
+        assert outcome.resolution is Resolution.RECOVERED
+        assert CALLS == [{"handler": "test.revert_crm", "record_id": "acct_9"}]

@@ -16,6 +16,7 @@ every event would not be.
 from __future__ import annotations
 
 import asyncio
+import enum
 import json
 import os
 import time
@@ -24,8 +25,47 @@ from pathlib import Path
 from typing import Any, Optional
 
 
+class BackpressurePolicy(enum.Enum):
+    """What append() does when the in-memory buffer is full.
+
+    A silently dropped record is a silently unrecoverable side effect: if the
+    STEP_INTENT for a charge never lands, the recovery daemon has no way to undo
+    it. So the default is RAISE -- fail the step *before* its effect runs, rather
+    than let the agent proceed with an incomplete rollback history.
+    """
+
+    RAISE = "RAISE"
+    """Raise WALBackpressure on overflow. The intent append happens before the
+    side effect, so the step aborts cleanly with nothing executed. Safe default."""
+
+    BLOCK = "BLOCK"
+    """Never drop. append() lets the buffer grow; the async durable path yields
+    via ensure_capacity() so the flush loop can drain. For high-integrity work
+    that would rather slow down than lose a record."""
+
+    DROP_SILENT = "DROP_SILENT"
+    """Count the drop and return a sentinel (-1), never fooling barrier() into
+    reporting a dropped record as durable. Only for low-value REVERSIBLE work
+    where a missing WAL line costs nothing (the state dies with the process)."""
+
+
+class WALBackpressure(RuntimeError):
+    """The WAL buffer is full and the policy is RAISE. Raised before any side
+    effect, so the transaction is safely abortable."""
+
+
+DROPPED = -1
+"""append() sentinel: the record was NOT written. Never a valid seq."""
+
+
 class AsyncWAL:
-    def __init__(self, path: Optional[str | Path] = None, *, max_buffer: int = 100_000):
+    def __init__(
+        self,
+        path: Optional[str | Path] = None,
+        *,
+        max_buffer: int = 100_000,
+        backpressure: BackpressurePolicy = BackpressurePolicy.RAISE,
+    ):
         self.path = Path(path) if path else None
         self._buf: deque = deque()
         self._seq = 0
@@ -36,9 +76,10 @@ class AsyncWAL:
         self._closing = False
         self._fh = None
         self._max_buffer = max_buffer
+        self.backpressure = backpressure
         self.dropped = 0
-        """Backpressure counter. A WAL that silently blocks the agent is a
-        worse failure than a WAL that reports it shed load."""
+        """Count of records shed under DROP_SILENT. Non-zero means rollback
+        history is incomplete -- surface it, never hide it."""
         self.barriers = 0
         """How many callers actually blocked waiting for durability."""
         self.flush_cycles = 0
@@ -55,15 +96,39 @@ class AsyncWAL:
 
     def append(self, event: str, payload: dict) -> int:
         """Hot path. Synchronous by design -- making this `async` would put an
-        event-loop scheduling hop between the agent and every tool call."""
+        event-loop scheduling hop between the agent and every tool call.
+
+        Returns the record's seq, or DROPPED (-1) under DROP_SILENT on overflow.
+        Raises WALBackpressure under RAISE. Under BLOCK, never drops (the buffer
+        may exceed max_buffer transiently; ensure_capacity() bounds it)."""
         if len(self._buf) >= self._max_buffer:
-            self.dropped += 1
-            return self._seq
+            if self.backpressure is BackpressurePolicy.RAISE:
+                raise WALBackpressure(
+                    f"WAL buffer full ({self._max_buffer} records); the flush loop "
+                    f"is not draining fast enough. Refusing to proceed without a "
+                    f"durable record. (event={event!r})"
+                )
+            if self.backpressure is BackpressurePolicy.DROP_SILENT:
+                self.dropped += 1
+                return DROPPED
+            # BLOCK: fall through and append anyway -- never lose a record.
         self._seq += 1
         self._buf.append({"seq": self._seq, "event": event, "ts": time.time(), **payload})
         if self._wake is not None and not self._wake.is_set():
             self._wake.set()
         return self._seq
+
+    async def ensure_capacity(self) -> None:
+        """Under BLOCK, yield until the buffer has room so the next append does
+        not push it further past the limit. A no-op under other policies. Bounded
+        by flush speed, not a busy-spin: each iteration wakes the flusher and
+        awaits a real scheduling turn."""
+        if self.backpressure is not BackpressurePolicy.BLOCK:
+            return
+        while len(self._buf) >= self._max_buffer and self._task is not None:
+            if self._wake is not None:
+                self._wake.set()
+            await asyncio.sleep(0.001)
 
     async def barrier(self, seq: Optional[int] = None) -> None:
         """Block until every record up to `seq` is durable on disk."""

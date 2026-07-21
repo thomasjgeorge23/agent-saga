@@ -551,10 +551,46 @@ async def test_wal_records_a_replayable_ordered_trace():
 
 
 @aio
-async def test_wal_sheds_load_rather_than_blocking_the_agent():
-    w = AsyncWAL(max_buffer=10)
+async def test_wal_drop_silent_sheds_load_and_returns_a_sentinel():
+    """DROP_SILENT is opt-in, for low-value work only. It must return the DROPPED
+    sentinel, never a real seq -- a dropped record that reported a valid seq
+    would fool barrier() into calling it durable."""
+    from agent_saga import BackpressurePolicy
+    from agent_saga.wal import DROPPED
+
+    w = AsyncWAL(max_buffer=10, backpressure=BackpressurePolicy.DROP_SILENT)
+    await w.start()
+    results = [w.append("NOISE", {"i": i}) for i in range(50)]
+    assert w.dropped > 0
+    assert DROPPED in results
+    assert all(r == DROPPED or r > 0 for r in results)
+    await w.close()
+
+
+@aio
+async def test_wal_default_policy_raises_rather_than_silently_dropping():
+    """The safe default: refuse to proceed without a durable record. The intent
+    append happens before the side effect, so raising here aborts the step with
+    nothing executed."""
+    from agent_saga import WALBackpressure
+
+    w = AsyncWAL(max_buffer=10)   # default backpressure = RAISE
+    await w.start()
+    with pytest.raises(WALBackpressure):
+        for i in range(50):
+            w.append("NOISE", {"i": i})
+    await w.close()
+
+
+@aio
+async def test_wal_block_policy_never_drops_and_ensure_capacity_drains():
+    from agent_saga import BackpressurePolicy
+
+    w = AsyncWAL(max_buffer=10, backpressure=BackpressurePolicy.BLOCK)
     await w.start()
     for i in range(50):
-        w.append("NOISE", {"i": i})
-    assert w.dropped > 0
+        w.append("NOISE", {"i": i})   # never raises, never drops
+    assert w.dropped == 0
+    await w.ensure_capacity()          # yields until the flusher drains the buffer
+    assert len(w._buf) < w._max_buffer
     await w.close()

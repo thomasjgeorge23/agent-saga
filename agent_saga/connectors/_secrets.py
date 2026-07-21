@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 _RESOLVER: Optional[Callable[[str], str]] = None
 
@@ -77,19 +77,57 @@ _SUSPICIOUS_KEYS = re.compile(
 )
 
 
+def _find_secret_value(value: Any, path: str) -> Optional[tuple[str, str]]:
+    """Walk nested dicts and lists; return (path, label) for the first string
+    matching a credential pattern, else None.
+
+    Only *values* are matched here, at any depth. The patterns are specific
+    (`sk_live_...`, JWTs, DB URIs), so recursing them through a row snapshot or
+    Stripe metadata has a low false-positive rate. Key *names* are deliberately
+    NOT recursed into these payloads -- a column literally named `token` or
+    `auth_provider` is user data, not a leak, and flagging it would break real
+    connectors.
+    """
+    if isinstance(value, str):
+        for pattern, label in _PATTERNS:
+            if pattern.match(value):
+                return path, label
+        return None
+    if isinstance(value, dict):
+        for k, v in value.items():
+            hit = _find_secret_value(v, f"{path}.{k}" if path else str(k))
+            if hit:
+                return hit
+    elif isinstance(value, (list, tuple)):
+        for i, v in enumerate(value):
+            hit = _find_secret_value(v, f"{path}[{i}]")
+            if hit:
+                return hit
+    return None
+
+
 def assert_no_secrets(kwargs: dict, *, where: str) -> None:
-    """Fail loudly while the developer is still writing the connector."""
-    for key, value in kwargs.items():
-        if isinstance(value, str):
-            for pattern, label in _PATTERNS:
-                if pattern.match(value):
-                    raise SecretLeak(
-                        f"{where}: compensation kwarg {key!r} looks like a {label}. "
-                        f"Compensation kwargs are written to the WAL in plaintext. "
-                        f"Pass a credential reference name instead and resolve it "
-                        f"in the handler via resolve_credential()."
-                    )
-        if _SUSPICIOUS_KEYS.search(key) and not key.endswith(("_ref", "_reference", "_name")):
+    """Fail loudly while the developer is still writing the connector.
+
+    Catches a credential-shaped value anywhere in the kwargs -- including nested
+    dicts and lists such as a Postgres row snapshot or Stripe metadata, not just
+    top-level strings -- plus top-level kwarg *names* that look like credentials
+    (those names are connector-authored, so strictness there is safe).
+    """
+    hit = _find_secret_value(kwargs, "")
+    if hit:
+        path, label = hit
+        loc = f"value at {path!r}" if path else "value"
+        raise SecretLeak(
+            f"{where}: {loc} looks like a {label}. Compensation kwargs are written "
+            f"to the WAL in plaintext, including nested structures. Pass a "
+            f"credential reference and resolve it in the handler via "
+            f"resolve_credential()."
+        )
+    for key in kwargs:
+        if isinstance(key, str) and _SUSPICIOUS_KEYS.search(key) and not key.endswith(
+            ("_ref", "_reference", "_name")
+        ):
             raise SecretLeak(
                 f"{where}: compensation kwarg {key!r} is named like a credential. "
                 f"If it is one, pass a reference instead (e.g. {key}_ref='stripe_prod'). "

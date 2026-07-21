@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Optional, Protocol, runtime_checkable
@@ -48,6 +49,8 @@ class SnapshotStore(Protocol):
     def put(self, snapshot_id: str, blob: bytes) -> None: ...
     def get(self, snapshot_id: str) -> bytes: ...
     def delete(self, snapshot_id: str) -> None: ...
+    def list_ids(self) -> list[str]: ...
+    def age_seconds(self, snapshot_id: str) -> Optional[float]: ...
 
 
 class FileSnapshotStore:
@@ -88,6 +91,16 @@ class FileSnapshotStore:
             self._path(snapshot_id).unlink()
         except FileNotFoundError:
             pass
+
+    def list_ids(self) -> list[str]:
+        return [p.name for p in self.root.iterdir()
+                if p.is_file() and not p.name.endswith(".tmp")]
+
+    def age_seconds(self, snapshot_id: str) -> Optional[float]:
+        try:
+            return max(0.0, time.time() - self._path(snapshot_id).stat().st_mtime)
+        except (FileNotFoundError, ValueError):
+            return None
 
 
 _STORE: Optional[SnapshotStore] = None

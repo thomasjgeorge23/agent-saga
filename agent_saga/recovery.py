@@ -223,10 +223,21 @@ class RecoveryDaemon:
     # -- scanning ----------------------------------------------------------
 
     def scan(self) -> dict[str, DanglingSaga]:
-        if not self.wal_path.exists():
-            return {}
-        with open(self.wal_path, encoding="utf-8") as fh:
-            records = [json.loads(line) for line in fh if line.strip()]
+        # Recovery runs precisely *after* a crash, so a truncated final line is
+        # the expected case, not the exceptional one. A bare json.loads over the
+        # file would raise on that partial line and take the whole recovery down
+        # with it -- a daemon that dies on the corruption it exists to resolve.
+        # iter_records skips unparseable lines and counts them.
+        from .ui.reader import ParseStats, iter_records
+
+        self.parse_stats = ParseStats()
+        records = list(iter_records(self.wal_path, self.parse_stats))
+        if self.parse_stats.corrupt_lines:
+            logger.warning(
+                "WAL %s had %d unparseable line(s) (likely a truncated final "
+                "write from the crash); they were skipped.",
+                self.wal_path, self.parse_stats.corrupt_lines,
+            )
         return parse_wal(records)
 
     def dangling(self) -> list[DanglingSaga]:

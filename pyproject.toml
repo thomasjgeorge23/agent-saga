@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent-rollback"
+name = "agent-saga"
 version = "0.1.0"
 description = "Transactional boundaries, typed compensation semantics, and a pre-flight safety gate for autonomous AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "AGPL-3.0-only" }
-authors = [{ name = "Avertis Systems" }]
-maintainers = [{ name = "Avertis Systems" }]
+authors = [{ name = "SagaOps" }]
+maintainers = [{ name = "SagaOps" }]
 keywords = ["ai-agents", "saga", "rollback", "compensation", "llm", "observability"]
 classifiers = [
     "License :: OSI Approved :: GNU Affero General Public License v3",
@@ -25,6 +25,13 @@ dev = ["pytest>=7.4", "langchain-core>=0.3"]
 langgraph = ["langchain-core>=0.3", "langgraph>=0.2"]
 crewai = ["crewai"]
 openai-agents = ["openai-agents"]
+postgres = ["psycopg>=3.1"]
+stripe = ["stripe>=5.0"]
+salesforce = ["httpx>=0.24"]
+all = [
+    "langchain-core>=0.3", "langgraph>=0.2", "crewai", "openai-agents",
+    "psycopg>=3.1", "stripe>=5.0", "httpx>=0.24",
+]
 
 [project.scripts]
 agent-saga = "agent_saga.cli:main"

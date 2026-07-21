@@ -41,6 +41,7 @@ from .durable import (
     set_snapshot_store,
     snapshot_file,
 )
+from .gc import GCReport, SnapshotGC
 from .snapshot import (
     AttributeSnapshot,
     MappingSnapshot,
@@ -50,14 +51,16 @@ from .snapshot import (
     auto_strategy,
     reversible,
 )
-from .wal import AsyncWAL
+from .wal import AsyncWAL, BackpressurePolicy, WALBackpressure
 
 __version__ = "0.1.0"
-__author__ = "Avertis Systems"
+__author__ = "SagaOps"
 
 __all__ = [
     "ActionSemantics",
     "AsyncWAL",
+    "BackpressurePolicy",
+    "WALBackpressure",
     "Compensation",
     "DanglingSaga",
     "DanglingStep",
@@ -100,5 +103,7 @@ __all__ = [
     "restore_file",
     "set_snapshot_store",
     "snapshot_file",
+    "GCReport",
+    "SnapshotGC",
     "__version__",
 ]

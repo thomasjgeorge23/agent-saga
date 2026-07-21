@@ -198,6 +198,10 @@ class SagaContext:
         step = SagaStep(tool=tool, semantics=semantics)
         self.stack.append(step)
 
+        # Under a BLOCK backpressure policy, yield until the WAL buffer has room
+        # so the intent append below cannot be dropped. No-op otherwise.
+        await self.wal.ensure_capacity()
+
         # 2. Write intent BEFORE the effect. On COMPENSABLE/IRREVERSIBLE we pay
         #    for durability -- losing the record of a charge is unacceptable;
         #    losing the record of a cache write is not.

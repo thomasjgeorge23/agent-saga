@@ -159,19 +159,25 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha. Core engine, recovery daemon, three reference connectors, adapters
-for LangGraph, CrewAI, and the OpenAI Agents SDK, the time-travel debugger, and
-both in-process (`REVERSIBLE`) and durable, crash-recoverable (`COMPENSABLE`)
-snapshot capture are implemented and tested (142 tests; the suite runs with only
+Pre-alpha, by SagaOps. Core engine, recovery daemon (truncation-tolerant),
+three reference connectors, adapters for LangGraph, CrewAI, and the OpenAI
+Agents SDK, the time-travel debugger, in-process (`REVERSIBLE`) and durable
+crash-recoverable (`COMPENSABLE`) snapshot capture, a snapshot-store GC sweep,
+and a configurable WAL backpressure policy (`RAISE` by default — never silently
+drops a record) are implemented and tested (158 tests; the suite runs with only
 `pytest`, and each adapter's integration tests use its own SDK when installed).
-Not yet published to PyPI. A snapshot-store GC pass and an AutoGen adapter are
-next.
+Not yet published to PyPI.
+
+Known-pending hardening, tracked openly (see [SECURITY.md](SECURITY.md)):
+WAL-at-rest encryption, authentication on the debugger UI, a distributed
+(non-filesystem) recovery lock, async-native connectors, full CRUD/compound-key
+Postgres coverage, and LlamaIndex / AutoGen adapters.
 
 ## License
 
 Licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only).
-See [LICENSE](LICENSE). Copyright (c) 2026 Avertis Systems.
+See [LICENSE](LICENSE). Copyright (c) 2026 SagaOps.
 
 The AGPL's network-use clause (section 13) means a hosted service built on this
 code must offer its users the corresponding source. If that does not fit your
-deployment, contact Avertis Systems about a commercial license.
+deployment, contact SagaOps about a commercial license.
