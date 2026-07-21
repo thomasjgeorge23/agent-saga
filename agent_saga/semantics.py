@@ -42,6 +42,7 @@ class StepState(enum.Enum):
     COMPENSATION_FAILED = "COMPENSATION_FAILED"
     ORPHANED = "ORPHANED"                # IRREVERSIBLE, executed, cannot be undone
     UNRESOLVED = "UNRESOLVED"            # rollback halted before reaching this step
+    COMPLETED_VIA_FALLBACK = "COMPLETED_VIA_FALLBACK" # completed using a fallback action
 
 
 @dataclass(frozen=True)

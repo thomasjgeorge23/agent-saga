@@ -335,6 +335,7 @@ class SagaContext:
         *,
         timeout: Optional[float] = None,
         policy_args: Optional[dict] = None,
+        fallback_action: Optional[Callable] = None,
     ) -> Any:
         """`policy_args` is what the gate evaluates, and it exists because
         `forward_kwargs` is not trustworthy for policy.
@@ -402,6 +403,31 @@ class SagaContext:
                 result = await _invoke(forward, forward_kwargs,
                                        timeout or self.default_timeout)
         except BaseException as exc:
+            if fallback_action is not None and not isinstance(exc, (SystemExit, KeyboardInterrupt)):
+                try:
+                    import inspect
+                    if inspect.iscoroutinefunction(fallback_action):
+                        result = await fallback_action()
+                    else:
+                        result = fallback_action()
+
+                    step.state = StepState.COMPLETED_VIA_FALLBACK
+                    self.wal.append(
+                        "COMPLETED_VIA_FALLBACK",
+                        {
+                            "saga_id": self.saga_id,
+                            "step_id": step.step_id,
+                            "tool": tool,
+                            "semantics": semantics.value,
+                            "compensation": None
+                        },
+                    )
+                    if self.durable_commit and semantics is not ActionSemantics.REVERSIBLE:
+                        await self.wal.barrier()
+                    return result
+                except Exception as fallback_exc:
+                    logger.error("Fallback action failed with error: %r", fallback_exc)
+
             # We do not know whether the effect landed. A timed-out POST to
             # Stripe may well have charged the card. Treat as UNKNOWN, not as
             # "did not happen", and still attempt idempotent compensation.

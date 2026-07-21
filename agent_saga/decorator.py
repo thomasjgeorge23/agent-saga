@@ -140,6 +140,7 @@ def tool(
     compensate: Optional[CompensationFactory] = None,
     timeout: Optional[float] = None,
     retry_policy: Optional[RetryPolicy] = None,
+    fallback_action: Optional[Callable] = None,
 ):
     """Registers a function as a saga-aware tool.
 
@@ -191,7 +192,16 @@ def tool(
                             raise
 
             if ctx is None:
-                return await retrying_forward(**kwargs)
+                try:
+                    return await retrying_forward(**kwargs)
+                except Exception as exc:
+                    if fallback_action is not None:
+                        import inspect
+                        if inspect.iscoroutinefunction(fallback_action):
+                            return await fallback_action()
+                        else:
+                            return fallback_action()
+                    raise
             return await ctx.execute(
                 tool=tool_name,
                 semantics=semantics,
@@ -199,6 +209,7 @@ def tool(
                 forward_kwargs=kwargs,
                 compensate=compensate,
                 timeout=timeout,
+                fallback_action=fallback_action,
             )
 
         wrapper.__saga_tool__ = {"name": tool_name, "semantics": semantics}  # type: ignore[attr-defined]

@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-saga"
-version = "0.1.4"
+version = "0.1.5"
 description = "Transactional boundaries, typed compensation semantics, and a pre-flight safety gate for autonomous AI agents."
 readme = "README.md"
 requires-python = ">=3.10"

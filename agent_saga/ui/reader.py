@@ -138,6 +138,7 @@ STEP_COMPENSATION_FAILED = "COMPENSATION_FAILED"
 STEP_ORPHANED = "ORPHANED"
 STEP_UNKNOWN = "UNKNOWN"
 STEP_GATED = "GATED"  # intent written, never committed (blocked or crashed pre-commit)
+STEP_COMPLETED_VIA_FALLBACK = "COMPLETED_VIA_FALLBACK"
 
 
 @dataclass
@@ -234,6 +235,13 @@ class _SagaAcc:
             s.committed_ts = ts
             s.status = STEP_COMMITTED
             s.compensation = rec.get("compensation")
+        elif ev == "COMPLETED_VIA_FALLBACK" and sid:
+            s = self.step(sid)
+            s.tool = rec.get("tool", s.tool)
+            s.semantics = rec.get("semantics", s.semantics)
+            s.committed_ts = ts
+            s.status = STEP_COMPLETED_VIA_FALLBACK
+            s.compensation = None
         elif ev == "STEP_UNKNOWN" and sid:
             s = self.step(sid)
             s.tool = rec.get("tool", s.tool)

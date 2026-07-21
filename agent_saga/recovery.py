@@ -128,7 +128,7 @@ def parse_wal(records: Iterable[dict]) -> dict[str, DanglingSaga]:
             saga.aborted = True
         elif ev == "ROLLBACK_END":
             saga.rollback_finished = True
-        elif ev in ("STEP_INTENT", "STEP_COMMITTED", "STEP_UNKNOWN"):
+        elif ev in ("STEP_INTENT", "STEP_COMMITTED", "STEP_UNKNOWN", "COMPLETED_VIA_FALLBACK"):
             step = _find(saga, rec["step_id"])
             if step is None:
                 step = DanglingStep(
@@ -143,6 +143,9 @@ def parse_wal(records: Iterable[dict]) -> dict[str, DanglingSaga]:
             elif ev == "STEP_UNKNOWN":
                 step.state = "UNKNOWN"
                 step.compensation = rec.get("compensation")
+            elif ev == "COMPLETED_VIA_FALLBACK":
+                step.state = "COMPLETED_VIA_FALLBACK"
+                step.compensation = None
         elif ev == "COMPENSATED":
             saga.compensated_step_ids.add(rec["step_id"])
         elif ev == "TENTATIVE_REGISTERED":
