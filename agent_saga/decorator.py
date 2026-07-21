@@ -162,6 +162,24 @@ def tool(
                         return await _invoke(fn, f_kwargs, timeout)
                     except Exception as exc:
                         if retry_policy is not None and attempt < retry_policy.max_retries:
+                            # Check if exception type is excluded
+                            should_exclude = False
+                            for ex_cls in retry_policy.exclude_exceptions:
+                                if issubclass(type(exc), ex_cls):
+                                    should_exclude = True
+                                    break
+                            if should_exclude:
+                                raise
+
+                            # Check if exception type is included for retry
+                            should_retry = False
+                            for ex_cls in retry_policy.retry_on:
+                                if issubclass(type(exc), ex_cls):
+                                    should_retry = True
+                                    break
+                            if not should_retry:
+                                raise
+
                             delay = retry_policy.calculate_delay(attempt)
                             logger.warning(
                                 "Step %s failed with exception: %r. Retrying in %.2fs (attempt %d/%d)...",

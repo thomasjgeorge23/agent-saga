@@ -43,6 +43,11 @@ class SagaJSONEncoder(json.JSONEncoder):
                 "__type__": "set",
                 "value": list(obj)
             }
+        elif isinstance(obj, type) and issubclass(obj, BaseException):
+            return {
+                "__type__": "exception_class",
+                "value": f"{obj.__module__}.{obj.__name__}"
+            }
         return super().default(obj)
 
 
@@ -58,6 +63,20 @@ def saga_object_hook(dct: dict) -> Any:
             return uuid.UUID(dct["value"])
         elif t == "set":
             return set(dct["value"])
+        elif t == "exception_class":
+            val = dct["value"]
+            try:
+                module_name, class_name = val.rsplit(".", 1)
+                if module_name == "builtins":
+                    import builtins
+                    return getattr(builtins, class_name)
+                module = importlib.import_module(module_name)
+                return getattr(module, class_name)
+            except Exception:
+                import builtins
+                if hasattr(builtins, val):
+                    return getattr(builtins, val)
+                return Exception
         elif t == "pydantic":
             class_path = dct["__class__"]
             value = dct["value"]

@@ -58,3 +58,65 @@ async def test_hard_failure_exceeds_retries_triggers_rollback():
     assert isinstance(exc_info.value.cause, RuntimeError)
     assert calls == 3  # initial attempt + 2 retries = 3 total attempts
     assert compensated == ["undone"]  # rollback triggers because all retries failed
+
+
+@pytest.mark.anyio
+async def test_retry_on_filtered_exception():
+    calls = 0
+    compensated = []
+
+    # Retry only on TimeoutError, exclude ValueError
+    policy = RetryPolicy(
+        max_retries=2,
+        base_delay=0.01,
+        retry_on=[TimeoutError],
+        exclude_exceptions=[ValueError]
+    )
+
+    @saga.step(semantics=C, retry_policy=policy, compensate=lambda r: Compensation(fn=lambda: compensated.append("undone")))
+    async def flaky_timeout_step():
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise TimeoutError("timeout occurred")
+        return "ok"
+
+    @saga
+    async def run_flow():
+        return await flaky_timeout_step()
+
+    res = await run_flow()
+    assert res == "ok"
+    assert calls == 3
+    assert len(compensated) == 0
+
+
+@pytest.mark.anyio
+async def test_exclude_exception_bypasses_retry_immediately():
+    calls = 0
+    compensated = []
+
+    # Retry only on TimeoutError, exclude ValueError
+    policy = RetryPolicy(
+        max_retries=2,
+        base_delay=0.01,
+        retry_on=[TimeoutError],
+        exclude_exceptions=[ValueError]
+    )
+
+    @saga.step(semantics=C, retry_policy=policy, compensate=lambda r: Compensation(fn=lambda: compensated.append("undone")))
+    async def immediate_fail_step():
+        nonlocal calls
+        calls += 1
+        raise ValueError("unrecoverable error")
+
+    @saga
+    async def run_flow():
+        await immediate_fail_step()
+
+    with pytest.raises(SagaAborted) as exc_info:
+        await run_flow()
+
+    assert isinstance(exc_info.value.cause, ValueError)
+    assert calls == 1  # Should fail on first attempt without retrying
+    assert compensated == ["undone"]  # Should trigger compensation immediately
