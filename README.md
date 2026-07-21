@@ -252,6 +252,27 @@ from agent_saga.adapters.crewai   import wrap_tool as crew_tool
 from agent_saga.adapters.llamaindex import wrap_tool as llama_tool
 ```
 
+### FastAPI integration
+
+For FastAPI applications, you can use the native lifespan plugin to automatically initialize the engine, configure the default process-wide WAL, and manage the background recovery daemon.
+
+```python
+from fastapi import FastAPI
+from agent_saga import saga_lifespan, saga
+
+app = FastAPI(lifespan=saga_lifespan("path/to/wal.jsonl"))
+
+@app.post("/checkout")
+async def checkout():
+    # Sagas inside routes will automatically use the default WAL
+    @saga
+    async def process_payment():
+        ...
+    return await process_payment()
+```
+
+During shutdown, the lifespan manager gracefully cancels the recovery daemon, awaits any pending compensations for active sagas, releases held semantic locks, and flushes the write-ahead log.
+
 ## Human approvals
 
 The gate can refuse. Refusing is often the wrong answer — what a bank actually

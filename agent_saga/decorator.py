@@ -17,6 +17,20 @@ _current: contextvars.ContextVar[Optional[SagaContext]] = contextvars.ContextVar
     "agent_saga_current", default=None
 )
 
+_DEFAULT_WAL: Optional[AsyncWAL] = None
+_active_sagas: set[SagaContext] = set()
+
+
+def get_default_wal() -> Optional[AsyncWAL]:
+    """Retrieve the process-wide default write-ahead log."""
+    return _DEFAULT_WAL
+
+
+def set_default_wal(wal: Optional[AsyncWAL]) -> None:
+    """Set the process-wide default write-ahead log."""
+    global _DEFAULT_WAL
+    _DEFAULT_WAL = wal
+
 
 def current_saga() -> Optional[SagaContext]:
     """The active saga for this task, or None. contextvars rather than a global
@@ -39,12 +53,13 @@ async def saga_scope(
     is raised carrying the `RollbackReport`. A caller that wants the report
     instead of the exception catches `SagaAborted` and reads `.report`.
     """
-    own_wal = wal is None
-    _wal = wal or AsyncWAL()
+    own_wal = wal is None and _DEFAULT_WAL is None
+    _wal = wal or _DEFAULT_WAL or AsyncWAL()
     if own_wal:
         await _wal.start()
     ctx = SagaContext(gate=gate, wal=_wal,
                       halt_on_compensation_failure=halt_on_compensation_failure)
+    _active_sagas.add(ctx)
     token = _current.set(ctx)
     await ctx.begin()
     try:
@@ -62,6 +77,7 @@ async def saga_scope(
         await ctx.finish()
     finally:
         _current.reset(token)
+        _active_sagas.discard(ctx)
         if own_wal:
             await _wal.close()
 
