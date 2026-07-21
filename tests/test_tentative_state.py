@@ -278,3 +278,72 @@ async def test_concurrent_sagas_contend_for_one_resource_and_only_one_wins():
     await asyncio.gather(contend("a"), contend("b"))
     assert len(winners) == 1 and len(losers) == 1
     assert get_semantic_locks().owner("account:shared") is None   # cleaned up
+
+
+# ==========================================================================
+# Crash durability -- a tentative resource must survive the crash the whole
+# engine exists for
+# ==========================================================================
+
+@aio
+async def test_a_tentative_stranded_by_a_real_crash_is_rolled_back_by_the_daemon():
+    """Registration lives in the WAL, not just memory, so a daemon in another
+    process can find the stranded resource and settle it."""
+    import subprocess
+    import sys as _sys
+    import time as _time
+
+    from agent_saga.recovery import RecoveryDaemon, Resolution
+    from agent_saga.registry import compensator
+
+    @compensator("demo.restore_balance")
+    def restore_balance(account, path, idempotency_key=None):
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(f"restored:{account}\n")
+
+    with tempfile.TemporaryDirectory() as d:
+        tmp = Path(d)
+        wal = tmp / "wal.jsonl"
+        effects = tmp / "effects.txt"
+        worker = Path(__file__).parent / "tentative_crash_worker.py"
+
+        proc = subprocess.run(
+            [_sys.executable, str(worker), str(wal), str(effects), "account:usr_1"],
+            capture_output=True, text=True, timeout=60)
+        assert proc.returncode == 9, proc.stderr
+        assert effects.read_text(encoding="utf-8").strip() == "debited:account:usr_1"
+
+        _time.sleep(0.8)          # let the lease expire
+        outcome = (await RecoveryDaemon(wal).recover_all())[0]
+
+        assert outcome.resolution is Resolution.RECOVERED
+        lines = effects.read_text(encoding="utf-8").splitlines()
+        assert lines == ["debited:account:usr_1", "restored:account:usr_1"]
+
+
+@aio
+async def test_an_in_process_only_tentative_escalates_instead_of_being_guessed_at():
+    """No registry handler means no daemon can settle it. Escalate, loudly."""
+    import json as _json
+    import time as _time
+
+    from agent_saga.recovery import RecoveryDaemon, Resolution
+
+    with tempfile.TemporaryDirectory() as d:
+        wal = Path(d) / "wal.jsonl"
+        old = _time.time() - 3600
+        recs = [
+            {"seq": 1, "event": "SAGA_START", "saga_id": "s1", "ts": old,
+             "pid": 1, "lease_ttl": 5.0},
+            {"seq": 2, "event": "TENTATIVE_REGISTERED", "saga_id": "s1", "ts": old,
+             "resource_id": "account:usr_9", "status": "PENDING",
+             "rollback_handler": None, "recoverable": False, "rollback_kwargs": {}},
+        ]
+        with open(wal, "w", encoding="utf-8") as fh:
+            for r in recs:
+                fh.write(_json.dumps(r) + "\n")
+
+        outcome = (await RecoveryDaemon(wal).recover_all())[0]
+        assert outcome.resolution is Resolution.NEEDS_HUMAN
+        assert "account:usr_9" in outcome.escalated
+        assert "in-process only" in outcome.reason

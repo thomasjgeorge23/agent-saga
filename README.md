@@ -159,7 +159,7 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (252 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (263 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
@@ -187,6 +187,17 @@ with only `pytest`; optional extras add their own SDKs):
   like a fresh refund). The key is auto-injected into handlers that accept it,
   and an execution ledger reads both the daemon journal and the crashed
   process's own WAL, so completed work is skipped rather than repeated.
+- OpenTelemetry spans (`pip install agent-saga[opentelemetry]`): a root
+  `saga.execute` span with `saga.status` (COMPLETED / ROLLED_BACK / FAILED),
+  child `saga.step.<tool>` and `saga.rollback.<tool>` spans, exceptions
+  recorded with ERROR status, and trace/span ids stamped onto every log record
+  so logs and traces join in either direction. Opt-in via `setup_telemetry()`;
+  a `NoOpTracer` is the default and importing the package never touches
+  `opentelemetry`.
+- Tentative resources are crash-durable: registration is written to the WAL
+  with a named rollback handler, so a resource stranded PENDING by a SIGKILL is
+  found and settled by the recovery daemon. An in-process-only rollback is
+  escalated rather than guessed at.
 - Saga isolation countermeasures: `TentativeResource` marks a business entity
   PENDING for the saga's life and resolves it to COMMITTED / ROLLED_BACK
   automatically at the boundary; `SemanticLockManager` lets a saga claim a

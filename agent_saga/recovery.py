@@ -76,6 +76,14 @@ class DanglingSaga:
     lease_ttl: float = 5.0
     pid: Optional[int] = None
     compensated_step_ids: set[str] = field(default_factory=set)
+    tentatives: dict = field(default_factory=dict)          # resource_id -> descriptor
+    resolved_tentative_ids: set[str] = field(default_factory=set)
+
+    def pending_tentatives(self) -> list[dict]:
+        """Resources left PENDING by a crash. A saga can be dangling purely
+        because of these, with every step already compensated."""
+        return [d for rid, d in self.tentatives.items()
+                if rid not in self.resolved_tentative_ids]
 
     def lease_expired(self, now: Optional[float] = None) -> bool:
         # Grace of 2x TTL: a GC pause or a stalled disk must not be mistaken
@@ -134,6 +142,14 @@ def parse_wal(records: Iterable[dict]) -> dict[str, DanglingSaga]:
                 step.compensation = rec.get("compensation")
         elif ev == "COMPENSATED":
             saga.compensated_step_ids.add(rec["step_id"])
+        elif ev == "TENTATIVE_REGISTERED":
+            rid = rec.get("resource_id")
+            if rid:
+                saga.tentatives[rid] = rec
+        elif ev == "TENTATIVE_RESOLVED":
+            rid = rec.get("resource_id")
+            if rid:
+                saga.resolved_tentative_ids.add(rid)
 
     return sagas
 
@@ -311,11 +327,11 @@ class RecoveryDaemon:
 
     def dangling(self) -> list[DanglingSaga]:
         return [s for s in self.scan().values()
-                if not s.resolved_in_process and s.pending()]
+                if not s.resolved_in_process and (s.pending() or s.pending_tentatives())]
 
     async def dangling_async(self) -> list[DanglingSaga]:
         return [s for s in (await self.scan_async()).values()
-                if not s.resolved_in_process and s.pending()]
+                if not s.resolved_in_process and (s.pending() or s.pending_tentatives())]
 
     # -- resolution --------------------------------------------------------
 
@@ -329,7 +345,8 @@ class RecoveryDaemon:
                                    reason="lease is still being renewed; owner is alive")
 
         pending = saga.pending()
-        if not pending:
+        pending_tentatives = saga.pending_tentatives()
+        if not pending and not pending_tentatives:
             return RecoveryOutcome(saga.saga_id, Resolution.NOTHING_TO_DO)
 
         # Case C: fail closed on anything irreversible, before touching anything.
@@ -432,10 +449,86 @@ class RecoveryDaemon:
                     "saga_id": saga.saga_id, "step_id": step.step_id,
                     "tool": step.tool, "token": token})
                 compensated.append(step.tool)
+
+            # Tentative resources stranded PENDING by the crash. They roll back
+            # after the step compensations, matching the in-process ordering.
+            stranded = await self._recover_tentatives(
+                saga, pending_tentatives, done_tokens)
+            if stranded is not None:
+                return stranded
+            compensated.extend(f"tentative:{d['resource_id']}"
+                               for d in pending_tentatives
+                               if d.get("recoverable"))
         finally:
             self._release(saga.saga_id)
 
         return RecoveryOutcome(saga.saga_id, Resolution.RECOVERED, compensated=compensated)
+
+    async def _recover_tentatives(self, saga: DanglingSaga, pending: list[dict],
+                                  done_tokens: set) -> Optional[RecoveryOutcome]:
+        """Roll back resources the crashed process left PENDING.
+
+        Returns a NEEDS_HUMAN outcome to abort the sweep, or None on success.
+        A resource whose rollback was only ever an in-process closure cannot be
+        resolved here -- that is escalated rather than guessed at, and it is why
+        `tentative()` warns when no registry handler is supplied.
+        """
+        for desc in pending:
+            resource_id = desc["resource_id"]
+            # Scope the key to the resource so it cannot collide with a step's.
+            token = IdempotencyManager.key(saga.saga_id, resource_id,
+                                           scope="tentative")
+            if IdempotencyManager.should_skip(token, done_tokens, resource_id):
+                continue
+
+            if not desc.get("recoverable"):
+                await self._journal("RECOVERY_ESCALATED", {
+                    "saga_id": saga.saga_id, "resource_id": resource_id,
+                    "reason": "tentative resource has no registry rollback handler"})
+                return RecoveryOutcome(
+                    saga.saga_id, Resolution.NEEDS_HUMAN,
+                    escalated=[resource_id],
+                    reason=(f"tentative resource {resource_id!r} is stranded PENDING "
+                            f"and its rollback was in-process only; a human must "
+                            f"settle it"))
+
+            handler = resolve(desc["rollback_handler"])
+            if handler is None:
+                await self._journal("RECOVERY_ESCALATED", {
+                    "saga_id": saga.saga_id, "resource_id": resource_id,
+                    "handler": desc["rollback_handler"],
+                    "reason": "handler not registered in this daemon"})
+                return RecoveryOutcome(
+                    saga.saga_id, Resolution.NEEDS_HUMAN, escalated=[resource_id],
+                    reason=(f"rollback handler {desc['rollback_handler']!r} for "
+                            f"{resource_id!r} is not registered in the daemon"))
+
+            call_kwargs = IdempotencyManager.inject(
+                handler, dict(desc.get("rollback_kwargs") or {}), token)
+
+            if self.dry_run:
+                await self._journal("RECOVERY_DRY_RUN", {
+                    "saga_id": saga.saga_id, "resource_id": resource_id,
+                    "handler": desc["rollback_handler"], "token": token})
+                continue
+
+            await self._journal("RECOVERY_ATTEMPT", {
+                "saga_id": saga.saga_id, "resource_id": resource_id,
+                "handler": desc["rollback_handler"], "token": token})
+            try:
+                await _call(handler, call_kwargs)
+            except BaseException as exc:
+                await self._journal("RECOVERY_FAILED", {
+                    "saga_id": saga.saga_id, "resource_id": resource_id,
+                    "token": token, "error": repr(exc)})
+                return RecoveryOutcome(
+                    saga.saga_id, Resolution.NEEDS_HUMAN, escalated=[resource_id],
+                    reason=f"tentative rollback for {resource_id!r} failed: {exc!r}")
+
+            await self._journal("RECOVERY_SUCCESS", {
+                "saga_id": saga.saga_id, "resource_id": resource_id,
+                "token": token})
+        return None
 
     async def watch(self, interval: float = 5.0) -> None:
         while True:

@@ -76,6 +76,12 @@ from .observability import (
     configure_logging,
     current_correlation,
 )
+from .observability.otel import (
+    NoOpTracer,
+    SagaTracer,
+    get_tracer,
+    setup_telemetry,
+)
 from .snapshot import (
     AttributeSnapshot,
     MappingSnapshot,
@@ -179,5 +185,9 @@ __all__ = [
     "TextFormatter",
     "configure_logging",
     "current_correlation",
+    "setup_telemetry",
+    "get_tracer",
+    "SagaTracer",
+    "NoOpTracer",
     "__version__",
 ]

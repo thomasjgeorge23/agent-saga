@@ -86,6 +86,14 @@ class CorrelationFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.saga_id = _saga_id.get() or "-"
         record.step_id = _step_id.get() or "-"
+        # When OTel is active, stamp the trace ids too, so a log line and a span
+        # can be joined in either direction. No-op (and no import cost) when
+        # tracing is off, which is the default.
+        from .otel import get_tracer
+
+        trace_id, span_id = get_tracer().correlation()
+        record.trace_id = trace_id or "-"
+        record.span_id = span_id or "-"
         return True
 
 
@@ -176,3 +184,12 @@ __all__ = [
     "current_correlation",
     "LOGGER_NAME",
 ]
+
+
+def __getattr__(name):
+    """Expose the OTel surface without importing opentelemetry at import time."""
+    if name in ("SagaTracer", "setup_telemetry", "get_tracer", "NoOpTracer"):
+        from . import otel
+
+        return getattr(otel, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -104,6 +104,8 @@ class SagaContext:
         self._heartbeat: Optional[asyncio.Task] = None
         self._obs_token = None
         self._abort_cause: Optional[tuple[str, str]] = None
+        self._span_cm = None
+        self._span = None
         self._tentatives: list = []
         """Resources held in PENDING for this saga's lifetime. Resolved exactly
         once at the boundary, so the failure path -- the one callers forget --
@@ -115,7 +117,13 @@ class SagaContext:
     # structural answers, wired into the lifecycle so they cannot be forgotten.
 
     def register_tentative(self, resource, *, lock: bool = False):
-        """Track a TentativeResource for automatic resolution at the boundary."""
+        """Track a TentativeResource for automatic resolution at the boundary.
+
+        Registration is recorded in the WAL, not just in memory. A tentative
+        resource that lived only in this process would be stranded PENDING
+        forever by a SIGKILL, with no daemon able to see it -- exactly the
+        orphan this engine exists to prevent.
+        """
         from .locks import SemanticLockConflictError, get_semantic_locks
 
         if lock:
@@ -128,6 +136,26 @@ class SagaContext:
                     manager.owner(resource.resource_id) or "?", self.saga_id)
             self._semantic_locks.append(resource.resource_id)
         self._tentatives.append(resource)
+
+        if not resource.recoverable:
+            logger.warning(
+                "tentative resource %r has no registry rollback_handler; it will "
+                "resolve normally in-process, but a crash leaves it PENDING with "
+                "no way for the recovery daemon to roll it back.",
+                resource.resource_id)
+        self.wal.append("TENTATIVE_REGISTERED", {
+            "saga_id": self.saga_id, **resource.describe()})
+        return resource
+
+    async def register_tentative_durable(self, resource, *, lock: bool = False):
+        """register_tentative, plus a fence.
+
+        Use this when the tentative write is the money: the registration must be
+        on disk *before* the debit, or a crash in between leaves a debit no one
+        knows was provisional.
+        """
+        self.register_tentative(resource, lock=lock)
+        await self.wal.barrier()
         return resource
 
     async def acquire_semantic_lock(self, resource_id: str, *,
@@ -165,6 +193,12 @@ class SagaContext:
                     await resource.commit()
                 else:
                     await resource.rollback()
+                # Record the terminal status so a daemon reading this WAL later
+                # knows the resource is settled and must not touch it again.
+                self.wal.append("TENTATIVE_RESOLVED", {
+                    "saga_id": self.saga_id,
+                    "resource_id": resource.resource_id,
+                    "status": resource.status.value})
             except Exception as exc:
                 logger.error(
                     "tentative resource %r failed to resolve to %s: %r",
@@ -186,6 +220,13 @@ class SagaContext:
         # under this context -- forward calls, the failure, all compensations --
         # carries the same saga_id an operator can grep on.
         self._obs_token = set_saga_id(self.saga_id)
+        # Root span for the whole saga. Entered manually rather than with a
+        # `with` block because a saga's lifetime spans begin()..finish(), which
+        # are separate calls the caller drives.
+        from .observability.otel import ATTR_SAGA_ID, SPAN_SAGA, get_tracer
+
+        self._span_cm = get_tracer().span(SPAN_SAGA, {ATTR_SAGA_ID: self.saga_id})
+        self._span = self._span_cm.__enter__()
         self.wal.append("SAGA_START", {"saga_id": self.saga_id, "pid": os.getpid(),
                                        "lease_ttl": self.lease_ttl})
         await self.wal.barrier()
@@ -219,6 +260,20 @@ class SagaContext:
         self.wal.append("SAGA_ABORTED" if aborted else "SAGA_COMPLETE",
                         {"saga_id": self.saga_id, "clean": clean})
         await self.wal.barrier()
+        # Close the root span with the saga's real outcome. ROLLED_BACK and
+        # FAILED are distinct on purpose: one means we cleaned up, the other
+        # means we could not.
+        from .observability.otel import (
+            ATTR_SAGA_STATUS, STATUS_COMPLETED, STATUS_FAILED, STATUS_ROLLED_BACK)
+
+        if self._span is not None:
+            status = (STATUS_COMPLETED if not aborted
+                      else (STATUS_ROLLED_BACK if clean else STATUS_FAILED))
+            self._span.set_attribute(ATTR_SAGA_STATUS, status)
+        if self._span_cm is not None:
+            self._span_cm.__exit__(None, None, None)
+            self._span_cm = self._span = None
+
         logger.info("saga %s", "aborted (rolled back)" if aborted else "completed")
         # Unbind the correlation id last, so the line above still carries it.
         if self._obs_token is not None:
@@ -312,9 +367,20 @@ class SagaContext:
         if semantics is not ActionSemantics.REVERSIBLE:
             await self.wal.barrier(seq)
 
-        # 3. Execute.
+        # 3. Execute, inside a child span so a trace shows which step failed.
+        from .observability.otel import (
+            ATTR_IS_COMPENSATION, ATTR_SEMANTICS, ATTR_STEP_ID, ATTR_TOOL,
+            get_tracer, step_span_name)
+
         try:
-            result = await _invoke(forward, forward_kwargs, timeout or self.default_timeout)
+            with get_tracer().span(step_span_name(tool), {
+                ATTR_STEP_ID: step.step_id,
+                ATTR_TOOL: tool,
+                ATTR_SEMANTICS: semantics.value,
+                ATTR_IS_COMPENSATION: False,
+            }):
+                result = await _invoke(forward, forward_kwargs,
+                                       timeout or self.default_timeout)
         except BaseException as exc:
             # We do not know whether the effect landed. A timed-out POST to
             # Stripe may well have charged the card. Treat as UNKNOWN, not as
@@ -419,7 +485,20 @@ class SagaContext:
                 continue
 
             try:
-                await _invoke(step.compensation.fn, step.compensation.kwargs, None)
+                from .observability.otel import (
+                    ATTR_IS_COMPENSATION as _IS_COMP,
+                    ATTR_STEP_ID as _SID,
+                    ATTR_TOOL as _TOOL,
+                    get_tracer as _tracer,
+                    rollback_span_name as _rb_name,
+                )
+
+                with _tracer().span(_rb_name(step.tool), {
+                    _SID: step.step_id,
+                    _TOOL: step.tool,
+                    _IS_COMP: True,
+                }):
+                    await _invoke(step.compensation.fn, step.compensation.kwargs, None)
             except BaseException as exc:
                 step.state = StepState.COMPENSATION_FAILED
                 step.error = repr(exc)

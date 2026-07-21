@@ -138,6 +138,8 @@ def tentative(
     *,
     on_commit: Optional[Callable[[], Any]] = None,
     on_rollback: Optional[Callable[[], Any]] = None,
+    rollback_handler: Optional[str] = None,
+    rollback_kwargs: Optional[dict] = None,
     lock: bool = False,
     **metadata: Any,
 ) -> TentativeResource:
@@ -157,7 +159,10 @@ def tentative(
     """
     resource = TentativeResource(
         resource_id=resource_id, saga_id=getattr(ctx, "saga_id", None),
-        on_commit=on_commit, on_rollback=on_rollback, metadata=dict(metadata),
+        on_commit=on_commit, on_rollback=on_rollback,
+        rollback_handler=rollback_handler,
+        rollback_kwargs=dict(rollback_kwargs or {}),
+        metadata=dict(metadata),
     )
     ctx.register_tentative(resource, lock=lock)
     return resource
