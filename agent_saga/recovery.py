@@ -561,6 +561,45 @@ class RecoveryDaemon:
                 "token": token})
         return None
 
+    async def compact(self, *, grace_seconds: float = 3600.0,
+                      now: Optional[float] = None) -> int:
+        """Trim resolved sagas from the log. Works on any backend.
+
+        A saga is kept if it is unresolved, has stranded tentatives, or resolved
+        only recently -- the grace period is the same caution the snapshot GC
+        applies, so compaction can never race a sweep that is still working.
+        Returns the number of records removed.
+        """
+        now = time.time() if now is None else now
+        records = await self.read_records()
+        sagas = parse_wal(records)
+
+        last_seen: dict[str, float] = {}
+        for rec in records:
+            sid, ts = rec.get("saga_id"), rec.get("ts")
+            if sid and isinstance(ts, (int, float)):
+                last_seen[sid] = max(last_seen.get(sid, 0.0), ts)
+
+        keep = {
+            sid for sid, saga in sagas.items()
+            if not saga.resolved_in_process
+            or saga.pending()
+            or saga.pending_tentatives()
+            or (now - last_seen.get(sid, 0.0)) <= grace_seconds
+        }
+        target = self.wal
+        if target is None:
+            from .wal import FileWAL
+
+            # Path-configured daemon: open the file just to compact it.
+            target = FileWAL(self.wal_path)
+            await target.start()
+            try:
+                return await target.compact(keep_saga_ids=keep)
+            finally:
+                await target.close()
+        return await target.compact(keep_saga_ids=keep)
+
     async def watch(self, interval: float = 5.0) -> None:
         while True:
             try:

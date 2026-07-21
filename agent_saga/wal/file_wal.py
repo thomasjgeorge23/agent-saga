@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any, Optional
@@ -26,6 +27,9 @@ from .base import (
     BufferedWAL,
     DEFAULT_BARRIER_TIMEOUT,
 )
+
+
+logger = logging.getLogger("agent_saga.wal.file")
 
 
 class FileWAL(BufferedWAL):
@@ -120,6 +124,66 @@ class FileWAL(BufferedWAL):
 
     async def read_all(self) -> list[dict]:
         return self.records()
+
+    async def compact(self, *, keep_saga_ids: set) -> int:
+        """Rewrite the log keeping only records for the given sagas.
+
+        The default backend grew without bound: a single node running for months
+        accumulates every saga it ever ran, and the recovery daemon reads the
+        whole file on every sweep. That is the same flaw the Redis backend was
+        hardened against, on the backend most people actually run.
+
+        A file can be filtered properly rather than only trimmed from the head,
+        so this reclaims every resolved saga, not just a leading run.
+
+        Safety:
+          * the io lock is held, so no flush can be writing while the file is
+            swapped underneath it;
+          * survivors are written to a temp file, fsynced, then os.replace'd --
+            atomic on POSIX and Windows, so a crash mid-compaction leaves either
+            the old complete log or the new one, never a truncated hybrid;
+          * appends during compaction land in the in-memory buffer (append() never
+            touches the file) and are flushed to the new file afterwards.
+        """
+        from ..encryption import encode_line
+
+        if self.path is None:
+            return 0
+
+        lock = self._io_lock
+        if lock is None:
+            return await self._compact_locked(keep_saga_ids, encode_line)
+        async with lock:
+            return await self._compact_locked(keep_saga_ids, encode_line)
+
+    async def _compact_locked(self, keep_saga_ids: set, encode_line) -> int:
+        import os as _os
+
+        if self._fh is not None:
+            self._fh.flush()
+            _os.fsync(self._fh.fileno())
+
+        records = self.records()
+        survivors = [r for r in records if r.get("saga_id") in keep_saga_ids]
+        removed = len(records) - len(survivors)
+        if removed <= 0:
+            return 0
+
+        tmp = self.path.with_suffix(self.path.suffix + ".compact")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write("".join(encode_line(r, self._encryptor) + "\n" for r in survivors))
+            fh.flush()
+            _os.fsync(fh.fileno())
+
+        # Close before replacing: Windows refuses to rename over an open handle.
+        if self._fh is not None:
+            self._fh.close()
+            self._fh = None
+        _os.replace(tmp, self.path)
+        self._fh = open(self.path, "a", encoding="utf-8")
+
+        logger.info("compacted %d resolved record(s) from %s", removed, self.path)
+        return removed
 
     async def clear(self) -> None:
         self._buf.clear()

@@ -281,3 +281,138 @@ async def test_read_since_returns_only_what_arrived_after_the_cursor():
     await wal.close()
 
     assert [r["saga_id"] for r in fresh] == ["b"]
+
+
+# ==========================================================================
+# FileWAL compaction -- the DEFAULT backend, which is what most people run
+# ==========================================================================
+
+@aio
+async def test_file_wal_compaction_reclaims_resolved_sagas():
+    """The file backend grew without bound: a node running for months keeps
+    every saga it ever ran, and the daemon reads the whole file each sweep."""
+    from agent_saga.wal import FileWAL
+
+    with tempfile.TemporaryDirectory() as d:
+        wal = FileWAL(Path(d) / "wal.jsonl")
+        await wal.start()
+        for sid in ("old1", "old2", "live"):
+            wal.append("SAGA_START", {"saga_id": sid})
+            wal.append("STEP_COMMITTED", {"saga_id": sid, "step_id": "s1"})
+        await wal.barrier()
+
+        before = len(await wal.read_all())
+        removed = await wal.compact(keep_saga_ids={"live"})
+        after = await wal.read_all()
+        await wal.close()
+
+    assert before == 6 and removed == 4
+    assert {r["saga_id"] for r in after} == {"live"}
+
+
+@aio
+async def test_file_compaction_filters_rather_than_only_trimming_the_head():
+    """Unlike a Redis list, a file can be rewritten -- so a resolved saga sitting
+    BEHIND a live one is reclaimed too."""
+    from agent_saga.wal import FileWAL
+
+    with tempfile.TemporaryDirectory() as d:
+        wal = FileWAL(Path(d) / "wal.jsonl")
+        await wal.start()
+        for sid in ("done1", "live", "done2"):
+            wal.append("SAGA_START", {"saga_id": sid})
+        await wal.barrier()
+        await wal.compact(keep_saga_ids={"live"})
+        remaining = {r["saga_id"] for r in await wal.read_all()}
+        await wal.close()
+
+    assert remaining == {"live"}          # done2 reclaimed despite being last
+
+
+@aio
+async def test_appends_during_compaction_are_not_lost():
+    """append() only touches the in-memory buffer, so records written while the
+    file is being swapped are flushed into the new file afterwards."""
+    from agent_saga.wal import FileWAL
+
+    with tempfile.TemporaryDirectory() as d:
+        wal = FileWAL(Path(d) / "wal.jsonl")
+        await wal.start()
+        wal.append("SAGA_START", {"saga_id": "old"})
+        await wal.barrier()
+
+        wal.append("SAGA_START", {"saga_id": "live"})   # buffered, not yet on disk
+        await wal.compact(keep_saga_ids={"live"})
+        await wal.barrier()                            # flushes into the new file
+
+        sagas = {r["saga_id"] for r in await wal.read_all()}
+        await wal.close()
+
+    assert sagas == {"live"}
+
+
+@aio
+async def test_compaction_leaves_no_temp_file_behind():
+    from agent_saga.wal import FileWAL
+
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "wal.jsonl"
+        wal = FileWAL(path)
+        await wal.start()
+        wal.append("SAGA_START", {"saga_id": "gone"})
+        await wal.barrier()
+        await wal.compact(keep_saga_ids=set())
+        await wal.close()
+        leftovers = [p.name for p in Path(d).iterdir() if p.name != "wal.jsonl"]
+
+    assert leftovers == []
+
+
+@aio
+async def test_a_backend_without_compaction_raises_rather_than_no_opping():
+    """A silent no-op would let an operator believe the log was bounded."""
+    from agent_saga.wal.base import BufferedWAL, BackpressurePolicy
+
+    class NoCompact(BufferedWAL):
+        async def _flush_batch(self, batch): pass
+        async def read_all(self): return []
+        async def clear(self): pass
+
+    wal = NoCompact()
+    with pytest.raises(NotImplementedError, match="grow without bound"):
+        await wal.compact(keep_saga_ids=set())
+
+
+@aio
+async def test_daemon_compaction_keeps_unresolved_and_recent_sagas():
+    """The daemon computes the keep-set itself: unresolved sagas, sagas with
+    stranded tentatives, and anything resolved inside the grace window."""
+    from agent_saga.wal import FileWAL
+
+    now = time.time()
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "wal.jsonl"
+        wal = FileWAL(path)
+        await wal.start()
+
+        # Resolved long ago -> reclaimable. BOTH records must carry the old
+        # timestamp: the keep-set uses a saga's most recent activity, so a fresh
+        # SAGA_COMPLETE would correctly put it back inside the grace window.
+        wal.append("SAGA_START", {"saga_id": "old", "ts": now - 99_999})
+        wal.append("SAGA_COMPLETE", {"saga_id": "old", "clean": True,
+                                     "ts": now - 99_999})
+        # resolved just now -> inside the grace window, kept
+        wal.append("SAGA_START", {"saga_id": "fresh"})
+        wal.append("SAGA_COMPLETE", {"saga_id": "fresh", "clean": True})
+        # never resolved -> always kept
+        wal.append("SAGA_START", {"saga_id": "live"})
+        await wal.barrier()
+
+        daemon = RecoveryDaemon(wal, journal_path=Path(d) / "j.jsonl",
+                                claims_dir=Path(d) / "c")
+        removed = await daemon.compact(grace_seconds=3600)
+        remaining = {r["saga_id"] for r in await wal.read_all()}
+        await wal.close()
+
+    assert removed == 2                             # the two 'old' records
+    assert remaining == {"fresh", "live"}

@@ -110,6 +110,20 @@ class BaseWAL(abc.ABC):
         """Optional hook: yield until the buffer has room. No-op by default."""
         return
 
+    async def compact(self, *, keep_saga_ids: set) -> int:
+        """Drop records belonging to no saga in `keep_saga_ids`. Returns the
+        count removed.
+
+        Not abstract, so a custom backend is not forced to implement it -- but
+        it raises rather than returning 0, because a silent no-op would let an
+        operator believe their log was being bounded when it was growing without
+        limit.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement compaction; its log will "
+            f"grow without bound unless you trim it yourself."
+        )
+
 
 class BufferedWAL(BaseWAL):
     """Shared machinery: buffer, sequencing, backpressure, group commit, fences.
@@ -140,6 +154,9 @@ class BufferedWAL(BaseWAL):
         self.barrier_timeout = barrier_timeout
         self._encryptor_arg = encryptor
         self._encryptor = None
+        self._io_lock: Optional[asyncio.Lock] = None
+        """Serialises flushing against compaction. A rewrite swaps the file out
+        from under the writer, so the two must never overlap."""
         self.dropped = 0
         """Count of records shed under DROP_SILENT. Non-zero means rollback
         history is incomplete -- surface it, never hide it."""
@@ -175,6 +192,7 @@ class BufferedWAL(BaseWAL):
                            else self._encryptor_arg)
         await self._open_sink()
         self._wake = asyncio.Event()
+        self._io_lock = asyncio.Lock()
         self._task = asyncio.create_task(self._flush_loop())
 
     async def close(self) -> None:
@@ -287,7 +305,11 @@ class BufferedWAL(BaseWAL):
         batch = self._take()
         if batch:
             try:
-                await self._flush_batch(batch)
+                if self._io_lock is not None:
+                    async with self._io_lock:
+                        await self._flush_batch(batch)
+                else:
+                    await self._flush_batch(batch)
             except asyncio.CancelledError:
                 raise
             except BaseException as exc:
