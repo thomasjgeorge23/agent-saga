@@ -25,7 +25,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -186,7 +186,182 @@ class SemanticLockManager:
             return dict(self._owners)
 
 
-_SEMANTIC_LOCKS = SemanticLockManager()
+class RedisSemanticLocks:
+    """Semantic locks that actually hold across nodes.
+
+    `SemanticLockManager` is an in-memory dict: correct in one process, and a
+    false sense of safety on Kubernetes, where two pods both "acquire" the same
+    account and neither learns of the other. This is the real thing.
+
+    Three details carry the correctness:
+
+      * ACQUIRE is `SET key token NX PX ttl` -- atomic test-and-set with an
+        expiry, so a holder that is SIGKILLed releases the resource when the TTL
+        lapses instead of deadlocking it forever.
+      * RELEASE is a compare-and-delete Lua script, never a bare DEL. If our TTL
+        already lapsed and another saga took the lock, a bare DEL would free
+        *their* claim -- the classic distributed-lock bug, and a silent one.
+      * RENEWAL extends the TTL while the saga is alive, so a long-running agent
+        does not lose a lock mid-transaction. The TTL is therefore a
+        crash-detector, not a deadline on the work.
+
+    Requires `pip install agent-saga[redis]`.
+    """
+
+    distributed = True
+
+    # KEYS[1] = lock key, ARGV[1] = our owner token.
+    _RELEASE_LUA = """
+    if redis.call('get', KEYS[1]) == ARGV[1] then
+        return redis.call('del', KEYS[1])
+    else
+        return 0
+    end
+    """
+
+    _RENEW_LUA = """
+    if redis.call('get', KEYS[1]) == ARGV[1] then
+        return redis.call('pexpire', KEYS[1], ARGV[2])
+    else
+        return 0
+    end
+    """
+
+    def __init__(
+        self,
+        url: str = "redis://localhost:6379/0",
+        *,
+        client: Any = None,
+        key_prefix: str = "agent-saga:semlock:",
+        ttl_ms: int = 30_000,
+        renew_interval: Optional[float] = None,
+    ):
+        self.url = url
+        self.key_prefix = key_prefix
+        self.ttl_ms = ttl_ms
+        # Renew at a third of the TTL: two renewals may be lost to a GC pause or
+        # a slow network before the lock is ever at risk of lapsing.
+        self.renew_interval = renew_interval or (ttl_ms / 3000.0)
+        self._client = client
+        self._owns_client = client is None
+        self._held: dict[str, str] = {}      # resource_id -> saga_id, this node
+        self._renewer: Optional[asyncio.Task] = None
+
+        if client is None:
+            try:
+                import redis.asyncio  # noqa: F401
+            except ImportError as exc:
+                raise ImportError(
+                    "RedisSemanticLocks needs the 'redis' package.\n"
+                    "    pip install agent-saga[redis]"
+                ) from exc
+
+    def _key(self, resource_id: str) -> str:
+        return f"{self.key_prefix}{resource_id}"
+
+    async def _conn(self):
+        if self._client is None:
+            from redis.asyncio import Redis
+
+            self._client = Redis.from_url(self.url, decode_responses=True)
+        return self._client
+
+    def try_acquire(self, resource_id: str, saga_id: str) -> bool:
+        """Not available on a distributed backend: the check is a network round
+        trip and cannot be done synchronously.
+
+        Raised rather than silently returning True, because a lock that lies is
+        worse than no lock at all.
+        """
+        raise RuntimeError(
+            "RedisSemanticLocks cannot acquire synchronously (it is a network "
+            "call). Use `await ctx.acquire_semantic_lock(resource_id)` before "
+            "registering the resource, and pass lock=False to tentative()."
+        )
+
+    async def acquire(self, resource_id: str, saga_id: str, *,
+                      timeout: float = 0.0, poll: float = 0.05) -> None:
+        conn = await self._conn()
+        key = self._key(resource_id)
+        deadline = time.monotonic() + timeout
+
+        while True:
+            # NX+PX: atomic, and self-expiring so a dead holder cannot deadlock.
+            acquired = await conn.set(key, saga_id, nx=True, px=self.ttl_ms)
+            if acquired:
+                self._held[resource_id] = saga_id
+                self._ensure_renewer()
+                return
+
+            current = await conn.get(key)
+            if current == saga_id:            # re-entrant for the same saga
+                self._held[resource_id] = saga_id
+                self._ensure_renewer()
+                return
+            if timeout <= 0 or time.monotonic() >= deadline:
+                raise SemanticLockConflictError(resource_id, current or "?", saga_id)
+            await asyncio.sleep(poll)
+
+    async def release(self, resource_id: str, saga_id: str) -> bool:
+        conn = await self._conn()
+        # Compare-and-delete: never free a claim we no longer own.
+        freed = await conn.eval(self._RELEASE_LUA, 1, self._key(resource_id), saga_id)
+        self._held.pop(resource_id, None)
+        return bool(freed)
+
+    async def release_all(self, saga_id: str) -> list[str]:
+        held = [r for r, owner in self._held.items() if owner == saga_id]
+        for resource_id in held:
+            await self.release(resource_id, saga_id)
+        return held
+
+    async def owner(self, resource_id: str) -> Optional[str]:
+        conn = await self._conn()
+        return await conn.get(self._key(resource_id))
+
+    # -- lease renewal -----------------------------------------------------
+
+    def _ensure_renewer(self) -> None:
+        if self._renewer is None or self._renewer.done():
+            try:
+                self._renewer = asyncio.create_task(self._renew_loop())
+            except RuntimeError:
+                self._renewer = None      # no running loop; renewal is optional
+
+    async def _renew_loop(self) -> None:
+        try:
+            while self._held:
+                await asyncio.sleep(self.renew_interval)
+                conn = await self._conn()
+                for resource_id, saga_id in list(self._held.items()):
+                    try:
+                        await conn.eval(self._RENEW_LUA, 1,
+                                        self._key(resource_id), saga_id,
+                                        str(self.ttl_ms))
+                    except Exception:
+                        # A renewal failure is not fatal: the lock lapses and
+                        # another saga may take it, which is the designed
+                        # behaviour for a holder that has gone quiet.
+                        pass
+        except asyncio.CancelledError:
+            raise
+
+    async def close(self) -> None:
+        if self._renewer is not None:
+            self._renewer.cancel()
+            try:
+                await self._renewer
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._renewer = None
+        if self._client is not None and self._owns_client:
+            close = getattr(self._client, "aclose", None) or getattr(self._client, "close", None)
+            if close is not None:
+                await close()
+        self._client = None
+
+
+_SEMANTIC_LOCKS: Any = SemanticLockManager()
 
 
 def get_semantic_locks() -> SemanticLockManager:
@@ -200,5 +375,6 @@ def set_semantic_locks(manager: SemanticLockManager) -> None:
 
 
 __all__ = ["RecoveryLock", "FileLock", "InProcessLock",
-           "SemanticLockManager", "SemanticLockConflictError",
+           "SemanticLockManager", "RedisSemanticLocks",
+           "SemanticLockConflictError",
            "get_semantic_locks", "set_semantic_locks"]

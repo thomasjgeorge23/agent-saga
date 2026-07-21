@@ -159,7 +159,7 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (268 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (277 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
@@ -206,7 +206,11 @@ with only `pytest`; optional extras add their own SDKs):
   automatically at the boundary; `SemanticLockManager` lets a saga claim a
   resource id so a concurrent saga cannot dirty-read it. Locks release on every
   exit path, including abort. Both process-local by default — inject a shared
-  implementation for multi-node.
+  implementation for multi-node -- `RedisSemanticLocks` ships in-tree
+  (`agent-saga[redis]`): `SET NX PX` for atomic acquire with a self-expiring
+  lease so a SIGKILLed holder cannot deadlock a resource, compare-and-delete
+  release via Lua so one saga can never free another's claim, and background
+  lease renewal so a long agent run does not lose its lock mid-transaction.
 - The recovery ledger is pluggable (`FileLedger` default, `RedisLedger` for a
   fleet). A node-local ledger behind a shared WAL means two daemons cannot see
   each other's successes and may compensate twice; the daemon warns when it

@@ -347,3 +347,178 @@ async def test_an_in_process_only_tentative_escalates_instead_of_being_guessed_a
         assert outcome.resolution is Resolution.NEEDS_HUMAN
         assert "account:usr_9" in outcome.escalated
         assert "in-process only" in outcome.reason
+
+
+# ==========================================================================
+# Distributed semantic locks
+# ==========================================================================
+
+class FakeRedisLocks:
+    """The slice of redis.asyncio RedisSemanticLocks uses: SET NX PX, GET, EVAL."""
+
+    def __init__(self):
+        self.store: dict[str, str] = {}
+        self.calls: list[tuple] = []
+
+    async def set(self, key, value, nx=False, px=None):
+        self.calls.append(("set", key, value, nx, px))
+        if nx and key in self.store:
+            return None
+        self.store[key] = value
+        return True
+
+    async def get(self, key):
+        return self.store.get(key)
+
+    async def eval(self, script, numkeys, key, *args):
+        token = args[0]
+        self.calls.append(("eval", key, token))
+        if "pexpire" in script:                       # renewal
+            return 1 if self.store.get(key) == token else 0
+        if self.store.get(key) == token:              # compare-and-delete
+            del self.store[key]
+            return 1
+        return 0
+
+    async def aclose(self):
+        pass
+
+
+def _redis_locks(**kw):
+    from agent_saga.locks import RedisSemanticLocks
+
+    return RedisSemanticLocks(client=FakeRedisLocks(), **kw)
+
+
+@aio
+async def test_distributed_lock_is_exclusive_across_two_nodes():
+    """The in-memory manager cannot do this: two pods would each 'acquire' and
+    neither would learn of the other."""
+    from agent_saga.locks import RedisSemanticLocks
+
+    shared = FakeRedisLocks()
+    node_a = RedisSemanticLocks(client=shared)
+    node_b = RedisSemanticLocks(client=shared)
+
+    await node_a.acquire("account:usr_1", "saga-A")
+    with pytest.raises(SemanticLockConflictError, match="semantically locked"):
+        await node_b.acquire("account:usr_1", "saga-B")
+
+    await node_a.release("account:usr_1", "saga-A")
+    await node_b.acquire("account:usr_1", "saga-B")     # now free
+    assert await node_b.owner("account:usr_1") == "saga-B"
+    await node_a.close()
+    await node_b.close()
+
+
+@aio
+async def test_distributed_acquire_sets_an_expiry_so_a_dead_holder_cannot_deadlock():
+    locks = _redis_locks(ttl_ms=15_000)
+    await locks.acquire("r", "saga-A")
+    call = next(c for c in locks._client.calls if c[0] == "set")
+    assert call[3] is True and call[4] == 15_000       # NX and PX both set
+    await locks.close()
+
+
+@aio
+async def test_release_is_compare_and_delete_not_a_bare_del():
+    """If our TTL lapsed and another saga took the lock, a bare DEL would free
+    THEIR claim. The Lua CAS makes that impossible."""
+    shared = FakeRedisLocks()
+    from agent_saga.locks import RedisSemanticLocks
+
+    a = RedisSemanticLocks(client=shared)
+    await a.acquire("r", "saga-A")
+
+    shared.store["agent-saga:semlock:r"] = "saga-B"    # our lease lapsed; B took it
+    freed = await a.release("r", "saga-A")
+
+    assert freed is False
+    assert shared.store["agent-saga:semlock:r"] == "saga-B"   # B keeps its claim
+    await a.close()
+
+
+@aio
+async def test_distributed_lock_is_reentrant_for_the_same_saga():
+    locks = _redis_locks()
+    await locks.acquire("r", "saga-A")
+    await locks.acquire("r", "saga-A")                # must not conflict
+    await locks.close()
+
+
+@aio
+async def test_distributed_acquire_can_wait_for_a_timeout():
+    shared = FakeRedisLocks()
+    from agent_saga.locks import RedisSemanticLocks
+
+    a = RedisSemanticLocks(client=shared)
+    b = RedisSemanticLocks(client=shared)
+    await a.acquire("r", "saga-A")
+
+    async def free_soon():
+        await asyncio.sleep(0.05)
+        await a.release("r", "saga-A")
+
+    asyncio.create_task(free_soon())
+    await b.acquire("r", "saga-B", timeout=2.0, poll=0.01)
+    assert await b.owner("r") == "saga-B"
+    await a.close()
+    await b.close()
+
+
+@aio
+async def test_release_all_frees_every_claim_a_saga_holds():
+    locks = _redis_locks()
+    await locks.acquire("r1", "saga-A")
+    await locks.acquire("r2", "saga-A")
+    await locks.acquire("r3", "saga-B")
+    freed = await locks.release_all("saga-A")
+    assert sorted(freed) == ["r1", "r2"]
+    assert await locks.owner("r3") == "saga-B"        # untouched
+    await locks.close()
+
+
+@aio
+async def test_sync_acquire_on_a_distributed_backend_refuses_with_guidance():
+    """Returning True would hand back a claim that was never made. Refuse, and
+    name the async call to use instead."""
+    locks = _redis_locks()
+    with pytest.raises(RuntimeError, match="cannot acquire synchronously"):
+        locks.try_acquire("r", "saga-A")
+    await locks.close()
+
+
+@aio
+async def test_tentative_with_lock_true_refuses_on_a_distributed_backend():
+    locks = _redis_locks()
+    set_semantic_locks(locks)
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            ctx, wal = await _ctx(Path(d))
+            await ctx.begin()
+            with pytest.raises(RuntimeError, match="acquire_semantic_lock"):
+                tentative(ctx, "account:usr_1", lock=True)
+            await ctx.finish()
+            await wal.close()
+    finally:
+        await locks.close()
+
+
+@aio
+async def test_the_async_path_works_end_to_end_with_a_distributed_backend():
+    """The supported pattern: await the lock, then register the resource."""
+    locks = _redis_locks()
+    set_semantic_locks(locks)
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            ctx, wal = await _ctx(Path(d))
+            await ctx.begin()
+            await ctx.acquire_semantic_lock("account:usr_1")
+            tentative(ctx, "account:usr_1", lock=False)
+            assert await locks.owner("account:usr_1") == ctx.saga_id
+            await ctx.finish()
+            await wal.close()
+            # Released at the boundary, through the async path.
+            assert await locks.owner("account:usr_1") is None
+    finally:
+        await locks.close()

@@ -128,6 +128,17 @@ class SagaContext:
 
         if lock:
             manager = get_semantic_locks()
+            if getattr(manager, "distributed", False):
+                # A distributed lock is a network round trip and cannot be taken
+                # from this synchronous call. Say so precisely rather than
+                # silently skipping the lock, which would hand back a claim that
+                # was never made.
+                raise RuntimeError(
+                    f"{type(manager).__name__} is distributed and cannot be "
+                    f"acquired synchronously. Do this instead:\n"
+                    f"    await ctx.acquire_semantic_lock({resource.resource_id!r})\n"
+                    f"    tentative(ctx, {resource.resource_id!r}, lock=False, ...)"
+                )
             # Fail fast rather than block: telling an agent the account is busy
             # beats freezing it mid-run behind another saga.
             if not manager.try_acquire(resource.resource_id, self.saga_id):
@@ -168,12 +179,21 @@ class SagaContext:
         if resource_id not in self._semantic_locks:
             self._semantic_locks.append(resource_id)
 
-    def _release_semantic_locks(self) -> None:
+    async def _release_semantic_locks(self) -> None:
+        """Release every claim this saga holds, on every exit path.
+
+        Supports both the in-process manager (sync) and a distributed one
+        (async), so swapping backends does not change the lifecycle.
+        """
         if not self._semantic_locks:
             return
+        import inspect
+
         from .locks import get_semantic_locks
 
         released = get_semantic_locks().release_all(self.saga_id)
+        if inspect.isawaitable(released):
+            released = await released
         self._semantic_locks.clear()
         if released:
             logger.info("released %d semantic lock(s): %s",
@@ -255,7 +275,7 @@ class SagaContext:
         await self._resolve_tentatives(committed=not aborted)
         # Locks come off last, and unconditionally: an aborted saga must not
         # strand a resource claimed forever.
-        self._release_semantic_locks()
+        await self._release_semantic_locks()
 
         self.wal.append("SAGA_ABORTED" if aborted else "SAGA_COMPLETE",
                         {"saga_id": self.saga_id, "clean": clean})

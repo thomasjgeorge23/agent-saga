@@ -223,6 +223,73 @@
   .proof .n { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; font-variant-numeric: tabular-nums; }
   .proof .l { font-family: var(--mono); font-size: .72rem; color: var(--dim); letter-spacing: .05em; margin-top: .3rem; }
 
+  /* ---- live demo ---- */
+  .demo-shell { padding: 0; overflow: hidden; }
+  .demo-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+    padding: 1rem 1.2rem; border-bottom: 1px solid var(--border); }
+  .switch-wrap { display: flex; align-items: center; gap: .6rem; margin-right: auto; }
+  .switch-label { font-family: var(--mono); font-size: .76rem; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--faint); transition: color .2s ease; }
+  .switch-label.active { color: var(--text); }
+  .switch { width: 52px; height: 28px; border-radius: 999px; border: 1px solid var(--border-strong);
+    background: var(--elev); position: relative; cursor: pointer; padding: 0; flex: 0 0 auto;
+    transition: background .2s ease, border-color .2s ease; }
+  .switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+  .switch .knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--text); transition: transform .2s ease; }
+  .switch[aria-checked="true"] .knob { transform: translateX(24px); background: #14100a; }
+  @media (prefers-reduced-motion: reduce) { .switch, .switch .knob { transition: none; } }
+  .btn.run { font-size: .88rem; padding: .5rem .9rem; }
+
+  .demo-grid { display: grid; gap: 0; grid-template-columns: 1fr; }
+  @media (min-width: 860px) { .demo-grid { grid-template-columns: 300px 1fr; } }
+  .systems { display: flex; flex-direction: column; gap: .7rem; padding: 1.2rem;
+    border-bottom: 1px solid var(--border); }
+  @media (min-width: 860px) { .systems { border-bottom: 0; border-right: 1px solid var(--border); } }
+  .sys { border: 1px solid var(--border); border-radius: 10px; padding: .8rem .9rem;
+    background: var(--elev); transition: border-color .25s ease, background .25s ease; }
+  .sys.dirty { border-color: var(--irreversible);
+    background: color-mix(in srgb, var(--irreversible) 8%, var(--elev)); }
+  .sys.clean { border-color: var(--reversible);
+    background: color-mix(in srgb, var(--reversible) 8%, var(--elev)); }
+  .sys-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .35rem; }
+  .sys-name { font-family: var(--mono); font-size: .78rem; color: var(--dim); }
+  .sys-tag { margin-left: auto; font-family: var(--mono); font-size: .62rem;
+    padding: .08rem .38rem; border-radius: 5px; border: 1px solid currentColor; }
+  .sys-val { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em; }
+  .sys-sub { font-family: var(--mono); font-size: .68rem; color: var(--faint); margin-top: .1rem; }
+
+  .trace { padding: 1.2rem; min-height: 260px; font-family: var(--mono); font-size: .8rem;
+    display: flex; flex-direction: column; gap: .45rem; }
+  .trace-empty { color: var(--faint); margin: auto; }
+  .tr { display: grid; grid-template-columns: 1.4rem 1fr auto; gap: .6rem; align-items: center;
+    padding: .45rem .6rem; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--elev); animation: slidein .28s ease both; }
+  @keyframes slidein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .tr { animation: none; } }
+  .tr .ic { text-align: center; font-weight: 700; }
+  .tr.ok .ic { color: var(--reversible); }
+  .tr.fail { border-color: var(--irreversible); }
+  .tr.fail .ic { color: var(--irreversible); }
+  .tr.undo { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .tr.undo .ic { color: var(--accent); }
+  .tr.note { border-style: dashed; }
+  .tr.note .ic { color: var(--faint); }
+  .tr .msg { color: var(--dim); min-width: 0; }
+  .tr .msg b { color: var(--text); font-weight: 600; }
+  .tr .meta { font-size: .66rem; color: var(--faint); white-space: nowrap; }
+
+  .verdict { padding: 1rem 1.2rem; border-top: 1px solid var(--border);
+    font-family: var(--mono); font-size: .8rem; display: flex; gap: .7rem; align-items: flex-start; }
+  .verdict .chip { font-weight: 700; padding: .15rem .5rem; border-radius: 6px; white-space: nowrap; }
+  .verdict.bad .chip { background: var(--irreversible); color: #fff; }
+  .verdict.good .chip { background: var(--reversible); color: #06231f; }
+  .verdict .txt { color: var(--dim); }
+  .verdict .txt b { color: var(--text); }
+  .impl-h { font-size: clamp(1.2rem,2.4vw,1.6rem); font-weight: 750; margin: .3rem 0 0; }
+  .win-label { margin-left: auto; font-family: var(--mono); font-size: .68rem; color: var(--faint); }
+
   footer { border-top: 1px solid var(--border); padding: 3rem 0; color: var(--dim); }
   .foot-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; }
   .foot-grid .lic { font-family: var(--mono); font-size: .78rem; color: var(--faint); max-width: 52ch; }
@@ -236,6 +303,7 @@
   <div class="wrap nav-in">
     <a class="brand" href="#top">SagaOps <span class="seq">seq&nbsp;001</span></a>
     <nav class="nav-links">
+      <a class="ghost" href="#demo">Live demo</a>
       <a class="ghost" href="#how">How it works</a>
       <a class="ghost" href="#why">Why it's different</a>
       <a href="#install">Docs</a>
@@ -261,7 +329,7 @@
         </div>
         <div class="cta-row">
           <a class="btn primary" href="https://github.com/thomasjgeorge23/agent-saga" target="_blank" rel="noopener">Star on GitHub →</a>
-          <a class="btn ghost" href="#how">See how it works</a>
+          <a class="btn ghost" href="#demo">Try the live demo</a>
         </div>
       </div>
 
@@ -297,6 +365,91 @@
   </section>
 
   <!-- CONTRAST -->
+  <!-- LIVE DEMO -->
+  <section id="demo">
+    <div class="wrap">
+      <p class="eyebrow">Run it yourself</p>
+      <h2>The same workflow, with the switch off and on.</h2>
+      <p class="lede">Three steps: charge $499.00, provision the account, send the welcome mail.
+        The mail server refuses the connection. Flip the switch and watch what each run
+        leaves behind.</p>
+
+      <div class="demo-shell panel" style="margin-top:2rem">
+        <div class="demo-bar">
+          <div class="switch-wrap">
+            <span class="switch-label" id="labelOff">Optimistic</span>
+            <button class="switch" id="sagaToggle" role="switch" aria-checked="false"
+                    aria-labelledby="labelOff labelOn"><span class="knob"></span></button>
+            <span class="switch-label on" id="labelOn">SagaOps</span>
+          </div>
+          <button class="btn primary run" id="runBtn">Run the agent →</button>
+          <button class="btn ghost run" id="resetBtn">Reset</button>
+        </div>
+
+        <div class="demo-grid">
+          <!-- systems -->
+          <div class="systems">
+            <div class="sys" id="sys-stripe">
+              <div class="sys-head"><span class="sys-name">Stripe</span>
+                <span class="sys-tag t-comp">compensable</span></div>
+              <div class="sys-val" id="val-stripe">$0.00</div>
+              <div class="sys-sub" id="sub-stripe">no charges</div>
+            </div>
+            <div class="sys" id="sys-db">
+              <div class="sys-head"><span class="sys-name">Postgres</span>
+                <span class="sys-tag t-comp">compensable</span></div>
+              <div class="sys-val" id="val-db">0</div>
+              <div class="sys-sub" id="sub-db">accounts</div>
+            </div>
+            <div class="sys" id="sys-mail">
+              <div class="sys-head"><span class="sys-name">Email</span>
+                <span class="sys-tag t-irr">irreversible</span></div>
+              <div class="sys-val" id="val-mail">0</div>
+              <div class="sys-sub" id="sub-mail">sent</div>
+            </div>
+          </div>
+
+          <!-- trace -->
+          <div class="trace" id="trace" aria-live="polite">
+            <div class="trace-empty" id="traceEmpty">Press <b>Run the agent</b> to start.</div>
+          </div>
+        </div>
+
+        <div class="verdict" id="verdict" hidden></div>
+      </div>
+
+      <!-- implementation diff -->
+      <p class="eyebrow" style="margin-top:3rem">What you actually change</p>
+      <h3 class="impl-h">One wrapper, one inverse per call.</h3>
+      <div class="showcase" style="margin-top:1.2rem">
+        <div class="panel code" id="codeBefore">
+          <div class="win"><i></i><i></i><i></i><span class="win-label">before — optimistic</span></div>
+<pre><span class="c-cm"># nothing unwinds. an exception just propagates.</span>
+charge  = stripe.<span class="c-fn">charge</span>(customer, <span class="c-va">49900</span>)
+account = db.<span class="c-fn">insert_account</span>(customer, email)
+mail.<span class="c-fn">send_welcome</span>(email)   <span class="c-cm"># ← raises</span></pre>
+        </div>
+        <div class="panel code" id="codeAfter">
+          <div class="win"><i></i><i></i><i></i><span class="win-label">after — transactional</span></div>
+<pre><span class="c-kw">async with</span> <span class="c-fn">saga_scope</span>() <span class="c-kw">as</span> saga:
+    charge = <span class="c-kw">await</span> saga.<span class="c-fn">execute</span>(
+        tool=<span class="c-str">"stripe.charge"</span>, semantics=COMPENSABLE,
+        forward=<span class="c-kw">lambda</span>: stripe.<span class="c-fn">charge</span>(customer, <span class="c-va">49900</span>),
+        <span class="c-cm"># the inverse, derived from the RESULT:</span>
+        compensate=<span class="c-kw">lambda</span> r: <span class="c-fn">Compensation</span>(
+            fn=refund, handler=<span class="c-str">"stripe.refund"</span>,
+            kwargs={<span class="c-str">"charge_id"</span>: r[<span class="c-str">"id"</span>]}))
+
+    account = <span class="c-kw">await</span> saga.<span class="c-fn">execute</span>(...)   <span class="c-cm"># same shape</span>
+    <span class="c-kw">await</span> saga.<span class="c-fn">execute</span>(...)             <span class="c-cm"># ← raises here</span>
+<span class="c-cm"># charge refunded, account deleted, LIFO, on the way out</span></pre>
+        </div>
+      </div>
+      <p class="caption">The only new idea is <code>compensate</code>: a factory that receives the
+        forward call's result, because you cannot refund a <code>charge_id</code> you have not seen yet.</p>
+    </div>
+  </section>
+
   <section id="why">
     <div class="wrap">
       <p class="eyebrow">Why it exists</p>
@@ -500,6 +653,150 @@
     }
     wireCopy(document.getElementById('copyBtn'));
     document.querySelectorAll('.copyBtn2').forEach(wireCopy);
+  })();
+
+  /* ---- live demo: the same workflow, optimistic vs. transactional ---- */
+  (function () {
+    var toggle = document.getElementById('sagaToggle');
+    var runBtn = document.getElementById('resetBtn') && document.getElementById('runBtn');
+    var resetBtn = document.getElementById('resetBtn');
+    var trace = document.getElementById('trace');
+    var traceEmpty = document.getElementById('traceEmpty');
+    var verdict = document.getElementById('verdict');
+    if (!toggle || !runBtn) return;
+
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var running = false;
+
+    var world = { cents: 0, rows: 0, mail: 0 };
+    var el = {
+      stripe: document.getElementById('val-stripe'), stripeSub: document.getElementById('sub-stripe'),
+      db: document.getElementById('val-db'), dbSub: document.getElementById('sub-db'),
+      mail: document.getElementById('val-mail'),
+      sysStripe: document.getElementById('sys-stripe'), sysDb: document.getElementById('sys-db'),
+      sysMail: document.getElementById('sys-mail')
+    };
+
+    function money(c) { return '$' + (c / 100).toFixed(2); }
+
+    function paint() {
+      el.stripe.textContent = money(world.cents);
+      el.db.textContent = String(world.rows);
+      el.mail.textContent = String(world.mail);
+      mark(el.sysStripe, world.cents === 0);
+      mark(el.sysDb, world.rows === 0);
+      mark(el.sysMail, world.mail === 0);
+    }
+    function mark(node, ok) {
+      node.classList.remove('clean', 'dirty');
+      node.classList.add(ok ? 'clean' : 'dirty');
+    }
+    function neutral() {
+      [el.sysStripe, el.sysDb, el.sysMail].forEach(function (n) {
+        n.classList.remove('clean', 'dirty');
+      });
+    }
+
+    function row(kind, icon, msg, meta) {
+      if (traceEmpty) traceEmpty.style.display = 'none';
+      var d = document.createElement('div');
+      d.className = 'tr ' + kind;
+      d.innerHTML = '<span class="ic">' + icon + '</span><span class="msg">' + msg +
+                    '</span><span class="meta">' + (meta || '') + '</span>';
+      trace.appendChild(d);
+      trace.scrollTop = trace.scrollHeight;
+    }
+
+    function wait(ms) {
+      return new Promise(function (r) { setTimeout(r, reduced ? 0 : ms); });
+    }
+
+    function reset() {
+      world = { cents: 0, rows: 0, mail: 0 };
+      trace.innerHTML = '<div class="trace-empty" id="traceEmpty">Press <b>Run the agent</b> to start.</div>';
+      traceEmpty = document.getElementById('traceEmpty');
+      verdict.hidden = true;
+      verdict.className = 'verdict';
+      // Clear it, not just hide it: leaving the previous run's text in the DOM
+      // lets a stale verdict flash before the new one lands.
+      verdict.innerHTML = '';
+      el.stripeSub.textContent = 'no charges';
+      el.dbSub.textContent = 'accounts';
+      paint(); neutral();
+    }
+
+    function setLabels() {
+      var on = toggle.getAttribute('aria-checked') === 'true';
+      document.getElementById('labelOn').classList.toggle('active', on);
+      document.getElementById('labelOff').classList.toggle('active', !on);
+    }
+
+    toggle.addEventListener('click', function () {
+      if (running) return;
+      var on = toggle.getAttribute('aria-checked') === 'true';
+      toggle.setAttribute('aria-checked', String(!on));
+      setLabels();
+      reset();
+    });
+    resetBtn.addEventListener('click', function () { if (!running) reset(); });
+
+    runBtn.addEventListener('click', async function () {
+      if (running) return;
+      running = true; runBtn.disabled = true; resetBtn.disabled = true;
+      reset();
+      var guarded = toggle.getAttribute('aria-checked') === 'true';
+
+      if (guarded) row('note', '⌁', 'saga opened &mdash; every call records its inverse', 'saga_7f2c');
+
+      // Step 1 -- charge
+      await wait(420);
+      world.cents = 49900; el.stripeSub.textContent = 'ch_9f2c'; paint();
+      row('ok', '✓', '<b>stripe.charge</b> &nbsp;$499.00',
+          guarded ? 'inverse: refund' : '');
+
+      // Step 2 -- provision
+      await wait(420);
+      world.rows = 1; el.dbSub.textContent = 'cus_acme_42 · provisioning'; paint();
+      row('ok', '✓', '<b>postgres.insert_row</b> &nbsp;account created',
+          guarded ? 'inverse: delete row' : '');
+
+      // Step 3 -- the failure
+      await wait(480);
+      row('fail', '✗', '<b>email.send_welcome</b> &nbsp;SMTP relay refused the connection', '');
+
+      if (!guarded) {
+        await wait(320);
+        row('note', '!', 'exception propagates. nothing unwinds. process exits.', '');
+        verdict.className = 'verdict bad';
+        verdict.innerHTML = '<span class="chip">CORRUPTED</span><span class="txt">' +
+          'Customer is out <b>$499.00</b>, an account is stranded in <b>provisioning</b>, ' +
+          'and no mail was sent. A human has to find this one &mdash; and every other ' +
+          'case like it &mdash; by hand.</span>';
+        verdict.hidden = false;
+      } else {
+        await wait(360);
+        row('note', '⌁', 'boundary intercepted &mdash; compensating <b>LIFO</b>', '');
+        await wait(420);
+        world.rows = 0; el.dbSub.textContent = 'accounts'; paint();
+        row('undo', '↺', '<b>postgres.delete_account</b> &nbsp;row removed', 'step 2');
+        await wait(420);
+        world.cents = 0; el.stripeSub.textContent = 'ch_9f2c + re_9f2c'; paint();
+        row('undo', '↺', '<b>stripe.refund</b> &nbsp;$499.00 returned', 'idempotency-keyed');
+        await wait(360);
+        row('note', '?', '<b>email.send_welcome</b> reported <b>UNKNOWN</b>, not "fine"', 'escalated');
+        verdict.className = 'verdict good';
+        verdict.innerHTML = '<span class="chip">RESTORED</span><span class="txt">' +
+          'Net <b>$0.00</b>, zero stranded rows. The ledger keeps <b>both</b> entries &mdash; ' +
+          'that is what COMPENSABLE means. And the mail step is reported <b>UNKNOWN</b> ' +
+          'rather than rounded up to "clean": a refused connection cannot be proven to be ' +
+          'a mail that never went out.</span>';
+        verdict.hidden = false;
+      }
+
+      running = false; runBtn.disabled = false; resetBtn.disabled = false;
+    });
+
+    setLabels(); paint(); neutral();
   })();
 </script>
 </body>
