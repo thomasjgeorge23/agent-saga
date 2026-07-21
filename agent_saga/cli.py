@@ -72,6 +72,77 @@ def _cmd_ui(args: argparse.Namespace) -> int:
     return 0
 
 
+def _read_wal(path: str) -> list:
+    from .encryption import decode_line
+
+    records = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(decode_line(line, None))
+            except Exception:
+                # A truncated final line is the normal state of a log whose
+                # process was killed -- the reader is deliberately tolerant.
+                continue
+    return records
+
+
+def _cmd_verify(args: argparse.Namespace) -> int:
+    """Exit 0 only if the chain is intact. Designed to be a CI gate and a cron
+    job, so the exit code is the product; the report is for the human reading
+    the failure."""
+    from .integrity import verify
+
+    try:
+        records = _read_wal(args.wal_path)
+    except OSError as exc:
+        print(f"cannot read {args.wal_path}: {exc}")
+        return 2
+
+    report = verify(records, strict=args.strict)
+    print(f"{args.wal_path}: {report.summary()}")
+    if not report.intact:
+        print("\nThe log does not add up. Each finding is the first record whose")
+        print("hash stops following from the one before it:\n")
+        for brk in report.breaks[:20]:
+            print(f"  - {brk}")
+        if len(report.breaks) > 20:
+            print(f"  ... and {len(report.breaks) - 20} more")
+        return 1
+    return 0
+
+
+def _cmd_export(args: argparse.Namespace) -> int:
+    """Write a verified, self-describing bundle for write-once storage."""
+    from .integrity import export_worm, verify
+
+    try:
+        records = _read_wal(args.wal_path)
+    except OSError as exc:
+        print(f"cannot read {args.wal_path}: {exc}")
+        return 2
+
+    report = verify(records)
+    if not report.intact and not args.allow_broken:
+        print(f"refusing to export: {report.summary()}")
+        print("Exporting a broken chain would launder it into an artifact that "
+              "looks authoritative. Pass --allow-broken to export it anyway, "
+              "labelled as broken.")
+        return 1
+
+    manifest = export_worm(records, args.out, source=args.wal_path, report=report)
+    print(f"exported {manifest['records']} record(s) to {args.out}")
+    print(f"  chain head : {manifest['chain_head']}")
+    print(f"  bundle sha : {manifest['bundle_sha256']}")
+    print(f"  intact     : {manifest['intact']}")
+    print("\nStore under an object-lock/WORM policy. Re-verify any time with:")
+    print(f"  agent-saga verify --wal-path {args.out}/records.jsonl")
+    return 0 if manifest["intact"] else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="agent-saga", description="agent-saga tooling")
     sub = p.add_subparsers(dest="command", required=True)
@@ -87,6 +158,25 @@ def build_parser() -> argparse.ArgumentParser:
     ui.add_argument("--auth", action="store_true",
                     help="mint a random bearer token and print the URL to open")
     ui.set_defaults(func=_cmd_ui)
+
+    verify = sub.add_parser(
+        "verify", help="check the WAL hash chain for tampering")
+    verify.add_argument("--wal-path", default="./agent-saga.wal",
+                        help="path to the WAL file (default: ./agent-saga.wal)")
+    verify.add_argument("--strict", action="store_true",
+                        help="also fail on records written before chaining was "
+                             "enabled, instead of reporting them as unchained")
+    verify.set_defaults(func=_cmd_verify)
+
+    export = sub.add_parser(
+        "export", help="write a verified WORM bundle for an auditor")
+    export.add_argument("--wal-path", default="./agent-saga.wal",
+                        help="path to the WAL file (default: ./agent-saga.wal)")
+    export.add_argument("--out", required=True,
+                        help="output directory for the bundle")
+    export.add_argument("--allow-broken", action="store_true",
+                        help="export even if verification fails (labelled broken)")
+    export.set_defaults(func=_cmd_export)
     return p
 
 

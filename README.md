@@ -252,6 +252,55 @@ from agent_saga.adapters.crewai   import wrap_tool as crew_tool
 from agent_saga.adapters.llamaindex import wrap_tool as llama_tool
 ```
 
+## Tamper-evident audit log
+
+A WAL is already the record of what an agent did with real money. Chained, it
+becomes something an auditor can rely on: every record commits to its
+predecessor, so any edit, reorder, insertion, or deletion invalidates the chain
+and the verifier names the first record that stops adding up.
+
+```bash
+agent-saga verify --wal-path ./agent-saga.wal     # exit 0 only if intact
+agent-saga export --wal-path ./agent-saga.wal --out ./audit-2026-07
+```
+
+On by default — one SHA-256 per record, on the flusher thread, off the caller's
+hot path. A log that is only *sometimes* chained is not evidence of anything.
+
+**The chain never hashes the payload directly.** It hashes a salted content
+digest, and that indirection is what makes the two *legitimate* mutations
+possible without weakening the proof:
+
+- **GDPR erasure.** `redact_record` destroys the payload **and the salt**, then
+  the chain still verifies. What survives is proof that a record existed, when,
+  in what order, and of what type — with its contents irrecoverable, including
+  by whoever holds the log. Dropping the salt is load-bearing: `{"amount": 4200}`
+  has few plausible preimages, so an unsalted digest would leak the value it was
+  meant to erase.
+- **Compaction.** `compact()` legitimately drops settled sagas, which looks
+  exactly like an attacker deleting the record of a charge — both are missing
+  sequence numbers. So compaction writes a **chained attestation** naming
+  precisely which sequences left and the digest of what they were. A gap is
+  accepted only when an attestation accounts for every sequence inside it, and
+  attestations themselves survive later compactions, because housekeeping that
+  erased them would turn an explained gap back into an apparent attack.
+
+`export` writes a WORM bundle — newline-delimited JSON plus a manifest carrying
+the chain head, the bundle's own SHA-256, and *the verification rule in prose*,
+so an auditor can re-check it years from now with `sha256sum` and nothing else.
+An archive readable only by the tool that wrote it is not evidence, it's a
+dependency. Export refuses a broken chain unless you pass `--allow-broken`,
+which labels it — exporting a broken chain silently would launder it into an
+artifact that looks authoritative.
+
+> **Scope.** The chain proves *one writer's* log is intact, and is per-process by
+> construction: a single chain across nodes would need a global lock on every
+> append, which is a distributed transaction on the hot path of every tool call.
+> For a fleet, each node's log is independently provable; correlating them is a
+> control-plane concern.
+
+---
+
 ## Time-travel debugger
 
 A zero-dependency visual debugger reads any WAL and reconstructs each run:

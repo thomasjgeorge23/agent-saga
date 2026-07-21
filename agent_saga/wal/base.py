@@ -141,7 +141,19 @@ class BufferedWAL(BaseWAL):
         backpressure: BackpressurePolicy = BackpressurePolicy.RAISE,
         encryptor: Any = _UNSET,
         barrier_timeout: Optional[float] = DEFAULT_BARRIER_TIMEOUT,
+        chain: bool = True,
     ):
+        self.chain = chain
+        """Hash-chain every record, making the log tamper-evident.
+
+        On by default: the cost is one SHA-256 over a small dict per record --
+        microseconds, off the caller's thread -- and a log that is only
+        *sometimes* chained is not evidence of anything. Turn it off only for a
+        throwaway or test log."""
+        self._chain_head: str = ""
+        """Set from the last record already on disk when the sink opens, so a
+        restart continues one chain instead of starting a second one that
+        silently proves nothing about the first."""
         self._buf: deque = deque()
         self._seq = 0
         self._durable_seq = 0
@@ -304,6 +316,15 @@ class BufferedWAL(BaseWAL):
         # consequence of batching.
         batch = self._take()
         if batch:
+            if self.chain:
+                # On the flusher thread, in sequence order, single writer -- the
+                # only place the chain can be built without a lock and without
+                # any chance of two records interleaving.
+                from ..integrity import GENESIS, stamp_batch
+
+                if not self._chain_head:
+                    self._chain_head = GENESIS
+                self._chain_head = stamp_batch(batch, self._chain_head)
             try:
                 if self._io_lock is not None:
                     async with self._io_lock:

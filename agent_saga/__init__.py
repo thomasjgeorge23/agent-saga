@@ -44,6 +44,13 @@ from .recovery import (
     parse_wal,
     recovery_token,
 )
+from .integrity import (
+    ChainReport,
+    export_worm,
+    redact_record,
+    redact_where,
+)
+from .integrity import verify as verify_chain
 from .registry import compensator, registered, resolve
 from .semantics import ActionSemantics, Compensation, SagaStep, StepState
 from .durable import (
@@ -150,6 +157,11 @@ __all__ = [
     "Verdict",
     "arg_exceeds",
     "tool_is",
+    "verify_chain",
+    "ChainReport",
+    "export_worm",
+    "redact_record",
+    "redact_where",
     "BudgetLimit",
     "RateLimit",
     "LimitExceeded",

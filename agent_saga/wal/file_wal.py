@@ -47,9 +47,11 @@ class FileWAL(BufferedWAL):
         backpressure: BackpressurePolicy = BackpressurePolicy.RAISE,
         encryptor: Any = _UNSET,
         barrier_timeout: Optional[float] = DEFAULT_BARRIER_TIMEOUT,
+        chain: bool = True,
     ):
         super().__init__(max_buffer=max_buffer, backpressure=backpressure,
-                         encryptor=encryptor, barrier_timeout=barrier_timeout)
+                         encryptor=encryptor, barrier_timeout=barrier_timeout,
+                         chain=chain)
         self.path = Path(path) if path else None
         self._fh = None
         self._flush_pool = None
@@ -64,7 +66,47 @@ class FileWAL(BufferedWAL):
         self._flush_pool = new_wal_executor()
         if self.path:
             self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._resume_chain()
             self._fh = open(self.path, "a", encoding="utf-8")
+
+    def _resume_chain(self) -> None:
+        """Pick the chain back up from the last record already on disk.
+
+        A restart that began a fresh chain would produce a log whose second half
+        verifies perfectly and proves nothing about its first half -- and the
+        seam is exactly where someone would insert a record.
+
+        Only the tail is read: the last record's hash is all that is needed, and
+        reading a months-old log in full on every process start would make
+        chaining something operators disable.
+        """
+        from ..integrity import HASH_FIELD
+
+        if not self.chain or self._chain_head or not self.path.exists():
+            return
+        try:
+            from ..encryption import decode_line
+
+            size = self.path.stat().st_size
+            with open(self.path, "rb") as fh:
+                fh.seek(max(0, size - 65_536))
+                tail = fh.read().decode("utf-8", errors="ignore")
+            for line in reversed(tail.splitlines()):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = decode_line(line, self._encryptor)
+                except Exception:
+                    continue          # truncated or partial final line
+                head = record.get(HASH_FIELD)
+                if head:
+                    self._chain_head = head
+                    return
+        except OSError as exc:
+            # A log we cannot read the tail of is not a reason to refuse to
+            # start; it is a reason to say the chain restarts here.
+            logger.warning("could not resume hash chain from %s: %r", self.path, exc)
 
     async def _close_sink(self) -> None:
         if self._fh:
@@ -163,11 +205,32 @@ class FileWAL(BufferedWAL):
             self._fh.flush()
             _os.fsync(self._fh.fileno())
 
+        from ..integrity import GAP_EVENT
+
         records = self.records()
-        survivors = [r for r in records if r.get("saga_id") in keep_saga_ids]
+        # Attestations are log metadata, not saga records, and must outlive the
+        # sagas they describe: a later compaction that dropped them would erase
+        # the proof that an earlier deletion was legitimate housekeeping, and
+        # the gap it explains would start reading as tampering.
+        survivors = [r for r in records
+                     if r.get("saga_id") in keep_saga_ids or r.get("event") == GAP_EVENT]
         removed = len(records) - len(survivors)
         if removed <= 0:
             return 0
+
+        # Housekeeping that deletes records must say so, or a verifier cannot
+        # tell it from an attacker erasing the record of a charge -- both look
+        # like missing sequence numbers. Appended (not spliced in at the gap),
+        # so it chains from the current head without re-hashing anything.
+        if self.chain:
+            from ..integrity import digest_of, gap_attestation
+
+            dropped = [r for r in records if r not in survivors]
+            attestation = gap_attestation(
+                removed_seqs=[r["seq"] for r in dropped if isinstance(r.get("seq"), int)],
+                removed_digest=digest_of(dropped),
+                reason=f"compaction: {removed} record(s) for settled sagas")
+            self.append(attestation.pop("event"), attestation)
 
         tmp = self.path.with_suffix(self.path.suffix + ".compact")
         with open(tmp, "w", encoding="utf-8") as fh:

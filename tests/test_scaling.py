@@ -345,7 +345,9 @@ async def test_appends_during_compaction_are_not_lost():
         await wal.compact(keep_saga_ids={"live"})
         await wal.barrier()                            # flushes into the new file
 
-        sagas = {r["saga_id"] for r in await wal.read_all()}
+        # A compacted log also carries a chain attestation naming what was
+        # removed; it is log metadata and has no saga_id.
+        sagas = {r["saga_id"] for r in await wal.read_all() if "saga_id" in r}
         await wal.close()
 
     assert sagas == {"live"}

@@ -70,9 +70,11 @@ class RedisWAL(BufferedWAL):
         backpressure: BackpressurePolicy = BackpressurePolicy.RAISE,
         encryptor: Any = _UNSET,
         barrier_timeout: Optional[float] = DEFAULT_BARRIER_TIMEOUT,
+        chain: bool = True,
     ):
         super().__init__(max_buffer=max_buffer, backpressure=backpressure,
-                         encryptor=encryptor, barrier_timeout=barrier_timeout)
+                         encryptor=encryptor, barrier_timeout=barrier_timeout,
+                         chain=chain)
         self.url = url
         self.key = key
         # Global sequence counter, shared by every node writing this log. See
