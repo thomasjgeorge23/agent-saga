@@ -199,7 +199,7 @@ async def test_a_completed_compensation_is_not_run_twice_after_a_crash():
 
         daemon = RecoveryDaemon(wal, daemon_id="d1")
         # Simulate the crash: st2 already compensated, journalled, then death.
-        daemon._journal("RECOVERY_SUCCESS", {
+        await daemon._journal("RECOVERY_SUCCESS", {
             "saga_id": "s1", "step_id": "st2", "tool": "tool2",
             "token": IdempotencyManager.key("s1", "st2")})
 

@@ -58,7 +58,17 @@ from .executors import (
 )
 from .gc import GCReport, SnapshotGC
 from .idempotency import IdempotencyManager
-from .locks import FileLock, InProcessLock, RecoveryLock
+from .ledger import FileLedger, InMemoryLedger, RecoveryLedger
+from .locks import (
+    FileLock,
+    InProcessLock,
+    RecoveryLock,
+    SemanticLockConflictError,
+    SemanticLockManager,
+    get_semantic_locks,
+    set_semantic_locks,
+)
+from .patterns import TentativeResource, TentativeStatus, tentative
 from .observability import (
     CorrelationFilter,
     JsonFormatter,
@@ -154,6 +164,16 @@ __all__ = [
     "FileLock",
     "InProcessLock",
     "RecoveryLock",
+    "SemanticLockManager",
+    "SemanticLockConflictError",
+    "get_semantic_locks",
+    "set_semantic_locks",
+    "FileLedger",
+    "InMemoryLedger",
+    "RecoveryLedger",
+    "TentativeResource",
+    "TentativeStatus",
+    "tentative",
     "CorrelationFilter",
     "JsonFormatter",
     "TextFormatter",

@@ -159,7 +159,7 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (236 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (252 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
@@ -187,6 +187,16 @@ with only `pytest`; optional extras add their own SDKs):
   like a fresh refund). The key is auto-injected into handlers that accept it,
   and an execution ledger reads both the daemon journal and the crashed
   process's own WAL, so completed work is skipped rather than repeated.
+- Saga isolation countermeasures: `TentativeResource` marks a business entity
+  PENDING for the saga's life and resolves it to COMMITTED / ROLLED_BACK
+  automatically at the boundary; `SemanticLockManager` lets a saga claim a
+  resource id so a concurrent saga cannot dirty-read it. Locks release on every
+  exit path, including abort. Both process-local by default — inject a shared
+  implementation for multi-node.
+- The recovery ledger is pluggable (`FileLedger` default, `RedisLedger` for a
+  fleet). A node-local ledger behind a shared WAL means two daemons cannot see
+  each other's successes and may compensate twice; the daemon warns when it
+  detects that combination.
 - Recovery is backend-agnostic: `RecoveryDaemon` accepts a path or any
   `BaseWAL`, so a daemon on one node can resolve a saga orphaned on another.
 - No unbounded waits: `barrier()` raises `WALStalled` rather than hanging

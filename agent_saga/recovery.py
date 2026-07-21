@@ -186,6 +186,7 @@ class RecoveryDaemon:
         daemon_id: Optional[str] = None,
         dry_run: bool = False,
         lock: Optional["RecoveryLock"] = None,
+        ledger: Optional["RecoveryLedger"] = None,
     ):
         from .wal import BaseWAL
 
@@ -208,27 +209,41 @@ class RecoveryDaemon:
         from .locks import FileLock
 
         self.lock = lock or FileLock(self.claims_dir, owner_id=self.daemon_id)
+        # The ledger records what recovery has already done, and it must be as
+        # shared as the WAL. A local file ledger behind a shared WAL lets two
+        # nodes each miss the other's success and compensate twice.
+        from .ledger import FileLedger
+
+        self.ledger = ledger or FileLedger(self.journal_path, daemon_id=self.daemon_id)
+        if self.wal is not None and not getattr(self.ledger, "distributed", False):
+            logger.warning(
+                "RecoveryDaemon has a shared WAL backend but a node-local ledger "
+                "(%s). Two daemons on different hosts cannot see each other's "
+                "successes and may compensate the same step twice. Pass a shared "
+                "ledger (e.g. RedisLedger) alongside a shared WAL.",
+                type(self.ledger).__name__)
         self.dry_run = dry_run
         """Enterprises will not point this at production until they have watched
         it narrate what it *would* do for a week. Make that the easy path."""
 
     # -- journal -----------------------------------------------------------
 
-    def _journal(self, event: str, payload: dict) -> None:
-        self.journal_path.parent.mkdir(parents=True, exist_ok=True)
-        rec = {"event": event, "ts": time.time(), "daemon_id": self.daemon_id, **payload}
-        with open(self.journal_path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(rec, default=str) + "\n")
-            fh.flush()
-            os.fsync(fh.fileno())
+    async def _journal(self, event: str, payload: dict) -> None:
+        """Record through the injected ledger. On one host that is the local
+        fsynced journal; behind a shared WAL it must be a shared ledger, or two
+        nodes cannot see each other's successes."""
+        await self.ledger.record(event, payload)
 
-    def _completed_tokens(self, wal_records: Optional[list[dict]] = None) -> set[str]:
+    async def _completed_tokens(self, wal_records: Optional[list[dict]] = None) -> set[str]:
         """Everything already known to have compensated.
 
-        Both sources: this daemon's journal, and the WAL the crashed process
-        wrote (whose COMPENSATED records prove work the daemon never did).
+        Both sources: the ledger (what recovery did, possibly on another node),
+        and the WAL the crashed process wrote (whose COMPENSATED records prove
+        work no daemon ever did).
         """
-        return IdempotencyManager.completed_keys(self.journal_path, wal_records)
+        done = await self.ledger.completed_keys()
+        done |= IdempotencyManager.completed_keys(None, wal_records or [])
+        return done
 
     def _claim(self, saga_id: str) -> bool:
         """Take the recovery lock for this saga. Delegates to the injected lock
@@ -320,7 +335,7 @@ class RecoveryDaemon:
         # Case C: fail closed on anything irreversible, before touching anything.
         irreversible = [s for s in pending if s.semantics is ActionSemantics.IRREVERSIBLE]
         if irreversible:
-            self._journal("RECOVERY_ESCALATED", {
+            await self._journal("RECOVERY_ESCALATED", {
                 "saga_id": saga.saga_id,
                 "reason": "irreversible step present in a dangling saga",
                 "steps": [s.tool for s in irreversible]})
@@ -337,8 +352,8 @@ class RecoveryDaemon:
         # The execution ledger, from BOTH sources: this daemon's own journal and
         # the WAL the crashed process wrote. Consulting only the journal would
         # re-run a compensation the dead process had already finished.
-        done_tokens = self._completed_tokens()
-        prior_attempts = IdempotencyManager.attempts(self.journal_path)
+        done_tokens = await self._completed_tokens(await self.read_records())
+        prior_attempts = await self.ledger.attempts()
         compensated: list[str] = []
         skipped: list[str] = []
         try:
@@ -354,7 +369,7 @@ class RecoveryDaemon:
                     reason = ("no compensation was recorded" if not desc
                               else "compensation is in-process only (closure or "
                                    "non-serializable kwargs)")
-                    self._journal("RECOVERY_ESCALATED", {
+                    await self._journal("RECOVERY_ESCALATED", {
                         "saga_id": saga.saga_id, "step_id": step.step_id,
                         "tool": step.tool, "reason": reason})
                     return RecoveryOutcome(
@@ -364,7 +379,7 @@ class RecoveryDaemon:
 
                 handler = resolve(desc["handler"])
                 if handler is None:
-                    self._journal("RECOVERY_ESCALATED", {
+                    await self._journal("RECOVERY_ESCALATED", {
                         "saga_id": saga.saga_id, "step_id": step.step_id,
                         "tool": step.tool, "handler": desc["handler"],
                         "reason": "handler not registered in this daemon"})
@@ -375,7 +390,7 @@ class RecoveryDaemon:
                                 f"daemon; it must import the same connectors as the agent"))
 
                 if self.dry_run:
-                    self._journal("RECOVERY_DRY_RUN", {
+                    await self._journal("RECOVERY_DRY_RUN", {
                         "saga_id": saga.saga_id, "step_id": step.step_id,
                         "tool": step.tool, "handler": desc["handler"],
                         "kwargs": desc.get("kwargs", {}), "token": token})
@@ -396,7 +411,7 @@ class RecoveryDaemon:
                 # deliberately NOT part of the key, because a key that changes
                 # per attempt defeats de-duplication entirely.
                 attempt = prior_attempts.get(token, 0) + 1
-                self._journal("RECOVERY_ATTEMPT", {
+                await self._journal("RECOVERY_ATTEMPT", {
                     "saga_id": saga.saga_id, "step_id": step.step_id, "tool": step.tool,
                     "handler": desc["handler"], "token": token, "attempt": attempt,
                     "idempotency_key": call_kwargs.get("idempotency_key")
@@ -405,7 +420,7 @@ class RecoveryDaemon:
                 try:
                     await _call(handler, call_kwargs)
                 except BaseException as exc:
-                    self._journal("RECOVERY_FAILED", {
+                    await self._journal("RECOVERY_FAILED", {
                         "saga_id": saga.saga_id, "step_id": step.step_id,
                         "tool": step.tool, "token": token, "error": repr(exc)})
                     return RecoveryOutcome(
@@ -413,7 +428,7 @@ class RecoveryDaemon:
                         escalated=[step.tool],
                         reason=f"compensation for {step.tool} failed: {exc!r}; halted")
 
-                self._journal("RECOVERY_SUCCESS", {
+                await self._journal("RECOVERY_SUCCESS", {
                     "saga_id": saga.saga_id, "step_id": step.step_id,
                     "tool": step.tool, "token": token})
                 compensated.append(step.tool)

@@ -104,6 +104,77 @@ class SagaContext:
         self._heartbeat: Optional[asyncio.Task] = None
         self._obs_token = None
         self._abort_cause: Optional[tuple[str, str]] = None
+        self._tentatives: list = []
+        """Resources held in PENDING for this saga's lifetime. Resolved exactly
+        once at the boundary, so the failure path -- the one callers forget --
+        is handled for them."""
+        self._semantic_locks: list[str] = []
+
+    # -- isolation countermeasures -----------------------------------------
+    # A saga has no ACID isolation: every step commits as it runs. These are the
+    # structural answers, wired into the lifecycle so they cannot be forgotten.
+
+    def register_tentative(self, resource, *, lock: bool = False):
+        """Track a TentativeResource for automatic resolution at the boundary."""
+        from .locks import SemanticLockConflictError, get_semantic_locks
+
+        if lock:
+            manager = get_semantic_locks()
+            # Fail fast rather than block: telling an agent the account is busy
+            # beats freezing it mid-run behind another saga.
+            if not manager.try_acquire(resource.resource_id, self.saga_id):
+                raise SemanticLockConflictError(
+                    resource.resource_id,
+                    manager.owner(resource.resource_id) or "?", self.saga_id)
+            self._semantic_locks.append(resource.resource_id)
+        self._tentatives.append(resource)
+        return resource
+
+    async def acquire_semantic_lock(self, resource_id: str, *,
+                                    timeout: float = 0.0) -> None:
+        """Claim a business resource for this saga. Released automatically when
+        the saga finishes, however it finishes."""
+        from .locks import get_semantic_locks
+
+        await get_semantic_locks().acquire(resource_id, self.saga_id, timeout=timeout)
+        if resource_id not in self._semantic_locks:
+            self._semantic_locks.append(resource_id)
+
+    def _release_semantic_locks(self) -> None:
+        if not self._semantic_locks:
+            return
+        from .locks import get_semantic_locks
+
+        released = get_semantic_locks().release_all(self.saga_id)
+        self._semantic_locks.clear()
+        if released:
+            logger.info("released %d semantic lock(s): %s",
+                        len(released), ", ".join(sorted(released)))
+
+    async def _resolve_tentatives(self, *, committed: bool) -> None:
+        """Move every still-pending resource to its terminal status, once.
+
+        A callback failure is reported, never swallowed: a resource silently
+        stuck in PENDING is a balance nobody will reconcile.
+        """
+        for resource in self._tentatives:
+            if resource.resolved:
+                continue
+            try:
+                if committed:
+                    await resource.commit()
+                else:
+                    await resource.rollback()
+            except Exception as exc:
+                logger.error(
+                    "tentative resource %r failed to resolve to %s: %r",
+                    resource.resource_id,
+                    "COMMITTED" if committed else "ROLLED_BACK", exc)
+                self.wal.append("TENTATIVE_UNRESOLVED", {
+                    "saga_id": self.saga_id,
+                    "resource_id": resource.resource_id,
+                    "target": "COMMITTED" if committed else "ROLLED_BACK",
+                    "error": repr(exc)})
 
     # -- lease -------------------------------------------------------------
     # The recovery daemon must distinguish "this saga is still running" from
@@ -137,6 +208,14 @@ class SagaContext:
             except asyncio.CancelledError:
                 pass
             self._heartbeat = None
+        # Resolve tentative state before the terminal record, so the WAL reads
+        # in causal order. On the abort path rollback() has already rolled them
+        # back; this is a no-op for anything already resolved.
+        await self._resolve_tentatives(committed=not aborted)
+        # Locks come off last, and unconditionally: an aborted saga must not
+        # strand a resource claimed forever.
+        self._release_semantic_locks()
+
         self.wal.append("SAGA_ABORTED" if aborted else "SAGA_COMPLETE",
                         {"saga_id": self.saga_id, "clean": clean})
         await self.wal.barrier()
@@ -369,6 +448,12 @@ class SagaContext:
             logger.info("compensated %r (%s)", step.tool, step.semantics.value)
 
         set_step_id(None)  # clear step correlation; the saga id stays bound
+
+        # Tentative resources roll back with the compensations they belong to,
+        # so a caller driving rollback() directly (without the boundary) still
+        # gets correct state.
+        await self._resolve_tentatives(committed=False)
+
         self.wal.append(
             "ROLLBACK_END",
             {"saga_id": self.saga_id, "clean": report.clean,
