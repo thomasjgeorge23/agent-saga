@@ -136,7 +136,7 @@ from .wal import (
 from .serialization import SagaJSONEncoder, dumps as saga_dumps, loads as saga_loads
 from .frameworks import saga_lifespan
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 __author__ = "SagaOps"
 
 __all__ = [

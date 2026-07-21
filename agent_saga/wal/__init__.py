@@ -23,11 +23,13 @@ from .file_wal import AsyncWAL, FileWAL
 
 
 def __getattr__(name: str) -> Any:
-    """Expose RedisWAL without importing `redis` at package import time."""
+    """Expose RedisWAL and PostgresWAL without importing driver packages at package import time."""
     if name == "RedisWAL":
         from .redis_wal import RedisWAL
-
         return RedisWAL
+    if name == "PostgresWAL":
+        from .postgres_wal import PostgresWAL
+        return PostgresWAL
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -37,6 +39,7 @@ __all__ = [
     "AsyncWAL",
     "FileWAL",
     "RedisWAL",
+    "PostgresWAL",
     "BackpressurePolicy",
     "WALBackpressure",
     "WALStalled",
