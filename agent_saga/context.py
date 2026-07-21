@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from .gate import GateContext, PreFlightGate, PreFlightViolation
+from .observability import reset_saga_id, reset_step_id, set_saga_id, set_step_id
 from .semantics import (
     ActionSemantics,
     Compensation,
@@ -101,6 +102,8 @@ class SagaContext:
         self.lease_ttl = lease_ttl
         self._rolled_back = False
         self._heartbeat: Optional[asyncio.Task] = None
+        self._obs_token = None
+        self._abort_cause: Optional[tuple[str, str]] = None
 
     # -- lease -------------------------------------------------------------
     # The recovery daemon must distinguish "this saga is still running" from
@@ -108,10 +111,15 @@ class SagaContext:
     # a PID is not, because PIDs are reused.
 
     async def begin(self) -> None:
+        # Bind the correlation id for the whole saga, so every log line emitted
+        # under this context -- forward calls, the failure, all compensations --
+        # carries the same saga_id an operator can grep on.
+        self._obs_token = set_saga_id(self.saga_id)
         self.wal.append("SAGA_START", {"saga_id": self.saga_id, "pid": os.getpid(),
                                        "lease_ttl": self.lease_ttl})
         await self.wal.barrier()
         self._heartbeat = asyncio.create_task(self._renew_lease())
+        logger.info("saga started (pid=%s, lease_ttl=%ss)", os.getpid(), self.lease_ttl)
 
     async def _renew_lease(self) -> None:
         try:
@@ -132,6 +140,11 @@ class SagaContext:
         self.wal.append("SAGA_ABORTED" if aborted else "SAGA_COMPLETE",
                         {"saga_id": self.saga_id, "clean": clean})
         await self.wal.barrier()
+        logger.info("saga %s", "aborted (rolled back)" if aborted else "completed")
+        # Unbind the correlation id last, so the line above still carries it.
+        if self._obs_token is not None:
+            reset_saga_id(self._obs_token)
+            self._obs_token = None
 
     def record_abort(self, exc: BaseException) -> None:
         """Record what triggered the rollback.
@@ -148,11 +161,13 @@ class SagaContext:
         app-controlled text; treat it as potentially sensitive downstream.
         """
         message = str(exc)
+        self._abort_cause = (type(exc).__name__, message)
         self.wal.append("SAGA_ABORT_CAUSE", {
             "saga_id": self.saga_id,
             "cause_type": type(exc).__name__,
             "cause": message if len(message) <= 2000 else message[:2000] + "…",
         })
+        logger.error("rollback triggered by %s: %s", type(exc).__name__, message)
 
     # -- execution ---------------------------------------------------------
 
@@ -292,8 +307,12 @@ class SagaContext:
 
         report = RollbackReport()
         self.wal.append("ROLLBACK_START", {"saga_id": self.saga_id, "steps": len(self.stack)})
+        logger.info("rollback starting: %d step(s) on the stack (LIFO)", len(self.stack))
 
         for step in reversed(self.stack):
+            # Bind the step id so each compensation's logs are traceable to it.
+            # Overwritten each iteration; cleared after the loop.
+            set_step_id(step.step_id)
             if report.halted:
                 step.state = StepState.UNRESOLVED
                 report.unresolved.append(step)
@@ -332,7 +351,8 @@ class SagaContext:
                      "error": repr(exc),
                      "idempotency_key": step.compensation.idempotency_key},
                 )
-                logger.error("Compensation failed for %r: %r", step.tool, exc)
+                logger.error("compensation FAILED for %r: %r%s", step.tool, exc,
+                             " — halting rollback" if self.halt_on_compensation_failure else "")
                 if self.halt_on_compensation_failure:
                     report.halted = True
                 continue
@@ -344,7 +364,9 @@ class SagaContext:
                 {"saga_id": self.saga_id, "step_id": step.step_id, "tool": step.tool,
                  "idempotency_key": step.compensation.idempotency_key},
             )
+            logger.info("compensated %r (%s)", step.tool, step.semantics.value)
 
+        set_step_id(None)  # clear step correlation; the saga id stays bound
         self.wal.append(
             "ROLLBACK_END",
             {"saga_id": self.saga_id, "clean": report.clean,
@@ -353,6 +375,9 @@ class SagaContext:
              "unresolved": len(report.unresolved), "halted": report.halted},
         )
         await self.wal.barrier()
+        # The one-line verdict an on-call engineer needs: clean or not, and why.
+        (logger.info if report.clean else logger.error)("rollback complete — %s",
+                                                         report.summary())
         return report
 
 

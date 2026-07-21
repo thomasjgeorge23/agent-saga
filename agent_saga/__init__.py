@@ -51,6 +51,13 @@ from .encryption import (
 )
 from .gc import GCReport, SnapshotGC
 from .locks import FileLock, InProcessLock, RecoveryLock
+from .observability import (
+    CorrelationFilter,
+    JsonFormatter,
+    TextFormatter,
+    configure_logging,
+    current_correlation,
+)
 from .snapshot import (
     AttributeSnapshot,
     MappingSnapshot,
@@ -123,5 +130,10 @@ __all__ = [
     "FileLock",
     "InProcessLock",
     "RecoveryLock",
+    "CorrelationFilter",
+    "JsonFormatter",
+    "TextFormatter",
+    "configure_logging",
+    "current_correlation",
     "__version__",
 ]
