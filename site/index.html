@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SagaOps — Transactional rollback for autonomous AI agents</title>
+<meta name="description" content="The open-source transactional rollback engine for autonomous AI agents. Unwind an agent's side effects across databases, CRMs and payments — or refuse to start what can't be undone." />
+<style>
+  :root {
+    --bg: #f4f6fa; --panel: #ffffff; --elev: #ffffff;
+    --border: #dde3ee; --border-strong: #c6cfe0;
+    --text: #16202f; --dim: #4f5d77; --faint: #8592a8;
+    --accent: #b9781a; --accent-ink: #7a4d08;
+    --reversible: #1a8f82; --compensable: #b9781a; --irreversible: #c14840;
+    --shadow: 0 1px 2px rgba(16,26,44,.06), 0 8px 30px rgba(16,26,44,.06);
+    --mono: "SF Mono","Cascadia Code","JetBrains Mono",ui-monospace,Consolas,"Liberation Mono",monospace;
+    --sans: system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --serif: "Iowan Old Style","Palatino Linotype","Book Antiqua",Georgia,serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1320; --panel: #141d2e; --elev: #1b2740;
+      --border: #26324a; --border-strong: #364566;
+      --text: #e7ecf5; --dim: #9aa7be; --faint: #63718a;
+      --accent: #e0a340; --accent-ink: #f4c977;
+      --reversible: #37b3a4; --compensable: #e0a340; --irreversible: #e0605a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 40px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6fa; --panel: #ffffff; --elev: #ffffff;
+    --border: #dde3ee; --border-strong: #c6cfe0;
+    --text: #16202f; --dim: #4f5d77; --faint: #8592a8;
+    --accent: #b9781a; --accent-ink: #7a4d08;
+    --reversible: #1a8f82; --compensable: #b9781a; --irreversible: #c14840;
+    --shadow: 0 1px 2px rgba(16,26,44,.06), 0 8px 30px rgba(16,26,44,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1320; --panel: #141d2e; --elev: #1b2740;
+    --border: #26324a; --border-strong: #364566;
+    --text: #e7ecf5; --dim: #9aa7be; --faint: #63718a;
+    --accent: #e0a340; --accent-ink: #f4c977;
+    --reversible: #37b3a4; --compensable: #e0a340; --irreversible: #e0605a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 40px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--sans); line-height: 1.6;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  .wrap { width: min(1140px, 92vw); margin-inline: auto; }
+  section { padding: clamp(3.5rem, 8vw, 7rem) 0; }
+  a { color: inherit; }
+  ::selection { background: var(--accent); color: #0d1320; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: .74rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--faint); margin: 0 0 1rem;
+  }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.08; letter-spacing: -.02em; }
+  h2 { font-size: clamp(1.7rem, 3.6vw, 2.7rem); font-weight: 800; margin: 0 0 1rem; }
+  .lede { color: var(--dim); font-size: clamp(1.02rem, 1.6vw, 1.18rem); max-width: 62ch; }
+
+  /* Nav */
+  header.nav {
+    position: sticky; top: 0; z-index: 50; backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-in { display: flex; align-items: center; gap: 1.5rem; height: 62px; }
+  .brand { display: flex; align-items: center; gap: .6rem; font-weight: 800;
+    letter-spacing: -.03em; font-size: 1.12rem; text-decoration: none; }
+  .brand .seq { font-family: var(--mono); font-weight: 600; font-size: .7rem;
+    color: var(--accent); border: 1px solid var(--border-strong); border-radius: 5px;
+    padding: .12rem .38rem; letter-spacing: .05em; }
+  .nav-links { margin-left: auto; display: flex; align-items: center; gap: 1.4rem;
+    font-size: .92rem; }
+  .nav-links a { color: var(--dim); text-decoration: none; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-links a.ghost { display: none; }
+  @media (min-width: 720px) { .nav-links a.ghost { display: inline; } }
+  .toggle { font: inherit; font-family: var(--mono); font-size: .78rem;
+    cursor: pointer; background: var(--panel); color: var(--dim);
+    border: 1px solid var(--border-strong); border-radius: 7px; padding: .3rem .55rem; }
+  .toggle:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: .5rem; text-decoration: none;
+    font-weight: 650; font-size: .95rem; border-radius: 9px; padding: .62rem 1.05rem;
+    border: 1px solid transparent; cursor: pointer; transition: transform .12s ease;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: var(--accent); color: #14100a; border-color: var(--accent); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.ghost { background: transparent; color: var(--text); border-color: var(--border-strong); }
+  .btn.ghost:hover { border-color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  /* Hero */
+  .hero { padding-top: clamp(2.5rem, 6vw, 4.5rem); }
+  .hero-grid { display: grid; gap: clamp(2rem, 4vw, 3.5rem); grid-template-columns: 1fr; }
+  @media (min-width: 940px) { .hero-grid { grid-template-columns: 1.05fr .95fr; align-items: center; } }
+  h1 { font-size: clamp(2.2rem, 5.4vw, 3.6rem); font-weight: 850; margin: 0 0 1.2rem; }
+  h1 .amber { color: var(--accent); }
+  .hero .lede { font-size: clamp(1.05rem, 1.7vw, 1.24rem); }
+  .cta-row { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.8rem; }
+  .install {
+    margin-top: 1.6rem; display: flex; align-items: center; gap: .75rem;
+    font-family: var(--mono); font-size: .9rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px; padding: .7rem .9rem;
+    max-width: 340px; box-shadow: var(--shadow);
+  }
+  .install .prompt { color: var(--accent); }
+  .install code { color: var(--text); flex: 1; }
+  .install button { font-family: var(--mono); font-size: .72rem; cursor: pointer;
+    background: transparent; border: 1px solid var(--border-strong); color: var(--dim);
+    border-radius: 6px; padding: .22rem .5rem; }
+  .install button:hover { color: var(--text); }
+
+  /* WAL timeline motif */
+  .wal {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow); overflow: hidden; font-family: var(--mono);
+  }
+  .wal-bar { display: flex; align-items: center; gap: .5rem; padding: .6rem .9rem;
+    border-bottom: 1px solid var(--border); color: var(--faint); font-size: .72rem;
+    letter-spacing: .04em; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); }
+  .wal-bar .fn { margin-left: auto; }
+  .wal-body { padding: .5rem 0; font-size: .8rem; }
+  .logline { display: grid; grid-template-columns: 3.2rem 1fr auto; gap: .6rem;
+    align-items: center; padding: .32rem .9rem; white-space: nowrap; }
+  .logline .seq { color: var(--faint); font-variant-numeric: tabular-nums; }
+  .logline .ev { color: var(--dim); }
+  .logline .ev b { color: var(--text); font-weight: 600; }
+  .tag { font-size: .68rem; padding: .1rem .45rem; border-radius: 5px;
+    border: 1px solid currentColor; }
+  .t-rev { color: var(--reversible); }
+  .t-comp { color: var(--compensable); }
+  .t-irr { color: var(--irreversible); }
+  .logline.roll { color: var(--irreversible); }
+  .logline.done .ev b { color: var(--reversible); }
+  .reveal { opacity: 0; transform: translateY(6px); animation: rise .5s ease forwards; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .reveal { animation: none; opacity: 1; transform: none; } }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 1rem 1.4rem; margin-top: 1.4rem;
+    font-family: var(--mono); font-size: .76rem; color: var(--dim); }
+  .legend span { display: inline-flex; align-items: center; gap: .45rem; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; }
+
+  /* generic panels */
+  .panel { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: var(--shadow); }
+  .grid { display: grid; gap: 1.1rem; }
+  .two { grid-template-columns: 1fr; }
+  @media (min-width: 860px) { .two { grid-template-columns: 1fr 1fr; } }
+  .card { padding: 1.5rem 1.5rem 1.6rem; }
+  .card h3 { font-size: 1.14rem; margin: 0 0 .5rem; font-weight: 750; }
+  .card p { margin: 0; color: var(--dim); font-size: .97rem; }
+  .kicker { font-family: var(--mono); font-size: .72rem; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .7rem; }
+
+  /* thesis pull quote */
+  .thesis { text-align: center; }
+  .thesis blockquote { font-family: var(--serif); font-style: italic;
+    font-size: clamp(1.6rem, 4vw, 2.6rem); line-height: 1.2; margin: 0 auto;
+    max-width: 20ch; letter-spacing: -.01em; }
+  .thesis .by { font-family: var(--mono); font-size: .78rem; color: var(--faint);
+    letter-spacing: .06em; margin-top: 1.3rem; }
+  .thesis .tri { color: var(--reversible); }
+  .thesis .tri i:nth-child(2) { color: var(--compensable); font-style: normal; }
+  .thesis .tri i:nth-child(3) { color: var(--irreversible); font-style: normal; }
+
+  /* code + debugger */
+  .showcase { display: grid; gap: 1.2rem; grid-template-columns: 1fr; }
+  @media (min-width: 960px) { .showcase { grid-template-columns: 1.05fr .95fr; align-items: stretch; } }
+  .code { font-family: var(--mono); font-size: .82rem; line-height: 1.7; overflow-x: auto; }
+  .code pre { margin: 0; padding: 1.3rem 1.4rem; }
+  .code .win { display: flex; gap: .45rem; padding: .8rem 1.1rem; border-bottom: 1px solid var(--border); }
+  .code .win i { width: 11px; height: 11px; border-radius: 50%; background: var(--border-strong); display: block; }
+  .c-kw { color: var(--accent); }
+  .c-fn { color: var(--reversible); }
+  .c-str { color: var(--irreversible); }
+  .c-cm { color: var(--faint); font-style: italic; }
+  .c-va { color: var(--text); }
+
+  .dbg { display: flex; flex-direction: column; }
+  .dbg .win { display: flex; align-items: center; gap: .5rem; padding: .7rem 1.1rem;
+    border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: .73rem; color: var(--faint); }
+  .dbg .status { margin-left: auto; color: var(--reversible); }
+  .dbg-body { padding: .9rem 1rem 1.1rem; display: flex; flex-direction: column; gap: .5rem; }
+  .step { display: grid; grid-template-columns: 8px 1fr auto; gap: .8rem; align-items: center;
+    padding: .6rem .7rem; border-radius: 9px; background: var(--elev); border: 1px solid var(--border); }
+  .rail { width: 4px; align-self: stretch; border-radius: 3px; }
+  .rev .rail { background: var(--reversible); } .comp .rail { background: var(--compensable); }
+  .irr .rail { background: var(--irreversible); }
+  .step .meta { min-width: 0; }
+  .step .tool { font-family: var(--mono); font-size: .82rem; font-weight: 600; }
+  .step .sub { font-family: var(--mono); font-size: .68rem; color: var(--faint); }
+  .pill { font-family: var(--mono); font-size: .64rem; letter-spacing: .05em; text-transform: uppercase;
+    padding: .18rem .5rem; border-radius: 999px; white-space: nowrap; }
+  .pill.committed { color: var(--dim); border: 1px solid var(--border-strong); }
+  .pill.compensated { color: var(--reversible); border: 1px solid color-mix(in srgb, var(--reversible) 55%, transparent); }
+  .pill.gated { color: var(--irreversible); border: 1px solid color-mix(in srgb, var(--irreversible) 55%, transparent); }
+  .caption { font-family: var(--mono); font-size: .7rem; color: var(--faint); margin-top: .8rem;
+    text-align: center; }
+
+  /* features */
+  .feat { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+  @media (min-width: 680px) { .feat { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 980px) { .feat { grid-template-columns: 1fr 1fr 1fr; } }
+  .feat .card h3 { font-size: 1.02rem; display: flex; align-items: center; gap: .5rem; }
+  .feat .mono-k { font-family: var(--mono); font-size: .66rem; color: var(--accent);
+    border: 1px solid var(--border-strong); border-radius: 5px; padding: .06rem .35rem; }
+
+  /* proof strip */
+  .proof { display: grid; gap: 1.5rem; grid-template-columns: repeat(2, 1fr); text-align: center; }
+  @media (min-width: 720px) { .proof { grid-template-columns: repeat(4, 1fr); } }
+  .proof .n { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .proof .l { font-family: var(--mono); font-size: .72rem; color: var(--dim); letter-spacing: .05em; margin-top: .3rem; }
+
+  footer { border-top: 1px solid var(--border); padding: 3rem 0; color: var(--dim); }
+  .foot-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; }
+  .foot-grid .lic { font-family: var(--mono); font-size: .78rem; color: var(--faint); max-width: 52ch; }
+  .foot-grid .right { margin-left: auto; display: flex; gap: 1.2rem; font-size: .9rem; }
+  .foot-grid a { color: var(--dim); text-decoration: none; } .foot-grid a:hover { color: var(--text); }
+  .note { font-family: var(--mono); font-size: .7rem; color: var(--faint); margin-top: 2rem; }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top">SagaOps <span class="seq">seq&nbsp;001</span></a>
+    <nav class="nav-links">
+      <a class="ghost" href="#how">How it works</a>
+      <a class="ghost" href="#why">Why it's different</a>
+      <a href="#install">Docs</a>
+      <!-- TODO: replace # with the public GitHub URL -->
+      <a href="#">GitHub</a>
+      <button class="toggle" id="themeBtn" aria-label="Toggle color theme">theme</button>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">Open source · AGPL-3.0 + commercial</p>
+        <h1>The transactional rollback engine for <span class="amber">autonomous AI&nbsp;agents</span>.</h1>
+        <p class="lede">Agents mutate real systems — databases, CRMs, payments — and they do it
+          non-deterministically. When one hallucinates mid-run, SagaOps unwinds every side effect it
+          caused, in reverse order — or refuses to start the one thing it could never undo.</p>
+        <div class="install" id="install">
+          <span class="prompt">$</span><code>pip install agent-saga</code>
+          <button id="copyBtn" aria-label="Copy install command">copy</button>
+        </div>
+        <div class="cta-row">
+          <!-- TODO: replace # with the public GitHub URL -->
+          <a class="btn primary" href="#">Star on GitHub →</a>
+          <a class="btn ghost" href="#how">See how it works</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="wal" aria-hidden="true">
+          <div class="wal-bar"><span class="dot"></span><span>write-ahead log</span><span class="fn">saga_7f2c · aborted → clean</span></div>
+          <div class="wal-body">
+            <div class="logline reveal" style="animation-delay:.05s"><span class="seq">001</span><span class="ev"><b>SAGA_START</b></span><span class="tag t-rev">reversible</span></div>
+            <div class="logline reveal" style="animation-delay:.15s"><span class="seq">002</span><span class="ev">STEP_COMMITTED <b>salesforce.patch</b></span><span class="tag t-comp">compensable</span></div>
+            <div class="logline reveal" style="animation-delay:.25s"><span class="seq">003</span><span class="ev">STEP_COMMITTED <b>postgres.update</b></span><span class="tag t-comp">compensable</span></div>
+            <div class="logline reveal" style="animation-delay:.35s"><span class="seq">004</span><span class="ev">STEP_COMMITTED <b>stripe.charge</b></span><span class="tag t-comp">compensable</span></div>
+            <div class="logline roll reveal" style="animation-delay:.5s"><span class="seq">005</span><span class="ev">ROLLBACK_START ← model raised</span><span class="tag t-irr">abort</span></div>
+            <div class="logline done reveal" style="animation-delay:.6s"><span class="seq">006</span><span class="ev">COMPENSATED <b>stripe.refund</b></span><span class="tag t-comp">↺</span></div>
+            <div class="logline done reveal" style="animation-delay:.7s"><span class="seq">007</span><span class="ev">COMPENSATED <b>postgres.restore</b></span><span class="tag t-comp">↺</span></div>
+            <div class="logline done reveal" style="animation-delay:.8s"><span class="seq">008</span><span class="ev">COMPENSATED <b>salesforce.revert</b></span><span class="tag t-comp">↺</span></div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--reversible)"></span> REVERSIBLE — restored exactly</span>
+          <span><span class="swatch" style="background:var(--compensable)"></span> COMPENSABLE — inverse action</span>
+          <span><span class="swatch" style="background:var(--irreversible)"></span> IRREVERSIBLE — gated up front</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- THESIS -->
+  <section class="thesis">
+    <div class="wrap">
+      <blockquote>“Undo” is not one thing. It's&nbsp;<span class="tri"><i>three</i></span>.</blockquote>
+      <p class="by tri">REVERSIBLE&nbsp;&nbsp;·&nbsp;&nbsp;<i>COMPENSABLE</i>&nbsp;&nbsp;·&nbsp;&nbsp;<i>IRREVERSIBLE</i></p>
+    </div>
+  </section>
+
+  <!-- CONTRAST -->
+  <section id="why">
+    <div class="wrap">
+      <p class="eyebrow">Why it exists</p>
+      <h2>A rollback layer built for agents, not for backups.</h2>
+      <p class="lede">Two things people reach for don't fit. SagaOps sits exactly where they fall short.</p>
+      <div class="grid two" style="margin-top:2rem">
+        <div class="panel card">
+          <span class="kicker">vs. enterprise backup / DR suites</span>
+          <h3>Backups restore a machine. They don't unwind a workflow.</h3>
+          <p>Snapshotting a whole database can't help when an agent charged a card, emailed a customer,
+          and updated three SaaS systems in ninety seconds. SagaOps is a developer-first library —
+          <span style="color:var(--text)">a decorator and a proxy</span>, not an ops platform — that undoes
+          the <em>actions</em>, in order.</p>
+        </div>
+        <div class="panel card">
+          <span class="kicker">vs. plain database transactions</span>
+          <h3>You can't hold <code>BEGIN…COMMIT</code> open while a model thinks.</h3>
+          <p>A transaction locks rows and pins a connection for the seconds an LLM takes to decide — and it
+          can't span Stripe, Salesforce and Postgres at once anyway. SagaOps records forward calls and their
+          <em>runtime-derived inverses</em>, then compensates LIFO across every system the agent touched.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CODE + DEBUGGER -->
+  <section id="install">
+    <div class="wrap">
+      <p class="eyebrow">Wrap a boundary · watch it unwind</p>
+      <h2>One <code>saga_scope</code>. Every side effect accounted for.</h2>
+      <div class="showcase" style="margin-top:2rem">
+        <div class="panel code">
+          <div class="win"><i></i><i></i><i></i></div>
+<pre><span class="c-kw">from</span> agent_saga <span class="c-kw">import</span> saga_scope
+<span class="c-kw">from</span> agent_saga.connectors <span class="c-kw">import</span> stripe, salesforce
+
+<span class="c-kw">async with</span> <span class="c-fn">saga_scope</span>() <span class="c-kw">as</span> saga:
+    <span class="c-kw">await</span> salesforce.<span class="c-fn">patch_object</span>(saga,
+        object_type=<span class="c-str">"Lead"</span>, object_id=<span class="c-str">"00Q…"</span>,
+        patch={<span class="c-str">"Status"</span>: <span class="c-str">"Won"</span>}, credential_ref=<span class="c-str">"sf"</span>)
+
+    <span class="c-kw">await</span> stripe.<span class="c-fn">charge</span>(saga, customer_id=<span class="c-str">"cus_…"</span>,
+        amount=<span class="c-va">42000</span>, credential_ref=<span class="c-str">"stripe_prod"</span>)
+
+    <span class="c-cm"># the agent hallucinates a field and raises →</span>
+    <span class="c-cm"># charge refunded, Lead reverted, LIFO, on the way out.</span>
+    <span class="c-cm"># had a step been IRREVERSIBLE, the pre-flight</span>
+    <span class="c-cm"># gate would have refused to start it at all.</span></pre>
+        </div>
+
+        <div class="panel dbg">
+          <div class="win"><span class="dot"></span> time-travel debugger · saga_7f2c
+            <span class="status">ROLLED_BACK ✓ clean</span></div>
+          <div class="dbg-body">
+            <div class="step comp"><span class="rail"></span>
+              <div class="meta"><div class="tool">salesforce.patch_object</div><div class="sub">Lead 00Q… · reverted to prior JSON</div></div>
+              <span class="pill compensated">compensated</span></div>
+            <div class="step comp"><span class="rail"></span>
+              <div class="meta"><div class="tool">postgres.update_row</div><div class="sub">leads#4821 · restore guarded</div></div>
+              <span class="pill compensated">compensated</span></div>
+            <div class="step comp"><span class="rail"></span>
+              <div class="meta"><div class="tool">stripe.charge</div><div class="sub">ch_… · refunded, idempotency-keyed</div></div>
+              <span class="pill compensated">compensated</span></div>
+            <div class="step irr"><span class="rail"></span>
+              <div class="meta"><div class="tool">email.send_receipt</div><div class="sub">blocked before send · needs approval</div></div>
+              <span class="pill gated">gated</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="caption">Representative view of the built-in time-travel debugger, rendered from the WAL.</p>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how">
+    <div class="wrap">
+      <p class="eyebrow">The engine</p>
+      <h2>Four parts. The gate is the one a risk committee buys.</h2>
+      <div class="grid two" style="margin-top:2rem">
+        <div class="panel card">
+          <span class="kicker">Typed compensation semantics</span>
+          <h3>Every effect is classified before it runs.</h3>
+          <p><b style="color:var(--reversible)">REVERSIBLE</b> restores exactly.
+          <b style="color:var(--compensable)">COMPENSABLE</b> emits an inverse that leaves an honest trace
+          (a refund, not a rewind). <b style="color:var(--irreversible)">IRREVERSIBLE</b> can't be undone —
+          so it's never quietly attempted.</p>
+        </div>
+        <div class="panel card">
+          <span class="kicker">Pre-flight policy gate</span>
+          <h3>Refuse the uncompensable, up front.</h3>
+          <p>The gate evaluates a tool call — including its arguments — <em>before</em> the side effect.
+          Cross an irreversible boundary or a value threshold and it pauses for a human. That refusal is
+          the contract, not the cleanup.</p>
+        </div>
+        <div class="panel card">
+          <span class="kicker">Write-ahead log</span>
+          <h3>Intent is durable before the effect.</h3>
+          <p>A tiered WAL fsyncs the plan for money-path steps and rides a lock-free fast path for the rest.
+          Optional BYOK at-rest encryption; a configurable backpressure policy that <em>never silently
+          drops</em> a record.</p>
+        </div>
+        <div class="panel card">
+          <span class="kicker">Recovery daemon</span>
+          <h3>A crash mid-saga isn't an orphan.</h3>
+          <p>If the process dies after a charge but before the rollback, an independent daemon reads the WAL,
+          runs the compensations by name, and fails closed to a human queue for anything it can't resolve
+          with certainty — no double refunds.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WEDGE -->
+  <section>
+    <div class="wrap panel card" style="padding:clamp(2rem,4vw,3rem)">
+      <p class="kicker">The wedge</p>
+      <h2 style="max-width:20ch">The agent chose the action. So the inverse is derived at runtime.</h2>
+      <p class="lede" style="max-width:70ch">Durable-workflow engines make a developer declare each compensating
+      step at authoring time. But an LLM picks the tool, and its arguments, while it runs — the refund can't be
+      known until the charge returns its id. SagaOps derives the compensating action from the forward call's
+      actual result. That's the part a statically declared workflow can't express.</p>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">Batteries, not lock-in</p>
+      <h2>Wraps the tools your agents already call.</h2>
+      <div class="feat" style="margin-top:2rem">
+        <div class="panel card"><h3>Connectors <span class="mono-k">compensable</span></h3><p>Stripe (idempotent refunds), Postgres (full CRUD, compound keys, concurrency-guarded restore), Salesforce (field-scoped revert).</p></div>
+        <div class="panel card"><h3>Framework adapters</h3><p>LangGraph, CrewAI, and the OpenAI Agents SDK — wrap a tool, keep its name and schema, and it records on the active saga.</p></div>
+        <div class="panel card"><h3>Snapshot capture</h3><p>In-process reversible state and durable, crash-recoverable file snapshots — with a conservative store GC that never reaps what a rollback still needs.</p></div>
+        <div class="panel card"><h3>Time-travel debugger</h3><p>A zero-dependency WAL viewer: every saga, every step, latency, and what could <em>not</em> be undone — secrets scrubbed on read.</p></div>
+        <div class="panel card"><h3>Credential-safe by design</h3><p>Compensations carry credential <em>references</em>, never values. An authoring-time guard refuses a secret before it can reach the log.</p></div>
+        <div class="panel card"><h3>Zero-dependency core</h3><p><code>pip install</code> and go. No broker, no Redis, no service to stand up. Extras are opt-in, per connector.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROOF -->
+  <section>
+    <div class="wrap panel card" style="padding:clamp(2rem,4vw,2.6rem)">
+      <div class="proof">
+        <div><div class="n">176</div><div class="l">tests, pytest-only core</div></div>
+        <div><div class="n">3</div><div class="l">compensation semantics</div></div>
+        <div><div class="n">0</div><div class="l">core dependencies</div></div>
+        <div><div class="n">LIFO</div><div class="l">deterministic rollback</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="thesis">
+    <div class="wrap">
+      <p class="eyebrow">Deploy agents you can actually roll back</p>
+      <h2 style="margin-bottom:1.6rem">Start in one line.</h2>
+      <div class="install" style="margin-inline:auto">
+        <span class="prompt">$</span><code>pip install agent-saga</code>
+        <button class="copyBtn2" aria-label="Copy install command">copy</button>
+      </div>
+      <div class="cta-row" style="justify-content:center">
+        <!-- TODO: replace # with the public GitHub URL -->
+        <a class="btn primary" href="#">Star on GitHub →</a>
+        <a class="btn ghost" href="#how">Read the docs</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div>
+      <div class="brand" style="margin-bottom:.6rem">SagaOps <span class="seq">seq&nbsp;001</span></div>
+      <p class="lic">Licensed AGPL-3.0-only, with a commercial license for hosted use.
+      © 2026 SagaOps. Not affiliated with the systems it connects to.</p>
+    </div>
+    <nav class="right">
+      <!-- TODO: replace # links with real URLs before launch -->
+      <a href="#">GitHub</a><a href="#install">Docs</a><a href="#">PyPI</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('themeBtn');
+    function current() {
+      return root.getAttribute('data-theme') ||
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    }
+    btn && btn.addEventListener('click', function () {
+      var next = current() === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      btn.textContent = next === 'dark' ? 'light' : 'dark';
+    });
+    function wireCopy(el) {
+      el && el.addEventListener('click', function () {
+        navigator.clipboard && navigator.clipboard.writeText('pip install agent-saga');
+        var t = el.textContent; el.textContent = 'copied'; setTimeout(function(){ el.textContent = t; }, 1400);
+      });
+    }
+    wireCopy(document.getElementById('copyBtn'));
+    document.querySelectorAll('.copyBtn2').forEach(wireCopy);
+  })();
+</script>
+</body>
+</html>
