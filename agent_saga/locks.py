@@ -143,40 +143,98 @@ class SemanticLockManager:
 
     def __init__(self) -> None:
         self._owners: dict[str, str] = {}     # resource_id -> saga_id
+        self._expirations: dict[str, float] = {}  # resource_id -> expiration timestamp
+        self._heartbeats: dict[str, asyncio.Task] = {}  # resource_id -> heartbeat task
         self._mutex = threading.Lock()
 
-    def try_acquire(self, resource_id: str, saga_id: str) -> bool:
+    def try_acquire(self, resource_id: str, saga_id: str, ttl: Optional[float] = None) -> bool:
         with self._mutex:
+            now = time.monotonic()
+            if resource_id in self._expirations and now > self._expirations[resource_id]:
+                self._clear_lock_internal(resource_id)
             owner = self._owners.get(resource_id)
             if owner is None:
                 self._owners[resource_id] = saga_id
+                if ttl is not None:
+                    self._expirations[resource_id] = now + ttl
                 return True
-            return owner == saga_id            # re-entrant for the same saga
+            if owner == saga_id:
+                if ttl is not None:
+                    self._expirations[resource_id] = now + ttl
+                return True
+            return False
 
     async def acquire(self, resource_id: str, saga_id: str, *,
-                      timeout: float = 5.0, poll: float = 0.01) -> None:
+                      timeout: float = 5.0, poll: float = 0.01,
+                      ttl: Optional[float] = None) -> None:
         """Claim a resource for a saga.
 
         `timeout=0` fails fast, which is usually right for an agent: blocking a
         model mid-run is worse than telling it the resource is busy. A positive
         timeout waits, yielding to the loop so other sagas keep progressing.
         """
-        if self.try_acquire(resource_id, saga_id):
+        if self.try_acquire(resource_id, saga_id, ttl=ttl):
+            if ttl is not None:
+                self._start_heartbeat(resource_id, saga_id, ttl)
             return
         if timeout > 0:
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:
                 await asyncio.sleep(poll)
-                if self.try_acquire(resource_id, saga_id):
+                if self.try_acquire(resource_id, saga_id, ttl=ttl):
+                    if ttl is not None:
+                        self._start_heartbeat(resource_id, saga_id, ttl)
                     return
         raise LockAcquisitionTimeoutError(resource_id, self.owner(resource_id) or "?", saga_id, timeout)
+
+    def _start_heartbeat(self, resource_id: str, saga_id: str, ttl: float) -> None:
+        with self._mutex:
+            old_task = self._heartbeats.pop(resource_id, None)
+            if old_task:
+                old_task.cancel()
+                try:
+                    loop = asyncio.get_running_loop()
+                    if loop.is_running():
+                        loop.create_task(self._await_cancelled_task(old_task))
+                except RuntimeError:
+                    pass
+            try:
+                loop = asyncio.get_running_loop()
+                task = loop.create_task(self._heartbeat_loop(resource_id, saga_id, ttl))
+                self._heartbeats[resource_id] = task
+            except RuntimeError:
+                pass
+
+    async def _heartbeat_loop(self, resource_id: str, saga_id: str, ttl: float) -> None:
+        interval = ttl / 2.0
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                renewed = self.renew(resource_id, saga_id, ttl)
+                if not renewed:
+                    break
+        except asyncio.CancelledError:
+            raise
+
+    def renew(self, resource_id: str, saga_id: str, ttl: float) -> bool:
+        with self._mutex:
+            if self._owners.get(resource_id) == saga_id:
+                self._expirations[resource_id] = time.monotonic() + ttl
+                return True
+            return False
+
+    async def _await_cancelled_task(self, task: asyncio.Task) -> None:
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
 
     def release(self, resource_id: str, saga_id: str) -> bool:
         """Release one resource, but only if this saga actually holds it --
         never let one saga free another's claim."""
         with self._mutex:
             if self._owners.get(resource_id) == saga_id:
-                del self._owners[resource_id]
+                self._clear_lock_internal(resource_id)
                 return True
             return False
 
@@ -186,15 +244,35 @@ class SemanticLockManager:
         with self._mutex:
             held = [r for r, owner in self._owners.items() if owner == saga_id]
             for r in held:
-                del self._owners[r]
+                self._clear_lock_internal(r)
             return held
+
+    def _clear_lock_internal(self, resource_id: str) -> None:
+        self._owners.pop(resource_id, None)
+        self._expirations.pop(resource_id, None)
+        task = self._heartbeats.pop(resource_id, None)
+        if task:
+            task.cancel()
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(self._await_cancelled_task(task))
+            except RuntimeError:
+                pass
 
     def owner(self, resource_id: str) -> Optional[str]:
         with self._mutex:
+            now = time.monotonic()
+            if resource_id in self._expirations and now > self._expirations[resource_id]:
+                self._clear_lock_internal(resource_id)
             return self._owners.get(resource_id)
 
     def held(self) -> dict[str, str]:
         with self._mutex:
+            now = time.monotonic()
+            for r in list(self._expirations.keys()):
+                if now > self._expirations[r]:
+                    self._clear_lock_internal(r)
             return dict(self._owners)
 
 
@@ -251,13 +329,11 @@ class RedisSemanticLocks:
         self.url = url
         self.key_prefix = key_prefix
         self.ttl_ms = ttl_ms
-        # Renew at a third of the TTL: two renewals may be lost to a GC pause or
-        # a slow network before the lock is ever at risk of lapsing.
-        self.renew_interval = renew_interval or (ttl_ms / 3000.0)
+        self.renew_interval = renew_interval or ((ttl_ms / 1000.0) / 2.0)
         self._client = client
         self._owns_client = client is None
         self._held: dict[str, str] = {}      # resource_id -> saga_id, this node
-        self._renewer: Optional[asyncio.Task] = None
+        self._heartbeats: dict[str, asyncio.Task] = {}  # resource_id -> heartbeat task
 
         if client is None:
             try:
@@ -302,23 +378,69 @@ class RedisSemanticLocks:
             acquired = await conn.set(key, saga_id, nx=True, px=self.ttl_ms)
             if acquired:
                 self._held[resource_id] = saga_id
-                self._ensure_renewer()
+                self._start_heartbeat(resource_id, saga_id)
                 return
 
             current = await conn.get(key)
             if current == saga_id:            # re-entrant for the same saga
                 self._held[resource_id] = saga_id
-                self._ensure_renewer()
+                self._start_heartbeat(resource_id, saga_id)
                 return
             if timeout <= 0 or time.monotonic() >= deadline:
                 raise LockAcquisitionTimeoutError(resource_id, current or "?", saga_id, timeout)
             await asyncio.sleep(poll)
+
+    def _start_heartbeat(self, resource_id: str, saga_id: str) -> None:
+        old_task = self._heartbeats.pop(resource_id, None)
+        if old_task:
+            old_task.cancel()
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(self._await_cancelled_task(old_task))
+            except RuntimeError:
+                pass
+
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(self._heartbeat_loop(resource_id, saga_id))
+            self._heartbeats[resource_id] = task
+        except RuntimeError:
+            pass
+
+    async def _heartbeat_loop(self, resource_id: str, saga_id: str) -> None:
+        try:
+            while True:
+                await asyncio.sleep(self.renew_interval)
+                conn = await self._conn()
+                renewed = await conn.eval(self._RENEW_LUA, 1,
+                                          self._key(resource_id), saga_id,
+                                          str(self.ttl_ms))
+                if not renewed:
+                    break
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+
+    async def _await_cancelled_task(self, task: asyncio.Task) -> None:
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
 
     async def release(self, resource_id: str, saga_id: str) -> bool:
         conn = await self._conn()
         # Compare-and-delete: never free a claim we no longer own.
         freed = await conn.eval(self._RELEASE_LUA, 1, self._key(resource_id), saga_id)
         self._held.pop(resource_id, None)
+        task = self._heartbeats.pop(resource_id, None)
+        if task:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
         return bool(freed)
 
     async def release_all(self, saga_id: str) -> list[str]:
@@ -331,41 +453,14 @@ class RedisSemanticLocks:
         conn = await self._conn()
         return await conn.get(self._key(resource_id))
 
-    # -- lease renewal -----------------------------------------------------
-
-    def _ensure_renewer(self) -> None:
-        if self._renewer is None or self._renewer.done():
-            try:
-                self._renewer = asyncio.create_task(self._renew_loop())
-            except RuntimeError:
-                self._renewer = None      # no running loop; renewal is optional
-
-    async def _renew_loop(self) -> None:
-        try:
-            while self._held:
-                await asyncio.sleep(self.renew_interval)
-                conn = await self._conn()
-                for resource_id, saga_id in list(self._held.items()):
-                    try:
-                        await conn.eval(self._RENEW_LUA, 1,
-                                        self._key(resource_id), saga_id,
-                                        str(self.ttl_ms))
-                    except Exception:
-                        # A renewal failure is not fatal: the lock lapses and
-                        # another saga may take it, which is the designed
-                        # behaviour for a holder that has gone quiet.
-                        pass
-        except asyncio.CancelledError:
-            raise
-
     async def close(self) -> None:
-        if self._renewer is not None:
-            self._renewer.cancel()
-            try:
-                await self._renewer
-            except (asyncio.CancelledError, Exception):
-                pass
-            self._renewer = None
+        tasks = list(self._heartbeats.values())
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._heartbeats.clear()
+
         if self._client is not None and self._owns_client:
             close = getattr(self._client, "aclose", None) or getattr(self._client, "close", None)
             if close is not None:
