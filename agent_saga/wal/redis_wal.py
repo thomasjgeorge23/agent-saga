@@ -161,11 +161,76 @@ class RedisWAL(BufferedWAL):
 
     # -- reading -----------------------------------------------------------
 
-    async def read_all(self) -> list[dict]:
+    async def read_all(self, *, chunk: int = 5_000) -> list[dict]:
+        """Every record, read in bounded chunks.
+
+        `LRANGE key 0 -1` materialises the entire history in one reply on both
+        the server and the client. Paging keeps *peak* memory proportional to
+        `chunk` rather than to the age of the log. It still returns everything --
+        `compact()` is what stops the log growing without bound.
+        """
+        assert self._client is not None, "RedisWAL not started; call await wal.start()"
+        raw: list = []
+        start = 0
+        while True:
+            page = await self._client.lrange(self.key, start, start + chunk - 1)
+            if not page:
+                break
+            raw.extend(page)
+            if len(page) < chunk:
+                break
+            start += chunk
+        return self._decode(raw)
+
+    async def read_since(self, gseq: int, *, chunk: int = 5_000) -> list[dict]:
+        """Records with a global sequence greater than `gseq`.
+
+        The cursor a long-running daemon wants: sweep N+1 only pays for what
+        arrived since sweep N.
+        """
+        return [r for r in await self.read_all(chunk=chunk)
+                if (r.get("gseq") or r.get("seq", 0)) > gseq]
+
+    async def compact(self, *, keep_saga_ids: set, chunk: int = 1_000) -> int:
+        """Drop resolved history from the head of the log.
+
+        A Redis list cannot cheaply delete from the middle, so this trims only
+        the leading run of records that belong to no saga in `keep_saga_ids`.
+        That is deliberately conservative: it can never remove a record an
+        unresolved saga still needs, and in practice it reclaims almost
+        everything, because sagas resolve roughly in the order they started.
+
+        `LTRIM start -1` is atomic and safe against a concurrent RPUSH -- a new
+        record lands past the end and survives. Returns the number removed.
+        """
+        assert self._client is not None, "RedisWAL not started; call await wal.start()"
+        watermark = 0
+        start = 0
+        done = False
+        while not done:
+            page = await self._client.lrange(self.key, start, start + chunk - 1)
+            if not page:
+                break
+            for offset, record in enumerate(self._decode(list(page))):
+                if record.get("saga_id") in keep_saga_ids:
+                    watermark = start + offset
+                    done = True
+                    break
+            else:
+                start += len(page)
+                watermark = start
+                if len(page) < chunk:
+                    done = True
+                continue
+        if watermark <= 0:
+            return 0
+        await self._client.ltrim(self.key, watermark, -1)
+        logger.info("compacted %d resolved record(s) from %s", watermark, self.key)
+        return watermark
+
+    def _decode(self, raw: list) -> list[dict]:
         from ..encryption import decode_line
 
-        assert self._client is not None, "RedisWAL not started; call await wal.start()"
-        raw = await self._client.lrange(self.key, 0, -1)
         out: list[dict] = []
         for line in raw:
             if isinstance(line, bytes):

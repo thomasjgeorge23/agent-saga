@@ -151,10 +151,33 @@ class RedisLedger:
             self._client = Redis.from_url(self.url, decode_responses=True)
         return self._client
 
+    @property
+    def done_key(self) -> str:
+        return f"{self.key}:done"
+
+    @property
+    def attempts_key(self) -> str:
+        return f"{self.key}:attempts"
+
     async def record(self, event: str, payload: dict) -> None:
         conn = await self._conn()
         rec = {"event": event, "ts": time.time(), "daemon_id": self.daemon_id, **payload}
         await conn.rpush(self.key, json.dumps(rec, default=str))
+
+        # Maintain compact indexes alongside the append-only log.
+        #
+        # Reading the full list to answer "has this token completed?" is O(all
+        # history) on every recovery sweep, which turns a long-lived fleet into
+        # an OOM. A SET of completed tokens answers the same question from a
+        # structure that grows with *compensated steps*, not with every event
+        # ever written -- and the list stays purely for audit.
+        token = payload.get("token")
+        if not token:
+            return
+        if event in _SUCCESS_EVENTS:
+            await conn.sadd(self.done_key, token)
+        elif event in _ATTEMPT_EVENTS:
+            await conn.hincrby(self.attempts_key, token, 1)
 
     async def _all(self) -> list[dict]:
         conn = await self._conn()
@@ -169,15 +192,55 @@ class RedisLedger:
         return out
 
     async def completed_keys(self) -> set[str]:
-        return {r["token"] for r in await self._all()
-                if r.get("event") in _SUCCESS_EVENTS and r.get("token")}
+        """From the SET index -- never a scan of the audit log."""
+        conn = await self._conn()
+        try:
+            members = await conn.smembers(self.done_key)
+        except AttributeError:
+            # A client without set support: fall back to the scan rather than
+            # returning an empty set, which would silently re-run compensations.
+            return {r["token"] for r in await self._all()
+                    if r.get("event") in _SUCCESS_EVENTS and r.get("token")}
+        return {m.decode("utf-8") if isinstance(m, bytes) else m for m in members}
+
+    async def is_completed(self, token: str) -> bool:
+        """O(1) membership, for callers that check one token at a time."""
+        conn = await self._conn()
+        return bool(await conn.sismember(self.done_key, token))
 
     async def attempts(self) -> dict[str, int]:
-        counts: dict[str, int] = {}
-        for r in await self._all():
-            if r.get("event") in _ATTEMPT_EVENTS and r.get("token"):
-                counts[r["token"]] = counts.get(r["token"], 0) + 1
-        return counts
+        conn = await self._conn()
+        try:
+            raw = await conn.hgetall(self.attempts_key)
+        except AttributeError:
+            counts: dict[str, int] = {}
+            for r in await self._all():
+                if r.get("event") in _ATTEMPT_EVENTS and r.get("token"):
+                    counts[r["token"]] = counts.get(r["token"], 0) + 1
+            return counts
+        out: dict[str, int] = {}
+        for k, v in (raw or {}).items():
+            if isinstance(k, bytes):
+                k = k.decode("utf-8")
+            out[k] = int(v)
+        return out
+
+    async def compact(self, *, keep_last: int = 10_000) -> int:
+        """Trim the audit log to its most recent entries.
+
+        Only the *log* is trimmed. The completed-token SET is never touched:
+        losing it would re-open the double-compensation window it exists to
+        close, which is a far worse outcome than an unbounded audit trail.
+        Returns the number of entries removed.
+        """
+        conn = await self._conn()
+        length = int(await conn.llen(self.key))
+        if length <= keep_last:
+            return 0
+        # Positive start with -1 end keeps the tail, and is safe against a
+        # concurrent RPUSH: a new entry lands past the end and survives.
+        await conn.ltrim(self.key, length - keep_last, -1)
+        return length - keep_last
 
     async def close(self) -> None:
         if self._client is not None and self._owns_client:

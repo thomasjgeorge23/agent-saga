@@ -159,7 +159,7 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (277 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (287 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
@@ -187,6 +187,13 @@ with only `pytest`; optional extras add their own SDKs):
   like a fresh refund). The key is auto-injected into handlers that accept it,
   and an execution ledger reads both the daemon journal and the crashed
   process's own WAL, so completed work is skipped rather than repeated.
+- Bounded over time, not just correct on day one: a recovery sweep reads the
+  log once (it used to re-read it per saga -- quadratic), `read_all()` pages in
+  chunks, `read_since(gseq)` gives a cursor, the Redis ledger answers
+  "already compensated?" from a SET/HASH index instead of scanning history, and
+  `compact()` trims resolved records from the head of the log. Compaction never
+  touches the completed-token index -- losing that would re-open the
+  double-compensation window it exists to close.
 - `RedisWAL` stamps a global sequence (`gseq`) from a shared Redis counter, one
   INCRBY per batch, so records on a multi-node log are uniquely identified and
   globally ordered. The per-process `seq` is left intact for fence bookkeeping.

@@ -339,10 +339,34 @@ class RecoveryDaemon:
     # -- resolution --------------------------------------------------------
 
     async def recover_all(self) -> list[RecoveryOutcome]:
-        # Always the async path so this works for every backend.
-        return [await self.recover(s) for s in await self.dangling_async()]
+        """One sweep: read the log once, read the ledger once, then resolve.
 
-    async def recover(self, saga: DanglingSaga) -> RecoveryOutcome:
+        Previously `recover()` re-read the entire WAL for every saga, so a sweep
+        with N dangling sagas performed N+1 full reads -- quadratic in the log,
+        which on a long-lived shared log degrades into an outage. The reads are
+        hoisted here and passed down.
+        """
+        records = await self.read_records()
+        self._check_parse_health()
+        sagas = parse_wal(records)
+        dangling = [s for s in sagas.values()
+                    if not s.resolved_in_process
+                    and (s.pending() or s.pending_tentatives())]
+        if not dangling:
+            return []
+
+        completed = await self._completed_tokens(records)
+        attempts = await self.ledger.attempts()
+        return [await self.recover(s, _completed=completed, _attempts=attempts)
+                for s in dangling]
+
+    async def recover(
+        self,
+        saga: DanglingSaga,
+        *,
+        _completed: Optional[set] = None,
+        _attempts: Optional[dict] = None,
+    ) -> RecoveryOutcome:
         if not saga.lease_expired():
             return RecoveryOutcome(saga.saga_id, Resolution.SKIPPED_ACTIVE,
                                    reason="lease is still being renewed; owner is alive")
@@ -372,8 +396,12 @@ class RecoveryDaemon:
         # The execution ledger, from BOTH sources: this daemon's own journal and
         # the WAL the crashed process wrote. Consulting only the journal would
         # re-run a compensation the dead process had already finished.
-        done_tokens = await self._completed_tokens(await self.read_records())
-        prior_attempts = await self.ledger.attempts()
+        # Hoisted by recover_all for a whole sweep. Fetched here only when
+        # recover() is driven directly (a single saga, or a test).
+        done_tokens = (_completed if _completed is not None
+                       else await self._completed_tokens(await self.read_records()))
+        prior_attempts = (_attempts if _attempts is not None
+                          else await self.ledger.attempts())
         compensated: list[str] = []
         skipped: list[str] = []
         try:
