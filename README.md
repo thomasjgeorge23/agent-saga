@@ -15,6 +15,9 @@ python examples/multi_domain.py   # 5 systems, 1 transaction, no network needed
 python examples/chaos_demo.py     # optimistic vs. transactional, side by side
 ```
 
+📖 **[MANUAL.md](MANUAL.md)** — the complete reference: every subsystem, how it
+works and why, CLI and configuration, deployment checklists, and troubleshooting.
+
 ---
 
 ## Why this is not just the Saga pattern, or just Temporal
@@ -128,6 +131,54 @@ The semantics that matter, all of them deliberate:
 > `set_limit_store(RedisLimitStore(...))` for anything running more than one
 > process. The check-and-debit is a single Lua script, because GET-then-SET
 > would let two nodes both read $49k, both decide $1k fits, and both spend.
+
+---
+
+## Crash testing
+
+Most of this suite runs in one cooperative process, which proves the design is
+coherent and proves nothing about durability. The chaos suite kills the process.
+
+```bash
+python -m pytest tests/test_chaos.py -v
+```
+
+A worker performs real, durable effects against a file-backed ledger and is then
+killed with `os._exit` — no `atexit`, no `finally`, no event-loop shutdown.
+Whatever holds afterwards holds because the design is right, not because
+anything got to clean up. Four crash points, each leaving the log in a
+structurally different state:
+
+| Crash point | State left behind |
+|---|---|
+| `after_intent` | intent fsynced, **the charge never happened** |
+| `after_effect` | charge happened, **its inverse is not yet durable** |
+| `after_commit` | compensation descriptor durable |
+| `mid_compensation` | died half way through unwinding a 3-step saga |
+
+What the suite asserts, against the ledger rather than against the log:
+
+- A crash after the effect is compensated, **or escalated to a human** — never a
+  clean report with money still outstanding.
+- Running the daemon **four times issues one refund**.
+- **Two daemons racing issue one refund.**
+- An interrupted rollback is *finished*, not restarted — every charge refunded
+  exactly once.
+- The hash chain verifies after a kill at all four points, and a torn final line
+  neither hides earlier records nor stops recovery.
+
+> **The ledger records refund *attempts* separately from refunds *applied*.** A
+> real payment processor absorbs a duplicate refund via its own idempotency key,
+> so a test that only checked the final balance would pass whether the guarantee
+> lives in `agent-saga` or in Stripe. Recording both lets these tests assert the
+> strong claim — that the second call was never *made*.
+
+**One guarantee a crash genuinely breaks, stated rather than buried:** spend
+windows live in the limit store, not the WAL. With the in-process default, a
+crashed and restarted agent starts its window fresh, so a crash-loop can spend
+the daily budget repeatedly. `RedisLimitStore` isn't only the multi-node answer —
+it's the crash-durable one. There is a test that asserts this, so it can't
+quietly stop being true.
 
 ---
 
@@ -559,14 +610,23 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (332 tests; the base suite runs
+Pre-alpha, by SagaOps. Implemented and tested (461 tests; the base suite runs
 with only `pytest`; optional extras add their own SDKs):
 
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
   with optional bearer-token auth for shared environments.
+- Durable human-in-the-loop approvals: requests survive a crash, are answerable
+  from another process (Slack → web → store, no inbound connectivity to the
+  agent), escalate through a chain, and **deny on timeout**. Break-glass
+  overrides are recorded distinctly and flagged for post-hoc review.
+- Per-step `RetryPolicy` (linear/exponential backoff, typed include/exclude
+  lists) and `fallback_action`, retried *inside* one step so the idempotency key
+  and approval id never change between attempts.
 - Connectors: Stripe, Postgres (full CRUD — update/insert/delete with compound
   primary keys), Salesforce.
 - Adapters: LangGraph, CrewAI, OpenAI Agents SDK, LlamaIndex, AutoGen.
+- A FastAPI lifespan (`saga_lifespan`) that starts the WAL, runs the recovery
+  daemon in the background, and drains in-flight sagas on shutdown.
 - Snapshot capture: in-process (`REVERSIBLE`) and durable crash-recoverable
   (`COMPENSABLE`), with a conservative store GC sweep.
 - Durability & safety: configurable WAL backpressure (`RAISE` by default —
@@ -576,11 +636,14 @@ with only `pytest`; optional extras add their own SDKs):
 - Recovery locking: an injectable lock interface, defaulting to a local file
   lock (no Redis in-tree — supply a distributed backend if you run a fleet).
 - Pluggable WAL backends behind `BaseWAL`: `FileWAL` (the zero-dependency
-  default, fsync-durable) and `RedisWAL` for multi-node deployments
-  (`pip install agent-saga[redis]`). `barrier()` is part of the interface, not
-  an extra — a backend without a durability fence is fire-and-forget. Redis is
-  documented as a *weaker* durability class than fsync and supports `WAIT` for
-  replica acknowledgment; read that section before putting money through it.
+  default, fsync-durable), `RedisWAL` for multi-node deployments
+  (`pip install agent-saga[redis]`), and `PostgresWAL` for a shared log in the
+  database you already run (`pip install agent-saga[postgres]`). `barrier()` is
+  part of the interface, not an extra — a backend without a durability fence is
+  fire-and-forget. Redis is documented as a *weaker* durability class than fsync
+  and supports `WAIT` for replica acknowledgment; read that section before
+  putting money through it. `PostgresWAL` inherits Postgres's own durability
+  (`synchronous_commit`), but does not yet implement `compact()`.
 - Deterministic idempotency: compensation keys are `SHA-256(saga_id, step_id,
   scope)` — stable across processes, hosts and restarts, and deliberately *not*
   keyed on attempt count (a key that varied per retry would make attempt 2 look
