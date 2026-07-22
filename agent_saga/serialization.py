@@ -51,6 +51,17 @@ class SagaJSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
+_DISALLOWED_MODULE_PREFIXES = (
+    "os", "sys", "subprocess", "shutil", "importlib", "builtins",
+    "ctypes", "socket", "webbrowser", "tempfile", "signal", "threading", "multiprocessing"
+)
+
+
+def _is_safe_module(module_name: str) -> bool:
+    top_level = module_name.split(".")[0]
+    return top_level not in _DISALLOWED_MODULE_PREFIXES
+
+
 def saga_object_hook(dct: dict) -> Any:
     """Object hook for decoding custom types back into original python objects."""
     if "__type__" in dct:
@@ -70,6 +81,8 @@ def saga_object_hook(dct: dict) -> Any:
                 if module_name == "builtins":
                     import builtins
                     return getattr(builtins, class_name)
+                if not _is_safe_module(module_name):
+                    return Exception
                 module = importlib.import_module(module_name)
                 return getattr(module, class_name)
             except Exception:
@@ -82,6 +95,8 @@ def saga_object_hook(dct: dict) -> Any:
             value = dct["value"]
             try:
                 module_name, class_name = class_path.rsplit(".", 1)
+                if not _is_safe_module(module_name):
+                    return value
                 module = importlib.import_module(module_name)
                 cls = getattr(module, class_name)
                 return cls(**value)

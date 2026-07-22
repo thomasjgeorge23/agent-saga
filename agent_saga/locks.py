@@ -46,9 +46,10 @@ class FileLock:
     Atomic on a local filesystem on both POSIX and Windows. The file records who
     holds it and when, so a stale claim can be diagnosed by hand."""
 
-    def __init__(self, claims_dir: str | Path, *, owner_id: Optional[str] = None):
+    def __init__(self, claims_dir: str | Path, *, owner_id: Optional[str] = None, ttl_seconds: Optional[float] = 300.0):
         self.claims_dir = Path(claims_dir)
         self.owner_id = owner_id or f"{os.getpid()}-{os.urandom(4).hex()}"
+        self.ttl_seconds = ttl_seconds
 
     def _path(self, key: str) -> Path:
         safe = key.replace("/", "_").replace("\\", "_")
@@ -56,10 +57,25 @@ class FileLock:
 
     def acquire(self, key: str) -> bool:
         self.claims_dir.mkdir(parents=True, exist_ok=True)
+        path = self._path(key)
         try:
-            fd = os.open(self._path(key), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
-            return False
+            if self.ttl_seconds is not None and path.exists():
+                try:
+                    stat = path.stat()
+                    if time.time() - stat.st_mtime > self.ttl_seconds:
+                        try:
+                            path.unlink()
+                        except FileNotFoundError:
+                            pass
+                        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                    else:
+                        return False
+                except (OSError, FileExistsError):
+                    return False
+            else:
+                return False
         with os.fdopen(fd, "w") as fh:
             fh.write(json.dumps({"owner_id": self.owner_id, "ts": time.time()}))
         return True

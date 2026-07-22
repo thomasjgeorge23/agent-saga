@@ -111,6 +111,30 @@ from .executors import (
     set_tool_executor,
     tool_executor_stats,
 )
+from .hallucination import (
+    GroundingFact,
+    HallucinationDetected,
+    RealityAnchor,
+    SelfCorrectingLoop,
+)
+from .healing import HealingPath, SelfHealingGraph
+from .speculative import SpeculativeEngine, StateSnapshot
+from .ai_engine import (
+    ContextSanitizer,
+    LoopEntropyDetector,
+    SemanticOutputVerifier,
+    UniversalToolAdapter,
+    VerifiedOutput,
+)
+from .mission_critical import (
+    InvariantRule,
+    MissionCriticalGate,
+    MissionCriticalViolation,
+    TripleRedundantVerifier,
+)
+from .auto import patch_all
+from .entanglement import EntangledNode, EntanglementMatrix
+from .sentinel import PredictiveSentinel
 from .gc import GCReport, SnapshotGC
 from .idempotency import IdempotencyManager
 from .ledger import FileLedger, InMemoryLedger, RecoveryLedger
@@ -298,4 +322,25 @@ __all__ = [
     "saga_loads",
     "saga_lifespan",
     "RetryPolicy",
+    "RealityAnchor",
+    "GroundingFact",
+    "SelfCorrectingLoop",
+    "HallucinationDetected",
+    "HealingPath",
+    "SelfHealingGraph",
+    "SpeculativeEngine",
+    "StateSnapshot",
+    "EntangledNode",
+    "EntanglementMatrix",
+    "PredictiveSentinel",
+    "SemanticOutputVerifier",
+    "VerifiedOutput",
+    "ContextSanitizer",
+    "LoopEntropyDetector",
+    "UniversalToolAdapter",
+    "InvariantRule",
+    "MissionCriticalGate",
+    "MissionCriticalViolation",
+    "TripleRedundantVerifier",
+    "patch_all",
 ]

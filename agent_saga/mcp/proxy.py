@@ -324,8 +324,6 @@ class SagaMCPProxy:
         """Run a compensation over this proxy's own upstream connection."""
         return await self.call_upstream(tool, arguments)
 
-        return _make
-
     def _observe(self, tool: str, arguments: dict) -> None:
         seen = self.observations.setdefault(tool, {"calls": 0, "arg_keys": set()})
         seen["calls"] += 1

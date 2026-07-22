@@ -74,7 +74,8 @@ def _cmd_ui(args: argparse.Namespace) -> int:
 
 
 def _read_wal(path: str) -> list:
-    from .encryption import decode_line
+    import sys
+    from .encryption import EncryptedRecordError, decode_line
 
     records = []
     with open(path, encoding="utf-8") as fh:
@@ -84,6 +85,10 @@ def _read_wal(path: str) -> list:
                 continue
             try:
                 records.append(decode_line(line, None))
+            except EncryptedRecordError as exc:
+                print(f"Error: {path} contains encrypted records but no key was provided. "
+                      f"Set AGENT_SAGA_WAL_KEY environment variable. ({exc})", file=sys.stderr)
+                sys.exit(1)
             except Exception:
                 # A truncated final line is the normal state of a log whose
                 # process was killed -- the reader is deliberately tolerant.

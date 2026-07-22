@@ -285,7 +285,9 @@ class BufferedWAL(BaseWAL):
             try:
                 self._waiters.remove(entry)
             except ValueError:
-                pass
+                # Race check: if entry was removed by flusher, fut might be resolved cleanly.
+                if fut.done() and not fut.cancelled() and fut.exception() is None:
+                    return
             raise WALStalled(
                 f"WAL did not reach durability for seq {target} within "
                 f"{self.barrier_timeout}s. The sink is not acknowledging writes "
@@ -305,9 +307,10 @@ class BufferedWAL(BaseWAL):
                 if self._closing:
                     await self._flush_once()
                     return
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as exc:
             self._flush_sync_best_effort()
             self._resolve_waiters()
+            self._fail_waiters(exc)
             raise
 
     async def _flush_once(self) -> None:
@@ -316,15 +319,15 @@ class BufferedWAL(BaseWAL):
         # consequence of batching.
         batch = self._take()
         if batch:
+            next_head = None
             if self.chain:
                 # On the flusher thread, in sequence order, single writer -- the
                 # only place the chain can be built without a lock and without
                 # any chance of two records interleaving.
                 from ..integrity import GENESIS, stamp_batch
 
-                if not self._chain_head:
-                    self._chain_head = GENESIS
-                self._chain_head = stamp_batch(batch, self._chain_head)
+                prior_head = self._chain_head or GENESIS
+                next_head = stamp_batch(batch, prior_head)
             try:
                 if self._io_lock is not None:
                     async with self._io_lock:
@@ -340,6 +343,8 @@ class BufferedWAL(BaseWAL):
                 # early as possible, because it is still before the side effect.
                 self._fail_waiters(exc)
                 return
+            if self.chain and next_head is not None:
+                self._chain_head = next_head
             self._durable_seq = batch[-1]["seq"]
         self._resolve_waiters()
 

@@ -49,17 +49,26 @@ class EncryptedRecordError(RuntimeError):
 
 class FernetEncryptor:
     """Authenticated symmetric encryption via `cryptography`'s Fernet (AES-128-CBC
-    + HMAC). Lazy import so the dependency is only needed when encryption is on."""
+    + HMAC). Supports single key or key rotation via MultiFernet (comma-separated or list of keys)."""
 
-    def __init__(self, key: str | bytes):
+    def __init__(self, key: str | bytes | list[str | bytes]):
         try:
-            from cryptography.fernet import Fernet
+            from cryptography.fernet import Fernet, MultiFernet
         except ImportError as exc:  # pragma: no cover - exercised via the extra
             raise ImportError(
                 "WAL encryption needs the 'cryptography' package. Install it with "
                 "`pip install agent-saga[encryption]`."
             ) from exc
-        self._fernet = Fernet(key)
+
+        if isinstance(key, str) and "," in key:
+            keys: list[str | bytes] = [k.strip() for k in key.split(",") if k.strip()]
+        elif isinstance(key, (list, tuple)):
+            keys = list(key)
+        else:
+            keys = [key]
+
+        fernets = [Fernet(k) for k in keys]
+        self._fernet = MultiFernet(fernets) if len(fernets) > 1 else fernets[0]
 
     def encrypt(self, plaintext: bytes) -> bytes:
         return self._fernet.encrypt(plaintext)

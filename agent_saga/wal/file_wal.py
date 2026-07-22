@@ -225,7 +225,8 @@ class FileWAL(BufferedWAL):
         if self.chain:
             from ..integrity import digest_of, gap_attestation
 
-            dropped = [r for r in records if r not in survivors]
+            survivor_seqs = {r.get("seq") for r in survivors if "seq" in r}
+            dropped = [r for r in records if r.get("seq") not in survivor_seqs]
             attestation = gap_attestation(
                 removed_seqs=[r["seq"] for r in dropped if isinstance(r.get("seq"), int)],
                 removed_digest=digest_of(dropped),
@@ -242,7 +243,12 @@ class FileWAL(BufferedWAL):
         if self._fh is not None:
             self._fh.close()
             self._fh = None
-        _os.replace(tmp, self.path)
+        try:
+            _os.replace(tmp, self.path)
+        except Exception:
+            if self.path and self.path.exists():
+                self._fh = open(self.path, "a", encoding="utf-8")
+            raise
         self._fh = open(self.path, "a", encoding="utf-8")
 
         logger.info("compacted %d resolved record(s) from %s", removed, self.path)

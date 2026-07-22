@@ -1,6 +1,6 @@
 # agent-saga — User Manual
 
-Version 0.1.0 · Apache-2.0 · SagaOps
+Version 0.1.6 · Apache-2.0 · SagaOps
 
 This is the complete operating manual: what the system is, how every piece
 works, what each module does, and how to run it in development and in
@@ -21,28 +21,37 @@ production. The [README](README.md) is the pitch; this is the reference.
 6. [Compensations and the registry](#6-compensations-and-the-registry)
 7. [The transactional boundary](#7-the-transactional-boundary)
 8. [The pre-flight gate](#8-the-pre-flight-gate)
-9. [Spend and rate limits](#9-spend-and-rate-limits)
-10. [The write-ahead log](#10-the-write-ahead-log)
-11. [Tamper-evident audit](#11-tamper-evident-audit)
-12. [Crash recovery](#12-crash-recovery)
-13. [Snapshots](#13-snapshots)
-14. [Isolation: tentative state and semantic locks](#14-isolation)
+9. [Human-in-the-loop approvals](#9-human-in-the-loop-approvals)
+10. [Spend and rate limits](#10-spend-and-rate-limits)
+11. [Retries and fallbacks](#11-retries-and-fallbacks)
+12. [The write-ahead log](#12-the-write-ahead-log)
+13. [Tamper-evident audit](#13-tamper-evident-audit)
+14. [Crash recovery](#14-crash-recovery)
+15. [Snapshots](#15-snapshots)
+16. [Isolation: tentative state and semantic locks](#16-isolation)
 
 **Part III — Integrations**
-15. [Connectors](#15-connectors)
-16. [Framework adapters](#16-framework-adapters)
-17. [The MCP proxy](#17-the-mcp-proxy)
+17. [Connectors](#17-connectors)
+18. [Framework adapters](#18-framework-adapters)
+19. [Database adapters](#19-database-adapters)
+20. [FastAPI integration](#20-fastapi-integration)
+21. [The MCP proxy](#21-the-mcp-proxy)
 
 **Part IV — Operating it**
-18. [Time-travel debugger](#18-time-travel-debugger)
-19. [Observability](#19-observability)
-20. [Thread pools and tuning](#20-thread-pools-and-tuning)
-21. [CLI reference](#21-cli-reference)
-22. [Configuration reference](#22-configuration-reference)
-23. [Deployment checklists](#23-deployment-checklists)
-24. [Troubleshooting](#24-troubleshooting)
-25. [Module map](#25-module-map)
-26. [Known gaps](#26-known-gaps)
+22. [Time-travel debugger](#22-time-travel-debugger)
+23. [Observability](#23-observability)
+24. [Serialization helpers](#24-serialization-helpers)
+25. [Thread pools and tuning](#25-thread-pools-and-tuning)
+26. [CLI reference](#26-cli-reference)
+27. [Configuration reference](#27-configuration-reference)
+28. [Deployment checklists](#28-deployment-checklists)
+29. [Troubleshooting](#29-troubleshooting)
+30. [Module map](#30-module-map)
+31. [Known gaps and open bugs](#31-known-gaps-and-open-bugs)
+
+> ⚠️ **Two confirmed bugs in the current tree** — a clean install cannot
+> `import agent_saga`, and the SQLAlchemy/Supabase adapters raise on every
+> write. Both are reproduced and diagnosed in [§31](#31-known-gaps-and-open-bugs).
 
 ---
 
@@ -116,13 +125,22 @@ uncompensable boundary without a human on the hook.
 
 ## 3. Install and first run
 
-**Requirements:** Python ≥ 3.10. The core has **zero dependencies**.
+**Requirements:** Python ≥ 3.10. The core is *designed* to have zero
+dependencies.
 
 ```bash
 git clone <repo> && cd agent-saga
-pip install -e .              # core, no third-party packages at all
+pip install -e .              # core
 pip install -e ".[dev]"       # + pytest for the test suite
 ```
+
+> ⚠️ **As of 0.1.6 the zero-dependency claim is broken.** `agent_saga/retry.py`
+> imports `pydantic` at module scope and `__init__.py` imports it
+> unconditionally, but `pyproject.toml` still declares `dependencies = []`. On a
+> machine without pydantic, `import agent_saga` raises `ModuleNotFoundError`. It
+> works in this repo only because pydantic arrives transitively via
+> `langchain-core`/`crewai`. Until it is fixed, add `pydantic>=2` yourself. See
+> [§31](#31-known-gaps-and-open-bugs).
 
 Optional extras, installed only when you need that integration:
 
@@ -133,7 +151,7 @@ Optional extras, installed only when you need that integration:
 | `[openai-agents]` | `openai-agents` | OpenAI Agents SDK adapter |
 | `[llamaindex]` | `llama-index-core` | LlamaIndex adapter |
 | `[autogen]` | `autogen-core` | AutoGen adapter |
-| `[postgres]` | `psycopg` | Postgres connector |
+| `[postgres]` | `asyncpg` | Postgres connector **and** `PostgresWAL` |
 | `[stripe]` | `stripe` | Stripe connector |
 | `[salesforce]` | `httpx` | Salesforce connector |
 | `[encryption]` | `cryptography` | WAL-at-rest encryption |
@@ -156,7 +174,7 @@ different unwind.
 
 ```bash
 python -m pytest -q
-# 406 passed
+# 461 passed
 ```
 
 The base suite runs on `pytest` alone. Tests for optional integrations skip
@@ -289,6 +307,7 @@ The lifecycle of one step, as recorded:
 | `COMPENSATION_FAILED` | Compensation raised |
 | `ORPHANED` | Executed, and no compensation exists |
 | `UNRESOLVED` | Rollback halted before reaching this step |
+| `COMPLETED_VIA_FALLBACK` | Forward call failed, but a `fallback_action` produced a result (§11) |
 
 `needs_compensation` is true for `COMMITTED` **and** `UNKNOWN`.
 
@@ -407,17 +426,32 @@ async def onboard(customer_id): ...
 ### `@tool` — register a saga-aware tool
 
 ```python
-from agent_saga import tool, ActionSemantics, Compensation
+from agent_saga import tool, ActionSemantics, Compensation, RetryPolicy
 
 @tool(semantics=ActionSemantics.COMPENSABLE,
       compensate=lambda r: Compensation(fn=close, handler="jira.close_issue",
-                                        kwargs={"issue_key": r["key"]}))
+                                        kwargs={"issue_key": r["key"]}),
+      timeout=30.0,
+      retry_policy=RetryPolicy(max_retries=3),   # §11
+      fallback_action=lambda: {"key": "CACHED"})  # §11
 async def create_issue(project: str, summary: str): ...
 ```
 
-Outside a saga boundary the call passes through untouched, so the same tool
-works in tests and one-off scripts. The wrapper accepts **keyword arguments
-only**.
+Outside a saga boundary the call passes through untouched (retries and fallback
+still apply), so the same tool works in tests and one-off scripts. The wrapper
+accepts **keyword arguments only**.
+
+`saga.step` is an alias for `@tool`, so `@saga.step(...)` reads naturally
+alongside `@saga`.
+
+### `set_default_wal`
+
+```python
+from agent_saga.decorator import set_default_wal
+set_default_wal(wal)      # sagas opened without an explicit wal= use this one
+```
+
+Set for you by the FastAPI lifespan (§20). Pass `None` to clear it.
 
 ### `current_saga()`
 
@@ -531,7 +565,7 @@ arg_exceeds("amount", 1000)                       # one call's numeric argument
 
 `arg_exceeds` sees exactly one call. It **cannot** express "no more than $50k a
 day" — an agent issuing 1,000 charges of $999 satisfies it every time. For that
-you need a limit (§9).
+you need a limit (§10).
 
 ### A custom gate
 
@@ -554,7 +588,135 @@ async with saga_scope(gate=gate) as saga: ...
 **A broken predicate fails closed.** If `rule.when(ctx)` raises, the call is
 blocked, not allowed.
 
-## 9. Spend and rate limits
+## 9. Human-in-the-loop approvals
+
+`agent_saga/approvals.py`
+
+`approval_provider` as a bare callback returning a bool is the right *shape* and
+the wrong *lifetime*. A human takes minutes, and everything that can go wrong in
+those minutes was the caller's problem. `ApprovalGateway` is the missing half —
+a drop-in `approval_provider` with a real lifecycle behind it.
+
+What a plain callback cannot do:
+
+- **Survive a crash.** A request living only in the waiting coroutine vanishes
+  when the process dies, and the approver's eventual "yes" arrives for a request
+  nobody is holding. Requests are written to a shared store *and to the WAL*
+  before anyone is asked.
+- **Be answered from somewhere else.** The human clicks a button in Slack, which
+  reaches a web process — not the agent. The decision lands in the store; the
+  waiting saga observes it there. **No inbound connectivity to the agent is
+  required**, because agents run in places that have none.
+- **Time out.** A prompt nobody answers must not hold a saga open forever,
+  holding its lease, its semantic locks and its tentative resources. A deadline
+  is mandatory and **expiry denies**.
+- **Escalate.** One person is asleep. A chain asks the next after a delay, and
+  records that it did.
+- **Not be asked twice.** A retried step finds its existing decision rather than
+  re-prompting a human who already answered.
+
+### Wiring it up
+
+```python
+import os
+from agent_saga import (PreFlightGate, ApprovalGateway, ApprovalPolicy,
+                        EscalationLevel, FileApprovalStore, WebhookNotifier)
+
+gate = PreFlightGate(approval_provider=ApprovalGateway(
+    store=FileApprovalStore("./.agent-saga-approvals"),
+    notifier=WebhookNotifier(os.environ["SLACK_WEBHOOK"]),
+    policy=ApprovalPolicy(timeout=900, levels=(
+        EscalationLevel(targets=("@oncall",)),
+        EscalationLevel(targets=("@head-of-risk",), after_seconds=300))),
+    wal=wal,                       # so requests/decisions land in the audit log
+))
+```
+
+### `ApprovalPolicy`
+
+| Field | Default | Meaning |
+|---|---|---|
+| `timeout` | `300.0` | Seconds before the request expires and is **DENIED** |
+| `poll_interval` | `1.0` | How often the waiting saga re-reads the store |
+| `levels` | one empty level | Escalation chain |
+| `allow_break_glass` | `True` | Whether an emergency override is permitted |
+
+`EscalationLevel(targets=("@oncall",), after_seconds=300)` — after 300 s the
+next level is notified and an `APPROVAL_ESCALATED` record is written.
+
+### Request identity
+
+```python
+request_id(saga_id, step_id, tool, rule) -> sha256(...)[:32]
+```
+
+Deterministic across processes, hosts and restarts, and **deliberately not keyed
+on attempt count** — a key that varied per retry would prompt a human again for
+a decision they already made, and the second answer would authorize a second
+effect. Stores are idempotent on this id, so two processes racing the same
+retried step cannot produce two prompts.
+
+### Stores
+
+| Store | `distributed` | Notes |
+|---|---|---|
+| `FileApprovalStore` (default) | `False` | One JSON file per request; an operator can see the queue with `ls`. Decisions are written to a temp file then `os.replace`d — a partially written decision that read as `GRANTED` would be the worst possible failure in this module |
+| `RedisApprovalStore` | `True` | Required when the agent and the web process receiving the click are different machines. `SET NX` on create; the decision is a Lua script so **first decision wins** |
+
+### Notifiers
+
+| Notifier | Notes |
+|---|---|
+| `ConsoleNotifier` (default) | Logs the request and the exact CLI command to approve it |
+| `WebhookNotifier(url)` | POSTs JSON; works with a Slack incoming webhook as-is. Uses `urllib` to keep the core dependency-free |
+
+`slack_payload` builds a Block Kit message carrying the **context** — the
+amount, the recipient, the semantics. That context block is what makes this an
+approval rather than a prompt: an approver deciding "allow this tool?" with no
+amount is rubber-stamping, and *a rubber stamp is worse than no control, because
+it produces an audit trail that looks like oversight*.
+
+**A notification failure never grants.** It is logged, the request stays
+`PENDING`, and it eventually expires — which denies. The opposite would let a
+broken Slack integration authorize spending.
+
+### Answering from the CLI
+
+```bash
+agent-saga approvals list
+agent-saga approvals approve <id> --approver you@corp --note "verified with ops"
+agent-saga approvals deny    <id> --approver you@corp
+agent-saga approvals list --redis redis://localhost:6379/0
+```
+
+`--approver` is **required**: an anonymous approval is an audit trail that
+proves nothing, which is the only thing the record exists for.
+
+### Break-glass
+
+`--break-glass` on an approve is an emergency override. It is recorded
+distinctly (`APPROVAL_BREAK_GLASS`), logged at ERROR, and flagged
+`requires_review: true`. **Never silent** — a break-glass that looked like a
+normal approval in the log would defeat the point of having one.
+
+### WAL events
+
+`APPROVAL_REQUESTED` · `APPROVAL_ESCALATED` · `APPROVAL_GRANTED` ·
+`APPROVAL_DENIED` · `APPROVAL_EXPIRED` · `APPROVAL_BREAK_GLASS` ·
+`APPROVAL_ERROR`
+
+### Everything fails closed
+
+A timeout denies. An unreachable store denies. An ambiguous state denies. A
+`decide()` that raises is caught, recorded as `APPROVAL_ERROR`, and returns
+`False` — because the gate turns `False` into a `BLOCK`, whereas raising would
+surface as an unhandled error rather than a refusal.
+
+> An approval control that lets a call through when its own infrastructure is
+> broken has inverted its purpose — and unlike a limiter, what it lets through is
+> precisely the action a human was specifically meant to see.
+
+## 10. Spend and rate limits
 
 `agent_saga/limits.py`
 
@@ -638,7 +800,74 @@ declare the dimension is throttled together instead of escaping the limit.
 > The check-and-debit must be atomic, because GET-then-SET would let two nodes
 > both read $49k, both decide $1k fits, and both spend.
 
-## 10. The write-ahead log
+## 11. Retries and fallbacks
+
+`agent_saga/retry.py` · `agent_saga/decorator.py` · `agent_saga/context.py`
+
+Both are configured on `@tool` and apply inside or outside a saga.
+
+### `RetryPolicy`
+
+```python
+from agent_saga import RetryPolicy
+
+RetryPolicy(
+    max_retries=3,
+    backoff_type="exponential",     # or "linear"
+    base_delay=1.0,
+    max_delay=60.0,
+    retry_on=[ConnectionError, TimeoutError],   # default: [Exception]
+    exclude_exceptions=[ValueError],            # checked FIRST, and wins
+)
+```
+
+Delay for attempt *n* (0-indexed):
+
+| `backoff_type` | Delay |
+|---|---|
+| `linear` | `min(base_delay * (n + 1), max_delay)` |
+| `exponential` | `min(base_delay * 2ⁿ, max_delay)` |
+
+Retries happen **inside** one saga step — the WAL sees a single `STEP_INTENT`,
+and the step's identity (and therefore its idempotency key and its approval
+request id) does not change between attempts. That is the same reasoning as
+§6: a key that varied per attempt would defeat de-duplication.
+
+`exclude_exceptions` is evaluated before `retry_on`, so an excluded type always
+raises immediately even if a broader class in `retry_on` would have matched.
+
+> ⚠️ `RetryPolicy` is a **pydantic** model. It is the reason the core currently
+> has an undeclared hard dependency — see [§31](#31-known-gaps-and-open-bugs).
+
+### `fallback_action`
+
+A zero-argument callable (sync or async) invoked when the forward call fails.
+
+```python
+@tool(semantics=ActionSemantics.REVERSIBLE,
+      retry_policy=RetryPolicy(max_retries=2),
+      fallback_action=lambda: {"source": "cache", "rows": []})
+async def fetch_pricing(sku: str): ...
+```
+
+Order of operations: **retries are exhausted first**, then the fallback runs. If
+the fallback succeeds, the step is marked `COMPLETED_VIA_FALLBACK`, a matching
+WAL record is written (with `compensation: None`), the durable barrier is
+honoured for non-`REVERSIBLE` steps, and the result is returned to the agent —
+the saga does **not** abort.
+
+If the fallback itself raises, the failure is logged and the step falls through
+to the normal `STEP_UNKNOWN` path: the original exception propagates and
+rollback proceeds.
+
+`SystemExit` and `KeyboardInterrupt` deliberately bypass the fallback.
+
+> **Use fallbacks for reads, not for writes.** A `COMPLETED_VIA_FALLBACK` step
+> records **no compensation**, so it contributes nothing to the rollback stack. A
+> fallback that performs a real side effect leaves that effect outside the
+> transaction entirely.
+
+## 12. The write-ahead log
 
 `agent_saga/wal/`
 
@@ -750,6 +979,33 @@ RedisWAL("redis://localhost:6379/0", key="agent-saga:wal",
 globally ordered; the per-process `seq` stays intact for fence bookkeeping. It
 also offers `read_since(gseq)` as a cursor and pages `read_all()` in chunks.
 
+**`PostgresWAL`** — a shared log stored directly in your primary PostgreSQL
+database, so a fleet gets multi-node recovery without deploying Redis.
+
+```python
+from agent_saga.wal import PostgresWAL
+
+wal = PostgresWAL("postgresql://user:pw@host/db", table_name="saga_wal")
+# or: PostgresWAL(host=..., port=..., user=..., password=..., database=...)
+# or inject an existing pool: PostgresWAL(pool=my_asyncpg_pool)
+await wal.start()      # CREATE TABLE IF NOT EXISTS on first start
+```
+
+Requires `pip install agent-saga[postgres]` (asyncpg). Imported lazily, so
+touching `agent_saga.wal` never requires the driver.
+
+Durability is Postgres's: a committed `INSERT` is durable under the default
+`synchronous_commit = on`, which is a **stronger** guarantee than Redis's
+default and comparable to fsync. If you set `synchronous_commit = off`, you have
+the same acknowledged-but-not-durable window described above for Redis.
+
+> ⚠️ **`PostgresWAL` does not implement `compact()`.** It inherits `BaseWAL`'s
+> version, which raises `NotImplementedError` rather than silently no-opping —
+> so `RecoveryDaemon.compact()` against it will raise, and the table grows
+> without bound until you trim it yourself. It also does not stamp a `gseq`, so
+> multi-writer ordering falls back to the per-process `seq` (`parse_wal` orders
+> by `gseq or seq`).
+
 ### Encryption at rest (BYOK)
 
 `agent_saga/encryption.py` · `pip install agent-saga[encryption]`
@@ -795,7 +1051,7 @@ Every record carries `seq`, `event`, `ts`, plus chain fields, plus the payload.
 | `TENTATIVE_REGISTERED` / `TENTATIVE_RESOLVED` / `TENTATIVE_UNRESOLVED` | tentative-resource lifecycle |
 | `WAL_CHAIN_GAP` | compaction attestation |
 
-## 11. Tamper-evident audit
+## 13. Tamper-evident audit
 
 `agent_saga/integrity.py`
 
@@ -894,7 +1150,7 @@ authoritative.
 > fleet, each node's log is independently provable; correlating them is a
 > control-plane concern.
 
-## 12. Crash recovery
+## 14. Crash recovery
 
 `agent_saga/recovery.py`
 
@@ -1048,7 +1304,7 @@ tentatives, or resolved only recently. Works on any backend. Compaction never
 touches the completed-token index — losing that would re-open the
 double-compensation window it exists to close.
 
-## 13. Snapshots
+## 15. Snapshots
 
 Two different kinds of "private" state, with genuinely different requirements.
 
@@ -1146,7 +1402,7 @@ still needs. Three guards:
 
 Anything the sweep is unsure about, it keeps.
 
-## 14. Isolation
+## 16. Isolation
 
 A saga has **no ACID isolation** — every step commits as it runs. The classic
 failure: step 1 debits an account, step 3 fails, and in between a second reader
@@ -1240,7 +1496,7 @@ is worse than no lock.
 
 # Part III — Integrations
 
-## 15. Connectors
+## 17. Connectors
 
 `agent_saga/connectors/`
 
@@ -1357,7 +1613,7 @@ async def upsert(ctx, *, collection, points):
     )
 ```
 
-## 16. Framework adapters
+## 18. Framework adapters
 
 `agent_saga/adapters/`
 
@@ -1406,7 +1662,74 @@ context (async tasks copy it; sync tools go through a context-preserving
 executor), so wrapped tools see the saga without threading anything through
 graph state.
 
-## 17. The MCP proxy
+## 19. Database adapters
+
+`agent_saga/adapters/base_db.py`, `sqlalchemy.py`, `supabase.py`
+
+A higher-level shortcut than writing a connector: perform an ORM/client write
+and have the compensating write registered for you.
+
+```python
+from agent_saga.adapters import SQLAlchemyAdapter, SupabaseAdapter
+
+db = SQLAlchemyAdapter(async_session)          # or a session factory
+await db.insert(Account, {"id": 7, "name": "acme"})       # → compensating DELETE
+await db.update(Account, {"name": "acme2"}, {"id": 7})    # → compensating UPDATE
+await db.delete(Account, {"id": 7})                       # → compensating INSERT
+
+sb = SupabaseAdapter(supabase_client, pk_mappings={"accounts": ["id"]})
+await sb.insert("accounts", {"id": 7, "name": "acme"})
+```
+
+`BaseDBAdapter` is the ABC — implement `insert` / `update` / `delete` and call
+`self._register_compensation(handler, *args, **kwargs)` to attach the inverse to
+the active saga. Outside a saga, registration is skipped and the write is a
+plain write.
+
+> 🔴 **These adapters do not currently work.** `_register_compensation` calls
+> `SagaContext.compensate(...)`, a method that does not exist, so every write
+> inside a saga raises `AttributeError`. There are no tests covering them.
+> Reproduction and the fix options are in [§31](#31-known-gaps-and-open-bugs).
+> Until it is fixed, use a connector (§17) or `ctx.execute(...)` directly.
+
+## 20. FastAPI integration
+
+`agent_saga/frameworks/fastapi.py`
+
+One lifespan hook that starts a WAL, installs it as the process default, runs a
+recovery daemon in the background, and shuts all of it down cleanly.
+
+```python
+from fastapi import FastAPI
+from agent_saga import saga_lifespan
+
+app = FastAPI(lifespan=saga_lifespan("./agent-saga.wal"))
+```
+
+Or drive it explicitly:
+
+```python
+async with saga_lifespan(app, "./agent-saga.wal"):
+    ...
+```
+
+`wal_path` may be a path **or** any `BaseWAL` instance (so you can hand it a
+`RedisWAL` or `PostgresWAL`).
+
+**On startup** it opens the WAL, calls `set_default_wal(wal)` so sagas opened
+without an explicit `wal=` use it, exposes `app.state.saga_wal` and
+`app.state.saga_daemon`, and spawns `daemon.watch(interval=5.0)` as a background
+task.
+
+**On shutdown**, in order: cancel the daemon task → wait up to **10 s** for
+in-flight sagas to finish rolling back (tracked in `decorator._active_sagas`) →
+release held semantic locks → close the WAL → clear the default.
+
+> The 10-second drain is a bound, not a guarantee. A saga still unwinding when it
+> elapses is left to the recovery daemon on the next boot — which is the designed
+> path, but it means a graceful shutdown is not a substitute for running a daemon.
+
+## 21. The MCP proxy
 
 `agent_saga/mcp/`
 
@@ -1530,7 +1853,7 @@ verbatim, so protocol features added later keep working.
 
 # Part IV — Operating it
 
-## 18. Time-travel debugger
+## 22. Time-travel debugger
 
 `agent_saga/ui/`
 
@@ -1584,7 +1907,7 @@ reader.list_sagas()
 reader.get_saga(saga_id)
 ```
 
-## 19. Observability
+## 23. Observability
 
 ### Correlation ids in logs
 
@@ -1633,7 +1956,39 @@ so every instrumentation site has exactly one code path, with no `if tracer:`
 guards scattered through the engine. Importing `agent_saga` never touches
 `opentelemetry`.
 
-## 20. Thread pools and tuning
+## 24. Serialization helpers
+
+`agent_saga/serialization.py`
+
+Compensation kwargs must survive a JSON round trip to be recoverable (§6), and
+plain `json` cannot encode the types agent code actually holds. These helpers
+handle the common ones **round-trip**, not just one-way.
+
+```python
+from agent_saga import saga_dumps, saga_loads, SagaJSONEncoder
+
+blob = saga_dumps({"when": datetime.now(), "id": uuid4(), "tags": {"a", "b"}})
+back = saga_loads(blob)          # datetime, UUID and set are restored as objects
+```
+
+| Type | Encoded as | Restored |
+|---|---|---|
+| pydantic v2 (`model_dump`) / v1 (`dict`) | `{"__type__": "pydantic", "__class__": "...", "value": {...}}` | re-instantiated by import path; falls back to the raw dict if the class cannot be imported |
+| `datetime` / `date` | ISO 8601 | ✅ |
+| `UUID` | string | ✅ |
+| `set` | list | ✅ |
+| exception **classes** | dotted path | ✅ (used by `RetryPolicy.retry_on`) |
+
+Use `SagaJSONEncoder` directly with `json.dumps(..., cls=SagaJSONEncoder)` if you
+need to plug it into existing code.
+
+> These are **not** wired into the WAL writer, which uses `encode_line` and the
+> conservative `_safe()` projection. `Compensation.recoverable` is still judged
+> by plain `json.loads(json.dumps(x)) == x`, so a compensation whose kwargs need
+> `saga_dumps` still reports as unrecoverable. Keep compensation kwargs to plain
+> JSON scalars.
+
+## 25. Thread pools and tuning
 
 `agent_saga/executors.py`
 
@@ -1691,7 +2046,7 @@ Two profiles, never blended:
 > deployment target** before you quote them. Run `bench/bench_core.py` and
 > `bench/bench_wal.py`; CI re-runs them on Linux and reports median-of-p99.
 
-## 21. CLI reference
+## 26. CLI reference
 
 One console script is installed: **`agent-saga`**. Stdlib `argparse`, no
 click/typer — the tool runs with nothing beyond the standard library.
@@ -1704,9 +2059,12 @@ agent-saga export   [--wal-path PATH] --out DIR [--allow-broken]
 agent-saga mcp      [--policy FILE] [--observe] [--emit-policy FILE]
                     [--boundary session|explicit|none] [--wal-path PATH]
                     -- <upstream server command>
+agent-saga approvals list|approve|deny [ID] [--approver WHO] [--note TEXT]
+                    [--break-glass] [--dir DIR] [--redis URL]
 ```
 
-Default `--wal-path` everywhere is `./agent-saga.wal`.
+Default `--wal-path` everywhere is `./agent-saga.wal`; default approval
+directory is `./.agent-saga-approvals`.
 
 **Exit codes**
 
@@ -1715,13 +2073,14 @@ Default `--wal-path` everywhere is `./agent-saga.wal`.
 | `verify` | chain intact | chain broken | WAL unreadable |
 | `export` | bundle written, intact | written but broken, or refused | WAL unreadable |
 | `mcp` | proxy exited cleanly | — | bad policy / no server command |
+| `approvals` | listed, or decision recorded | already decided by someone else | missing `--approver` / unknown id / bad flag combination |
 
 `verify` is designed to be a CI gate and a cron job.
 
 There is **no `recoveryd` console script** — run the daemon as a Python program
 (§12).
 
-## 22. Configuration reference
+## 27. Configuration reference
 
 ### Environment variables
 
@@ -1754,7 +2113,7 @@ configure_logging(...)             # observability/__init__.py
 Plus per-instance injection: `RecoveryDaemon(lock=..., ledger=...)`,
 `SagaContext(gate=..., wal=...)`, `FileWAL(encryptor=..., backpressure=...)`.
 
-## 23. Deployment checklists
+## 28. Deployment checklists
 
 ### Single process, single host
 
@@ -1777,21 +2136,29 @@ The defaults are correct. Nothing to configure.
 
 ### Fleet (multi-node)
 
-- [ ] `RedisWAL` — and read the durability caveat in §10 before putting money
+- [ ] `RedisWAL` or `PostgresWAL` — read the durability caveats in §12 before
+      putting money
       through it (`appendfsync always` + `wait_replicas>=1`)
 - [ ] `RedisLedger` — **mandatory** with a shared WAL, or two daemons
       double-compensate
 - [ ] `RedisLimitStore`
 - [ ] `RedisSemanticLocks`
+- [ ] `RedisApprovalStore` — **mandatory** if approvals are answered by a
+      different process than the one waiting (they almost always are)
 - [ ] A **distributed** `RecoveryLock` — a filesystem lock over NFS is not
       trustworthy. None ships in-tree; inject one
 - [ ] A shared `SnapshotStore` (S3/GCS-backed) reachable by agents and daemons
 - [ ] Daemons import **exactly the same handler modules** as the agents
+- [ ] If using `PostgresWAL`, schedule your own table trim — it cannot
+      `compact()` (§12)
 
 ### Before production, regardless
 
 - [ ] Run the daemon `dry_run=True` for a week and read what it says it would do
 - [ ] Re-measure the durable-path latency on your actual disk
+- [ ] Set an `ApprovalPolicy.timeout` you can actually meet — expiry **denies**,
+      so a 300 s default plus an overnight on-call rotation means every
+      after-hours approval fails closed (§9)
 - [ ] Set `set_credential_resolver()` to your real secret store
 - [ ] Decide `AGENT_SAGA_WAL_KEY` — encrypted or deliberately not
 - [ ] Wire `tool_executor_stats()` into metrics
@@ -1799,7 +2166,7 @@ The defaults are correct. Nothing to configure.
 - [ ] Schedule `agent-saga verify` and `agent-saga export` to WORM storage
 - [ ] Never bind the UI beyond `127.0.0.1` without `--auth`
 
-## 24. Troubleshooting
+## 29. Troubleshooting
 
 **`PreFlightViolation: [BLOCK] … No approval provider is configured`**
 The default rule sends `IRREVERSIBLE` to `REQUIRE_APPROVAL`, and with no
@@ -1862,7 +2229,34 @@ A compensation failed and `halt_on_compensation_failure=True` stopped the
 unwind. These steps were never attempted. Fix the failing compensation, then
 re-drive.
 
-## 25. Module map
+**`ModuleNotFoundError: No module named 'pydantic'` on `import agent_saga`**
+An undeclared core dependency introduced by `retry.py`. `pip install pydantic`
+as a stopgap; see [§31](#31-known-gaps-and-open-bugs) for the real fix.
+
+**`AttributeError: 'SagaContext' object has no attribute 'compensate'`**
+You are using `SQLAlchemyAdapter` or `SupabaseAdapter`. They are broken in this
+tree — see [§31](#31-known-gaps-and-open-bugs). Use a connector or
+`ctx.execute(...)` instead.
+
+**Approvals always deny after exactly `timeout` seconds**
+Nobody answered, and expiry denies by design. Check that the notifier is
+actually reaching a human — a `WebhookNotifier` failure is logged but never
+grants. Confirm with `agent-saga approvals list` that the request is visible in
+the store the approver's tooling reads.
+
+**Approvals hang or the approver's "yes" is ignored**
+The waiting saga and the answering process are almost certainly using different
+stores. `FileApprovalStore` is node-local; use `RedisApprovalStore` (§9).
+
+**`NotImplementedError: PostgresWAL does not implement compaction`**
+Correct behaviour — a silent no-op would let you believe the log was bounded.
+Trim the table yourself.
+
+**A step "succeeded" but nothing was compensated on rollback**
+Check for `COMPLETED_VIA_FALLBACK` in the WAL. A fallback result is returned to
+the agent and registers **no** compensation (§11).
+
+## 30. Module map
 
 ```
 agent_saga/
@@ -1872,7 +2266,10 @@ agent_saga/
 │                          leases, tentative/lock lifecycle, RollbackReport
 ├── decorator.py           saga_scope, @saga, @tool, current_saga
 ├── gate.py                PreFlightGate, Rule, Verdict, predicates
+├── approvals.py           ApprovalGateway, stores, notifiers, escalation
 ├── limits.py              BudgetLimit, RateLimit, scopes, limit stores
+├── retry.py               RetryPolicy (pydantic model)
+├── serialization.py       SagaJSONEncoder, saga_dumps / saga_loads
 ├── registry.py            @compensator — named cross-process handlers
 ├── idempotency.py         deterministic keys + the execution ledger reader
 ├── recovery.py            RecoveryDaemon, parse_wal, DanglingSaga, Resolution
@@ -1889,7 +2286,10 @@ agent_saga/
 ├── wal/
 │   ├── base.py            BaseWAL contract, BufferedWAL machinery, backpressure
 │   ├── file_wal.py        FileWAL (== AsyncWAL), the zero-dep default
-│   └── redis_wal.py       RedisWAL, gseq, read_since, WAIT-based barrier
+│   ├── redis_wal.py       RedisWAL, gseq, read_since, WAIT-based barrier
+│   └── postgres_wal.py    PostgresWAL (asyncpg; no compact(), no gseq)
+├── frameworks/
+│   └── fastapi.py         saga_lifespan — WAL + daemon + graceful drain
 ├── mcp/
 │   ├── policy.py          ProxyPolicy, ToolPolicy, CompensationSpec, $-paths
 │   ├── proxy.py           SagaMCPProxy — interception, boundaries, dispatcher
@@ -1902,6 +2302,8 @@ agent_saga/
 ├── adapters/
 │   ├── _common.py         build_runner — the shared routing core
 │   ├── langgraph.py  crewai.py  openai_agents.py  llamaindex.py  autogen.py
+│   ├── base_db.py         BaseDBAdapter ABC  ⚠ see §31
+│   └── sqlalchemy.py  supabase.py            ⚠ see §31
 ├── observability/
 │   ├── __init__.py        correlation ids, Text/Json formatters
 │   └── otel.py            SagaTracer, NoOpTracer, setup_telemetry
@@ -1912,20 +2314,89 @@ agent_saga/
     ├── server.py          stdlib HTTP server + bearer auth
     └── templates/         dashboard.html
 
-examples/    demo.py · chaos_demo.py · multi_domain.py
+examples/    demo.py · chaos_demo.py · multi_domain.py · hallucination_recovery.py
 bench/       bench_core.py · bench_wal.py · summarize.py
-tests/       406 tests
+tests/       461 tests
 ```
 
-## 26. Known gaps
+## 31. Known gaps and open bugs
 
-Tracked openly; see [SECURITY.md](SECURITY.md).
+### Open bugs — reproduced in this tree
 
+**1. `import agent_saga` fails on a clean install (undeclared pydantic
+dependency).**
+
+`agent_saga/retry.py` line 1 does `from pydantic import BaseModel, Field` at
+module scope, and `__init__.py` line 14 does `from .retry import RetryPolicy`
+unconditionally — but `pyproject.toml` still declares `dependencies = []`.
+
+```bash
+$ python -c "
+import sys
+from importlib.abc import MetaPathFinder
+class B(MetaPathFinder):
+    def find_spec(self, name, path=None, target=None):
+        if name.split('.')[0] == 'pydantic': raise ImportError('simulated clean install')
+sys.meta_path.insert(0, B()); import agent_saga"
+ImportError: No module named 'pydantic' (simulated clean install)
+```
+
+It passes in this repo only because pydantic 2.13.4 is present transitively via
+`langchain-core` / `crewai`. Anyone running `pip install agent-saga` gets an
+`ImportError` on the first line of their program.
+
+*Two ways out, and it is a real product decision:* add `pydantic>=2` to
+`dependencies` (drops the zero-dependency guarantee that §10 of the README sells,
+and puts a compiled transitive dependency in the process that moves money), or
+re-implement `RetryPolicy` as a stdlib `dataclass` with hand-rolled validation
+(keeps the guarantee; ~30 lines). The second is more consistent with every other
+choice in this codebase — `limits.py`, `gate.py` and `approvals.py` all validate
+by hand precisely to stay dependency-free.
+
+**2. `SQLAlchemyAdapter` and `SupabaseAdapter` raise on every write inside a
+saga.**
+
+`BaseDBAdapter._register_compensation` calls `saga_ctx.compensate(handler, *args,
+**kwargs)`, but `SagaContext` has no `compensate` method:
+
+```
+AttributeError: 'SagaContext' object has no attribute 'compensate'
+```
+
+Every `insert` / `update` / `delete` on both adapters routes through that helper,
+so all six paths fail. There are **no tests** for either adapter, which is why it
+went unnoticed — the 461-test suite passes with the bug present.
+
+*The fix is a design choice too.* `SagaContext.execute()` takes a compensation
+*factory over the forward result*, whereas these adapters want to register an
+already-built inverse **after** the write has happened. So either add a genuine
+`SagaContext.compensate(fn, *args, **kwargs)` that pushes a pre-derived
+`Compensation` onto the stack, or rewrite the adapters to wrap their writes in
+`ctx.execute(...)` like the connectors do. The latter is the shape the rest of
+the engine assumes — it is also what gets these writes a `STEP_INTENT` record,
+which the current design never writes at all.
+
+Note that as written these adapters also register **closures** (bound methods
+like `self._delete_rollback`) with no registry `handler`, so even once they run,
+their compensations would be in-process-only and unrecoverable after a crash
+(§6). They need `@compensator`-registered handlers with JSON-serializable kwargs
+to be crash-safe.
+
+### Design gaps — tracked openly; see [SECURITY.md](SECURITY.md)
+
+- **`PostgresWAL` cannot compact and stamps no `gseq`.** Its log grows without
+  bound, and multi-writer ordering degrades to per-process `seq` (§12).
 - **No shipped distributed recovery lock.** The interface exists; no backend
   ships in-tree for the recovery claim (`RedisSemanticLocks` covers *semantic*
   locks, which is a different concern). Inject one for a multi-host fleet.
 - **Async-native connectors are partial.** Salesforce and Postgres-via-`asyncpg`
-  are async-native; Stripe and Postgres-via-`psycopg` go through the thread pool.
+  are async-native; Stripe goes through the thread pool.
+- **`fallback_action` steps carry no compensation.** A `COMPLETED_VIA_FALLBACK`
+  step contributes nothing to the rollback stack, so a fallback that writes puts
+  that write outside the transaction (§11).
+- **The serialization helpers are not wired into the WAL.**
+  `Compensation.recoverable` still uses plain JSON, so `saga_dumps`-only types
+  count as unrecoverable (§24).
 - **KMS/Vault key resolution is deliberately absent** from this BYOK core — it is
   an intended Enterprise-tier feature. `set_credential_resolver()` is the hook.
 - **The MCP proxy cannot infer regret.** With `--boundary session` or `none`, an

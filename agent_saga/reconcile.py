@@ -272,9 +272,12 @@ class Reconciliation:
                 detail=(f"no reconciler registered for {effect.handler!r}; "
                         f"this effect is asserted by the log alone"))
         try:
-            result = observer(**effect.kwargs)
-            if inspect.isawaitable(result):
-                result = await asyncio.wait_for(result, self.timeout)
+            if inspect.iscoroutinefunction(observer):
+                coro = observer(**effect.kwargs)
+            else:
+                from .executors import get_tool_executor
+                coro = get_tool_executor().run(observer, effect.kwargs)
+            result = await asyncio.wait_for(coro, self.timeout)
         except asyncio.TimeoutError:
             return Finding(effect.saga_id, effect.step_id, effect.tool,
                            effect.handler, effect.expected, UNVERIFIABLE,

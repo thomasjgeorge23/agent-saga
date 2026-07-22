@@ -403,87 +403,95 @@ class SagaContext:
             ATTR_IS_COMPENSATION, ATTR_SEMANTICS, ATTR_STEP_ID, ATTR_TOOL,
             get_tracer, step_span_name)
 
+        tok_saga = set_saga_id(self.saga_id)
+        tok_step = set_step_id(step.step_id)
         try:
-            with get_tracer().span(step_span_name(tool), {
-                ATTR_STEP_ID: step.step_id,
-                ATTR_TOOL: tool,
-                ATTR_SEMANTICS: semantics.value,
-                ATTR_IS_COMPENSATION: False,
-            }):
-                result = await _invoke(forward, forward_kwargs,
-                                       timeout or self.default_timeout)
-        except BaseException as exc:
-            if fallback_action is not None and not isinstance(exc, (SystemExit, KeyboardInterrupt)):
-                try:
-                    import inspect
-                    if inspect.iscoroutinefunction(fallback_action):
-                        result = await fallback_action()
-                    else:
-                        result = fallback_action()
+            try:
+                with get_tracer().span(step_span_name(tool), {
+                    ATTR_STEP_ID: step.step_id,
+                    ATTR_TOOL: tool,
+                    ATTR_SEMANTICS: semantics.value,
+                    ATTR_IS_COMPENSATION: False,
+                }):
+                    result = await _invoke(forward, forward_kwargs,
+                                           timeout or self.default_timeout)
+            except BaseException as exc:
+                if isinstance(exc, (asyncio.CancelledError, SystemExit, KeyboardInterrupt)):
+                    raise
+                if fallback_action is not None:
+                    try:
+                        import inspect
+                        if inspect.iscoroutinefunction(fallback_action):
+                            result = await fallback_action()
+                        else:
+                            result = fallback_action()
 
-                    step.state = StepState.COMPLETED_VIA_FALLBACK
-                    self.wal.append(
-                        "COMPLETED_VIA_FALLBACK",
-                        {
-                            "saga_id": self.saga_id,
-                            "step_id": step.step_id,
-                            "tool": tool,
-                            "semantics": semantics.value,
-                            "compensation": None
-                        },
-                    )
-                    if self.durable_commit and semantics is not ActionSemantics.REVERSIBLE:
-                        await self.wal.barrier()
-                    return result
-                except Exception as fallback_exc:
-                    logger.error("Fallback action failed with error: %r", fallback_exc)
+                        step.state = StepState.COMPLETED_VIA_FALLBACK
+                        self.wal.append(
+                            "COMPLETED_VIA_FALLBACK",
+                            {
+                                "saga_id": self.saga_id,
+                                "step_id": step.step_id,
+                                "tool": tool,
+                                "semantics": semantics.value,
+                                "compensation": None
+                            },
+                        )
+                        if self.durable_commit and semantics is not ActionSemantics.REVERSIBLE:
+                            await self.wal.barrier()
+                        return result
+                    except Exception as fallback_exc:
+                        logger.error("Fallback action failed with error: %r", fallback_exc)
 
-            # We do not know whether the effect landed. A timed-out POST to
-            # Stripe may well have charged the card. Treat as UNKNOWN, not as
-            # "did not happen", and still attempt idempotent compensation.
-            step.state = StepState.UNKNOWN
-            step.error = repr(exc)
-            # Tell the breaker. Reached only when the tool actually ran and
-            # raised -- a PreFlightViolation is thrown by the gate above and
-            # never arrives here, which is deliberate: counting refusals would
-            # trip the breaker exactly when the controls were working, and it
-            # would then block the calls that were still fine.
-            _tell_breaker(tool, ok=False, error=repr(exc))
+                # We do not know whether the effect landed. A timed-out POST to
+                # Stripe may well have charged the card. Treat as UNKNOWN, not as
+                # "did not happen", and still attempt idempotent compensation.
+                step.state = StepState.UNKNOWN
+                step.error = repr(exc)
+                # Tell the breaker. Reached only when the tool actually ran and
+                # raised -- a PreFlightViolation is thrown by the gate above and
+                # never arrives here, which is deliberate: counting refusals would
+                # trip the breaker exactly when the controls were working, and it
+                # would then block the calls that were still fine.
+                _tell_breaker(tool, ok=False, error=repr(exc))
+                if compensate is not None:
+                    step.compensation = _derive(compensate, None, tool)
+                self.wal.append(
+                    "STEP_UNKNOWN",
+                    {"saga_id": self.saga_id, "step_id": step.step_id, "tool": tool,
+                     "semantics": semantics.value, "error": repr(exc),
+                     "compensation": step.compensation.describe() if step.compensation else None},
+                )
+                if semantics is not ActionSemantics.REVERSIBLE:
+                    await self.wal.barrier()
+                raise
+
+            # 4. Derive the inverse from the actual result -- the charge id, the row
+            #    ids, the message ts. This is what a statically declared workflow
+            #    cannot do when the agent picked the action at runtime.
+            step.state = StepState.COMMITTED
+            _tell_breaker(tool, ok=True)
             if compensate is not None:
-                step.compensation = _derive(compensate, None, tool)
+                step.compensation = _derive(compensate, result, tool)
+                self._warn_if_unrecoverable(step)
+
             self.wal.append(
-                "STEP_UNKNOWN",
+                "STEP_COMMITTED",
                 {"saga_id": self.saga_id, "step_id": step.step_id, "tool": tool,
-                 "semantics": semantics.value, "error": repr(exc),
+                 "semantics": semantics.value,
                  "compensation": step.compensation.describe() if step.compensation else None},
             )
-            if semantics is not ActionSemantics.REVERSIBLE:
+            # The compensation descriptor is only born here -- it needed the result.
+            # If we crash before it is durable, the daemon inherits a STEP_INTENT
+            # with no way to undo it, which is exactly the orphan we exist to
+            # prevent. So the money path pays for a second fsync. Group commit
+            # amortizes it under concurrency; at idle it roughly doubles p50.
+            if self.durable_commit and semantics is not ActionSemantics.REVERSIBLE:
                 await self.wal.barrier()
-            raise
-
-        # 4. Derive the inverse from the actual result -- the charge id, the row
-        #    ids, the message ts. This is what a statically declared workflow
-        #    cannot do when the agent picked the action at runtime.
-        step.state = StepState.COMMITTED
-        _tell_breaker(tool, ok=True)
-        if compensate is not None:
-            step.compensation = _derive(compensate, result, tool)
-            self._warn_if_unrecoverable(step)
-
-        self.wal.append(
-            "STEP_COMMITTED",
-            {"saga_id": self.saga_id, "step_id": step.step_id, "tool": tool,
-             "semantics": semantics.value,
-             "compensation": step.compensation.describe() if step.compensation else None},
-        )
-        # The compensation descriptor is only born here -- it needed the result.
-        # If we crash before it is durable, the daemon inherits a STEP_INTENT
-        # with no way to undo it, which is exactly the orphan we exist to
-        # prevent. So the money path pays for a second fsync. Group commit
-        # amortizes it under concurrency; at idle it roughly doubles p50.
-        if self.durable_commit and semantics is not ActionSemantics.REVERSIBLE:
-            await self.wal.barrier()
-        return result
+            return result
+        finally:
+            reset_step_id(tok_step)
+            reset_saga_id(tok_saga)
 
     def _warn_if_unrecoverable(self, step: SagaStep) -> None:
         """Say it now, while everything is still fine -- not at 3am from a
@@ -651,7 +659,8 @@ async def _invoke(fn: Callable[..., Any], kwargs: dict, timeout: Optional[float]
 
 
 def _derive(factory: CompensationFactory, result: Any, tool: str) -> Optional[Compensation]:
-    """A broken compensation factory must not mask the original failure."""
+    """A broken compensation factory must not mask the original failure or prevent step completion;
+    uncompensated steps will be correctly identified as orphaned during rollback."""
     try:
         comp = factory(result)
     except Exception as exc:

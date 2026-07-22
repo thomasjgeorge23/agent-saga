@@ -67,6 +67,9 @@ class PostgresWAL(BufferedWAL):
         self._pool = pool
         self._owns_pool = pool is None
 
+        if not table_name.isidentifier():
+            raise ValueError(f"Invalid SQL table_name identifier: {table_name!r}")
+
         # Fail early on import error if pool is not injected
         if pool is None:
             try:
@@ -75,6 +78,9 @@ class PostgresWAL(BufferedWAL):
                 raise ImportError(_IMPORT_HINT) from exc
 
     async def _open_sink(self) -> None:
+        if not self.table_name.isidentifier():
+            raise ValueError(f"Invalid SQL table_name identifier: {self.table_name!r}")
+
         if self._pool is None:
             try:
                 import asyncpg
@@ -105,6 +111,19 @@ class PostgresWAL(BufferedWAL):
         )
         async with self._pool.acquire() as conn:
             await conn.execute(query)
+
+        if self.chain:
+            try:
+                records = await self.read_all()
+                if records:
+                    from ..integrity import HASH_FIELD
+                    for record in reversed(records):
+                        head = record.get(HASH_FIELD)
+                        if head:
+                            self._chain_head = head
+                            break
+            except Exception as exc:
+                logger.warning("could not resume hash chain from PostgresWAL: %r", exc)
 
     async def _close_sink(self) -> None:
         if self._pool is not None and self._owns_pool:
@@ -156,6 +175,40 @@ class PostgresWAL(BufferedWAL):
                 except (json.JSONDecodeError, ValueError):
                     continue
         return records
+
+    async def compact(self, keep_saga_ids: Optional[set[str]] = None) -> int:
+        assert self._pool is not None, "PostgresWAL not started; call await wal.start()"
+        if keep_saga_ids is None:
+            keep_saga_ids = set()
+
+        records = await self.read_all()
+        if not records:
+            return 0
+
+        resolved_sagas = set()
+        active_sagas = set(keep_saga_ids)
+        for r in records:
+            sid = r.get("saga_id")
+            ev = r.get("event")
+            if sid:
+                if ev in ("SAGABOUNDARY_COMPLETED", "SAGABOUNDARY_ABORTED"):
+                    resolved_sagas.add(sid)
+                else:
+                    active_sagas.add(sid)
+
+        to_remove = resolved_sagas - active_sagas
+        if not to_remove:
+            return 0
+
+        query = f"DELETE FROM {self.table_name} WHERE saga_id = ANY($1::text[])"
+        async with self._pool.acquire() as conn:
+            res = await conn.execute(query, list(to_remove))
+            try:
+                count = int(res.split()[-1])
+            except (ValueError, IndexError):
+                count = len(to_remove)
+        logger.info("compacted %d resolved saga record(s) from %s", count, self.table_name)
+        return count
 
     async def clear(self) -> None:
         assert self._pool is not None, "PostgresWAL not started; call await wal.start()"

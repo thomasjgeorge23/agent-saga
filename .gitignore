@@ -1,4 +1,4 @@
-﻿__pycache__/
+__pycache__/
 *.pyc
 .pytest_cache/
 bench/results-*.json
@@ -11,3 +11,7 @@ bench/results-*.json
 dist/
 build/
 *.egg-info/
+
+# proprietary trade secrets
+TRADE_SECRETS_PROPRIETARY.md
+.saga_secrets/
