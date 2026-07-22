@@ -25,6 +25,7 @@ import os
 import re
 from typing import Any, Optional, Sequence
 
+from ..reconcile import Observation, reconciler
 from ..registry import compensator
 from ..semantics import ActionSemantics, Compensation
 from ._secrets import assert_no_secrets, resolve_credential
@@ -544,4 +545,93 @@ __all__ = [
     "insert_row", "delete_inserted_row",
     "delete_row", "reinsert_row",
     "ConcurrentModification",
+    "observe_restored_row", "observe_deleted_insert", "observe_reinserted_row",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Reconcilers: ask the database what is actually in the row
+# ---------------------------------------------------------------------------
+#
+# A compensation returning without raising means the UPDATE reported a row
+# count. It does not mean the row now holds what we intended: a trigger can
+# rewrite it, a replica can be read instead of the primary, and a later writer
+# can undo the undo. These re-read and compare.
+
+
+async def _fetch_row(credential_ref: str, table: str, where: dict,
+                     columns: Sequence[str]) -> Optional[dict]:
+    tbl = _qualified(table)
+    cols = [_ident(c, kind="column") for c in columns] or ["*"]
+    keys = list(where)
+
+    async def plan(style, _execute, fetchone):
+        conds = " AND ".join(
+            f"{_ident(c, kind='column')} = {_ph(style, i + 1)}"
+            for i, c in enumerate(keys))
+        sql = f"SELECT {', '.join(cols)} FROM {tbl} WHERE {conds}"
+        row = await fetchone(sql, [where[c] for c in keys])
+        return dict(row) if row is not None else None
+
+    return await _run(credential_ref, plan)
+
+
+def _matches(row: dict, expected: dict) -> bool:
+    return all(row.get(k) == v for k, v in expected.items())
+
+
+@reconciler("postgres.restore_row")
+async def observe_restored_row(*, table: str, pk_column: str, pk_value: Any,
+                               previous_state: dict, expected_current: dict,
+                               credential_ref: str, **_ignored) -> Observation:
+    """Did the row actually go back to what it was before the agent touched it?
+
+    Three outcomes worth distinguishing, and a boolean would collapse them:
+    the row holds the previous values (reversed), it still holds what the agent
+    wrote (the rollback did not take), or it holds neither -- someone else has
+    written since, and no automated answer is safe.
+    """
+    columns = sorted(set(previous_state) | set(expected_current))
+    row = await _fetch_row(credential_ref, table, {pk_column: pk_value}, columns)
+    if row is None:
+        return Observation(exists=False, reversed_=False,
+                           detail=f"row {pk_column}={pk_value!r} no longer exists")
+    if _matches(row, previous_state):
+        return Observation(exists=True, reversed_=True,
+                           detail="row holds its pre-saga values")
+    if _matches(row, expected_current):
+        return Observation(exists=True, reversed_=False,
+                           detail="row still holds the values the agent wrote")
+    return Observation(
+        exists=True, reversed_=None,
+        detail=("row matches neither the pre-saga nor the agent-written state; "
+                "a third party has written to it since"))
+
+
+@reconciler("postgres.delete_inserted_row")
+async def observe_deleted_insert(*, table: str, pk: dict, credential_ref: str,
+                                 **_ignored) -> Observation:
+    """The inverse of an INSERT is a DELETE, so reversal means the row is gone."""
+    row = await _fetch_row(credential_ref, table, pk, list(pk))
+    return Observation(
+        exists=row is not None, reversed_=row is None,
+        detail=("inserted row was removed" if row is None
+                else "inserted row is still present"))
+
+
+@reconciler("postgres.reinsert_row")
+async def observe_reinserted_row(*, table: str, row: dict, pk_columns: list,
+                                 credential_ref: str, **_ignored) -> Observation:
+    """The inverse of a DELETE is a re-INSERT, so reversal means it is back --
+    and back with the values it had, not merely a row with the same key."""
+    where = {c: row[c] for c in pk_columns if c in row}
+    found = await _fetch_row(credential_ref, table, where, sorted(row))
+    if found is None:
+        return Observation(exists=False, reversed_=False,
+                           detail="deleted row has not been restored")
+    if _matches(found, row):
+        return Observation(exists=True, reversed_=True,
+                           detail="deleted row is back with its original values")
+    return Observation(
+        exists=True, reversed_=None,
+        detail="a row with that key exists but its values differ from the original")

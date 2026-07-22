@@ -367,6 +367,28 @@ that gets shown to an auditor.
 `Observation` is deliberately tri-state (`True` / `False` / `None`) rather than
 boolean, so "I don't know" survives instead of being forced into a claim.
 
+Every shipped connector registers a reconciler alongside its compensator, so
+importing the connector gets both:
+
+```bash
+agent-saga reconcile --wal-path ./agent-saga.wal \
+    --import agent_saga.connectors.stripe \
+    --import agent_saga.connectors.postgres
+```
+
+| Handler | What it re-reads | The failure it catches |
+|---|---|---|
+| `stripe.refund` | the charge | refund acknowledged but never applied; **partial refunds**, which are not reversals |
+| `postgres.restore_row` | the row's columns | the UPDATE reported a rowcount but a trigger rewrote it; a third party wrote in between (reported as *indeterminate*, not guessed) |
+| `postgres.delete_inserted_row` | row existence | the inserted row is still there |
+| `postgres.reinsert_row` | row + values | a row with the right key came back carrying the *wrong* values |
+| `salesforce.revert_object` | the patched fields only | the PATCH returned 204 and a workflow rule immediately put the value back |
+
+That last one is worth dwelling on: a Salesforce workflow rule, flow, or Apex
+trigger can rewrite a field microseconds after your update, and *nothing in the
+API response tells you*. Only reading the record does. Only the fields the saga
+touched are compared — reverting a record is not a claim about the rest of it.
+
 Run it as a separate, later pass — not inline. Payment and CRM APIs are
 eventually consistent, so reading back immediately after a write reports drift
 that's merely latency, and a control that cries wolf gets muted.

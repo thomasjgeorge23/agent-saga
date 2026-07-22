@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+from ..reconcile import Observation, reconciler
 from ..registry import compensator
 from ..semantics import ActionSemantics, Compensation
 from ._secrets import assert_no_secrets, resolve_credential
@@ -134,4 +135,53 @@ async def charge(
     )
 
 
-__all__ = ["charge", "refund_charge", "refund_key_for"]
+@reconciler("stripe.refund")
+def observe_refund(*, charge_id: str, credential_ref: str, **_ignored) -> Observation:
+    """Ask Stripe what actually happened to this charge.
+
+    `refund_charge` returning success means Stripe acknowledged a request. It
+    does not mean the money went back: an idempotency key can match a
+    *different* request, and a refund can be created and then fail. The only
+    authority on whether a charge is refunded is the charge.
+
+    Accepts and ignores the other compensation kwargs (`amount`,
+    `idempotency_key`) so the registry can pass a compensation's kwargs through
+    unchanged -- a reconciler that had to be kept in signature-lockstep with its
+    compensator would silently stop being run the first time one of them gained
+    an argument.
+    """
+    stripe = _client(credential_ref)
+    try:
+        charge = stripe.Charge.retrieve(charge_id)
+    except Exception as exc:
+        message = str(exc)
+        if "No such charge" in message or "resource_missing" in message:
+            # Stripe has never heard of it. For a charge we believe we made,
+            # that is drift; the caller decides, which is why this reports the
+            # fact rather than an interpretation.
+            return Observation(exists=False, reversed_=False,
+                               detail="Stripe has no such charge")
+        raise
+
+    refunded = bool(_get(charge, "refunded"))
+    amount = _get(charge, "amount")
+    amount_refunded = _get(charge, "amount_refunded") or 0
+    # A partial refund is not a reversal. Saying so plainly avoids a report
+    # that calls a half-returned payment "confirmed".
+    if not refunded and amount_refunded:
+        return Observation(
+            exists=True, reversed_=False, amount=amount,
+            detail=f"PARTIALLY refunded: {amount_refunded} of {amount}")
+    return Observation(
+        exists=True, reversed_=refunded, amount=amount,
+        detail=f"status={_get(charge, 'status')}, refunded={refunded}")
+
+
+def _get(obj: Any, key: str) -> Any:
+    """Stripe objects are dict-like, but a test double may be a plain object."""
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
+__all__ = ["charge", "refund_charge", "refund_key_for", "observe_refund"]

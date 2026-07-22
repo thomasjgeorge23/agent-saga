@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+from ..reconcile import Observation, reconciler
 from ..registry import compensator
 from ..semantics import ActionSemantics, Compensation
 from ._secrets import assert_no_secrets, resolve_credential
@@ -190,5 +191,60 @@ async def patch_object(
     )
 
 
+@reconciler("salesforce.revert_object")
+async def observe_reverted_object(
+    *,
+    instance_url: str,
+    object_type: str,
+    object_id: str,
+    previous_values: dict,
+    credential_ref: str,
+    api_version: str = DEFAULT_API_VERSION,
+    client: Any = None,
+    **_ignored,
+) -> Observation:
+    """Read the record back and see which version of the fields it holds.
+
+    A 204 from the PATCH says Salesforce accepted the write. It does not say
+    the record now holds those values: a workflow rule, a flow, a validation
+    rule or an Apex trigger can rewrite a field immediately after the update,
+    and none of that reaches the caller. Only reading the record does.
+
+    Only the fields this saga touched are compared. Reverting a record is not a
+    claim about the rest of it, and asserting on untouched fields would report
+    drift every time anyone else edited anything.
+    """
+    import httpx
+
+    body = writable(previous_values)
+    if not body:
+        return Observation(reversed_=None,
+                           detail="no writable fields were reverted")
+
+    token = resolve_credential(credential_ref)
+    url = _url(instance_url, object_type, object_id, api_version)
+    http = client or httpx.AsyncClient(timeout=30.0)
+    try:
+        resp = await http.get(url, headers={"Authorization": f"Bearer {token}"},
+                              params={"fields": ",".join(sorted(body))})
+        if resp.status_code == 404:
+            return Observation(exists=False, reversed_=False,
+                               detail=f"{object_type} {object_id} no longer exists")
+        resp.raise_for_status()
+        record = resp.json()
+    finally:
+        if client is None:
+            await http.aclose()
+
+    mismatched = sorted(k for k, v in body.items() if record.get(k) != v)
+    if not mismatched:
+        return Observation(exists=True, reversed_=True,
+                           detail=f"{len(body)} field(s) hold their pre-saga values")
+    return Observation(
+        exists=True, reversed_=False,
+        detail=(f"{len(mismatched)} of {len(body)} field(s) do not hold their "
+                f"pre-saga values: {', '.join(mismatched[:5])}"))
+
+
 __all__ = ["patch_object", "revert_object", "writable", "StaleObject",
-           "READ_ONLY_FIELDS"]
+           "READ_ONLY_FIELDS", "observe_reverted_object"]
