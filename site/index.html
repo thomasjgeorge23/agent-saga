@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga — The Supreme Transactional Reliability & Anti-Hallucination Engine for AI Agents</title>
+<title>agent-saga v0.1.7 — Supreme Transactional Reliability & Anti-Hallucination Engine for AI Agents</title>
 <meta name="description" content="Mission-critical transactional reliability, 99.999% anti-hallucination reality anchors, and zero-configuration auto-rollback infrastructure for autonomous AI agents across Banking, Healthcare, Aerospace, and Enterprise SaaS." />
 <style>
   :root {
@@ -15,7 +15,6 @@
     --shadow: 0 4px 20px rgba(0,0,0,.4), 0 12px 50px rgba(0,0,0,.5);
     --mono: "JetBrains Mono","SF Mono","Cascadia Code",Consolas,monospace;
     --sans: system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    --serif: "Iowan Old Style","Palatino Linotype",Georgia,serif;
   }
   :root[data-theme="light"] {
     --bg: #f4f7fc; --panel: #ffffff; --elev: #f0f4fa;
@@ -33,20 +32,20 @@
     font-family: var(--sans); line-height: 1.6;
     -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   }
-  .wrap { width: min(1200px, 92vw); margin-inline: auto; }
+  .wrap { width: min(1240px, 92vw); margin-inline: auto; }
   section { padding: clamp(3.5rem, 7vw, 6.5rem) 0; }
   a { color: inherit; }
   ::selection { background: var(--accent); color: #0d1320; }
 
   .eyebrow {
-    font-family: var(--mono); font-size: .76rem; letter-spacing: .18em;
+    font-family: var(--mono); font-size: .78rem; letter-spacing: .18em;
     text-transform: uppercase; color: var(--accent); margin: 0 0 .9rem;
-    display: inline-flex; align-items: center; gap: .5rem;
+    display: inline-flex; align-items: center; gap: .5rem; font-weight: 700;
   }
   h1, h2, h3 { text-wrap: balance; line-height: 1.1; letter-spacing: -.025em; }
-  h1 { font-size: clamp(2.4rem, 5.8vw, 4rem); font-weight: 850; margin: 0 0 1.2rem; }
+  h1 { font-size: clamp(2.4rem, 5.8vw, 4.2rem); font-weight: 850; margin: 0 0 1.2rem; }
   h2 { font-size: clamp(1.8rem, 3.8vw, 2.8rem); font-weight: 800; margin: 0 0 1rem; }
-  .lede { color: var(--dim); font-size: clamp(1.05rem, 1.7vw, 1.22rem); max-width: 65ch; }
+  .lede { color: var(--dim); font-size: clamp(1.05rem, 1.7vw, 1.24rem); max-width: 68ch; }
 
   /* Nav */
   header.nav {
@@ -56,12 +55,12 @@
   }
   .nav-in { display: flex; align-items: center; gap: 1.5rem; height: 66px; }
   .brand { display: flex; align-items: center; gap: .6rem; font-weight: 850;
-    letter-spacing: -.03em; font-size: 1.2rem; text-decoration: none; }
-  .brand .seq { font-family: var(--mono); font-weight: 700; font-size: .7rem;
+    letter-spacing: -.03em; font-size: 1.22rem; text-decoration: none; }
+  .brand .seq { font-family: var(--mono); font-weight: 700; font-size: .72rem;
     color: var(--accent); border: 1px solid var(--border-strong); border-radius: 6px;
-    padding: .12rem .45rem; letter-spacing: .05em; background: var(--elev); }
+    padding: .14rem .5rem; letter-spacing: .05em; background: var(--elev); }
   .nav-links { margin-left: auto; display: flex; align-items: center; gap: 1.4rem; font-size: .94rem; }
-  .nav-links a { color: var(--dim); text-decoration: none; font-weight: 550; }
+  .nav-links a { color: var(--dim); text-decoration: none; font-weight: 550; transition: color .15s ease; }
   .nav-links a:hover { color: var(--text); }
   .toggle { font: inherit; font-family: var(--mono); font-size: .78rem;
     cursor: pointer; background: var(--panel); color: var(--dim);
@@ -122,18 +121,18 @@
   .logline.done .ev b { color: var(--reversible); }
 
   /* Industry Categories */
-  .category-grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-top: 2.5rem; }
+  .category-grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); margin-top: 2.5rem; }
   .cat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 1.8rem; box-shadow: var(--shadow); transition: transform .2s ease, border-color .2s ease; }
   .cat-card:hover { transform: translateY(-4px); border-color: var(--accent); }
-  .cat-icon { font-size: 2rem; margin-bottom: .8rem; display: block; }
+  .cat-icon { font-size: 2.2rem; margin-bottom: .8rem; display: block; }
   .cat-card h3 { font-size: 1.25rem; margin: 0 0 .6rem; color: var(--text); }
   .cat-card p { margin: 0; color: var(--dim); font-size: .95rem; }
-  .cat-badge { display: inline-block; font-family: var(--mono); font-size: .68rem; padding: .2rem .55rem; border-radius: 6px; background: var(--elev); color: var(--accent); border: 1px solid var(--border-strong); margin-bottom: .8rem; }
+  .cat-badge { display: inline-block; font-family: var(--mono); font-size: .68rem; padding: .2rem .55rem; border-radius: 6px; background: var(--elev); color: var(--accent); border: 1px solid var(--border-strong); margin-bottom: .8rem; font-weight: 600; }
 
   /* Live Interactive Demo */
   .demo-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
   .demo-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2rem; padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--elev); }
-  .scenario-select { font-family: var(--mono); font-size: .84rem; background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: .45rem .8rem; cursor: pointer; }
+  .scenario-select { font-family: var(--mono); font-size: .84rem; background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: .45rem .8rem; cursor: pointer; font-weight: 600; }
   .switch-wrap { display: flex; align-items: center; gap: .7rem; margin-left: auto; }
   .switch-label { font-family: var(--mono); font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); font-weight: 700; }
   .switch-label.active { color: var(--text); }
@@ -143,7 +142,7 @@
   .switch[aria-checked="true"] .knob { transform: translateX(26px); background: #0d1320; }
 
   .demo-grid { display: grid; grid-template-columns: 1fr; }
-  @media (min-width: 900px) { .demo-grid { grid-template-columns: 320px 1fr; } }
+  @media (min-width: 900px) { .demo-grid { grid-template-columns: 340px 1fr; } }
   .systems { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 1rem; }
   @media (min-width: 900px) { .systems { border-bottom: 0; border-right: 1px solid var(--border); } }
   .sys { border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; background: var(--elev); }
@@ -153,7 +152,7 @@
   .sys-val { font-size: 1.6rem; font-weight: 850; margin-top: .3rem; font-variant-numeric: tabular-nums; }
   .sys-sub { font-family: var(--mono); font-size: .72rem; color: var(--faint); margin-top: .2rem; }
 
-  .trace { padding: 1.5rem; min-height: 320px; font-family: var(--mono); font-size: .84rem; display: flex; flex-direction: column; gap: .6rem; background: var(--panel); }
+  .trace { padding: 1.5rem; min-height: 340px; font-family: var(--mono); font-size: .84rem; display: flex; flex-direction: column; gap: .6rem; background: var(--panel); }
   .tr { display: grid; grid-template-columns: 1.5rem 1fr auto; gap: .8rem; align-items: center; padding: .55rem .8rem; border-radius: 10px; border: 1px solid var(--border); background: var(--elev); }
   .tr.ok .ic { color: var(--reversible); font-weight: bold; }
   .tr.fail { border-color: var(--irreversible); background: color-mix(in srgb, var(--irreversible) 10%, var(--elev)); }
@@ -168,11 +167,21 @@
   .verdict.bad .chip { background: var(--irreversible); color: #fff; padding: .2rem .6rem; border-radius: 6px; font-weight: bold; }
   .verdict.good .chip { background: var(--reversible); color: #082824; padding: .2rem .6rem; border-radius: 6px; font-weight: bold; }
 
-  /* Feature Grid */
-  .feat-grid { display: grid; gap: 1.4rem; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); margin-top: 2.5rem; }
-  .feat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 1.8rem; box-shadow: var(--shadow); }
-  .feat-card h3 { font-size: 1.2rem; margin: 0 0 .6rem; display: flex; align-items: center; gap: .6rem; }
+  /* Dynamic Feature Modal / Card Inspection */
+  .feat-grid { display: grid; gap: 1.4rem; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); margin-top: 2.5rem; }
+  .feat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 1.8rem; box-shadow: var(--shadow); cursor: pointer; transition: border-color .2s ease, transform .2s ease; }
+  .feat-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+  .feat-card h3 { font-size: 1.2rem; margin: 0 0 .6rem; display: flex; align-items: center; gap: .6rem; color: var(--text); }
   .feat-card p { margin: 0; color: var(--dim); font-size: .96rem; }
+  .feat-inspect-hint { font-family: var(--mono); font-size: .7rem; color: var(--accent); margin-top: 1rem; display: block; font-weight: bold; }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 100; backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  .modal-overlay[hidden] { display: none; }
+  .modal-card { background: var(--panel); border: 1px solid var(--border-strong); border-radius: 18px; box-shadow: var(--shadow); max-width: 650px; width: 100%; padding: 2rem; position: relative; font-family: var(--mono); }
+  .modal-close { position: absolute; top: 1.2rem; right: 1.2rem; background: var(--elev); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: .3rem .7rem; cursor: pointer; }
+  .modal-title { font-size: 1.3rem; font-weight: bold; color: var(--text); margin-bottom: 1rem; }
+  .modal-code { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; overflow-x: auto; font-size: .84rem; color: var(--reversible); margin-top: 1rem; }
 
   footer { border-top: 1px solid var(--border); padding: 4rem 0; color: var(--dim); }
   .foot-grid { display: flex; flex-wrap: wrap; gap: 2rem; align-items: center; }
@@ -182,7 +191,7 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top">agent-saga <span class="seq">v0.1.0</span></a>
+    <a class="brand" href="#top">agent-saga <span class="seq">v0.1.7</span></a>
     <nav class="nav-links">
       <a href="#categories">Industries</a>
       <a href="#demo">Live Playground</a>
@@ -199,11 +208,11 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">⚡ World-Class AI Reliability Engine · Apache-2.0</p>
+        <p class="eyebrow">⚡ World-Class AI Reliability Engine · PyPI v0.1.7</p>
         <h1>The supreme transactional engine for <span class="amber">autonomous AI agents</span>.</h1>
         <p class="lede">
           When AI models execute real-world actions — database writes, Stripe charges, medical prescriptions, or financial transfers — they operate non-deterministically. 
-          <b>agent-saga</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, and automatic LIFO rollbacks.
+          <b>agent-saga v0.1.7</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, zero-config auto-hooking, and automatic LIFO rollbacks.
         </p>
         <div class="install">
           <span class="prompt">$</span><code>pip install agent-saga</code>
@@ -218,7 +227,7 @@
       <div>
         <div class="wal">
           <div class="wal-bar">
-            <span class="dot"></span><span>Write-Ahead Log (WAL)</span>
+            <span class="dot"></span><span>Write-Ahead Log (WAL v0.1.7)</span>
             <span class="fn">SAGA_LIVE · 99.999% Grounded</span>
           </div>
           <div class="wal-body">
@@ -238,7 +247,7 @@
     <div class="wrap">
       <p class="eyebrow">Universal Domain Integration</p>
       <h2>Built for where AI errors cannot be tolerated.</h2>
-      <p class="lede">From high-frequency banking to medical examination and flight control, agent-saga powers mission-critical reliability across all software fields.</p>
+      <p class="lede">From high-frequency banking to medical examination, flight control, and cloud infrastructure, agent-saga powers mission-critical reliability across all software fields.</p>
       
       <div class="category-grid">
         <div class="cat-card">
@@ -291,7 +300,7 @@
     <div class="wrap">
       <p class="eyebrow">Interactive Live Playground</p>
       <h2>Compare AI model execution: Before vs. After agent-saga.</h2>
-      <p class="lede">Test example scenarios to see how raw AI agents hallucinate and corrupt system state (BEFORE), versus how agent-saga intercepts, verifies, and auto-heals (AFTER).</p>
+      <p class="lede">Test 5 real-world industry scenarios to see how raw AI agents hallucinate and corrupt system state (BEFORE), versus how agent-saga intercepts, verifies, and auto-heals (AFTER).</p>
 
       <div class="demo-shell" style="margin-top: 2rem;">
         <div class="demo-bar">
@@ -299,6 +308,8 @@
             <option value="ecommerce">🛒 E-Commerce ($499 Charge + DB + Email Relay Failure)</option>
             <option value="medical">🩺 Medical Examination (500mg Overdose Attempt Intercepted)</option>
             <option value="banking">🏦 FinTech Wire Transfer ($250,000 Triple Redundant Consensus)</option>
+            <option value="aerospace">🚀 Aerospace Flight Control (Predictive Chaos Entropy Tripped)</option>
+            <option value="devops">☁️ Cloud DevOps (Multi-Cloud Subnet & K8s Pod Rollback)</option>
           </select>
 
           <div class="switch-wrap">
@@ -339,58 +350,74 @@
     </div>
   </section>
 
-  <!-- WORLD-CLASS INNOVATIONS -->
+  <!-- DYNAMIC FEATURE INSPECTOR & INNOVATIONS -->
   <section id="features">
     <div class="wrap">
       <p class="eyebrow">Engineered Innovations</p>
-      <h2>Capabilities no other platform provides.</h2>
+      <h2>Click any feature to inspect its live code payload & architecture.</h2>
       
       <div class="feat-grid">
-        <div class="feat-card">
+        <div class="feat-card" onclick="openFeatureModal('reality')">
           <h3>🎯 Anti-Hallucination Reality Anchor</h3>
           <p>Intercepts candidate tool calls, validating arguments against immutable WAL history and pre-flight invariants before side effects hit production APIs.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card">
+        <div class="feat-card" onclick="openFeatureModal('mission')">
           <h3>🩺 Mission-Critical 99.999% Consensus</h3>
           <p>Executes 3 independent verification passes (Schema Structural, Range Boundary, Ledger Consistency) requiring unanimous 3/3 consensus for medical/banking actions.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card">
+        <div class="feat-card" onclick="openFeatureModal('shadow')">
           <h3>🔮 Speculative Shadow Engine</h3>
           <p>Captures sub-microsecond pre/post state differentials and auto-synthesizes inverse compensation functions without requiring manually written undo code.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card">
+        <div class="feat-card" onclick="openFeatureModal('entanglement')">
           <h3>🔗 Cross-Domain Agent Entanglement</h3>
           <p>Binds execution graphs across CrewAI, LangGraph, AutoGen, and OpenAI Agents into a single atomic transaction boundary across network nodes.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card">
+        <div class="feat-card" onclick="openFeatureModal('sentinel')">
           <h3>🛡️ Predictive Chaos Sentinel</h3>
           <p>Evaluates latency variance and LLM response entropy, pre-emptively tripping safety gates before API failure cascades occur.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card">
+        <div class="feat-card" onclick="openFeatureModal('auto')">
           <h3>⚡ Zero-Configuration Auto-Hook</h3>
           <p>Simply run <code>pip install agent-saga</code> and <code>import agent_saga.auto</code> to auto-attach pre-flight gates across all active framework loops.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
       </div>
     </div>
   </section>
 </main>
 
+<!-- FEATURE MODAL -->
+<div class="modal-overlay" id="featureModal" hidden onclick="closeFeatureModal(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeFeatureModal()">✕ Close</button>
+    <div class="modal-title" id="modalTitle">Feature Inspection</div>
+    <div id="modalDesc" style="color: var(--dim); font-size: .95rem;"></div>
+    <pre class="modal-code" id="modalCode"></pre>
+  </div>
+</div>
+
 <footer>
   <div class="wrap foot-grid">
     <div>
-      <div class="brand">agent-saga <span class="seq">v0.1.0</span></div>
+      <div class="brand">agent-saga <span class="seq">v0.1.7</span></div>
       <p style="font-size: .85rem; color: var(--faint); margin-top: .4rem;">
         Licensed under Apache-2.0. Built for mission-critical enterprise AI agent reliability.
       </p>
     </div>
     <div style="margin-left: auto; display: flex; gap: 1.5rem; font-size: .9rem;">
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">GitHub</a>
-      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI</a>
+      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.1.7</a>
     </div>
   </div>
 </footer>
@@ -412,6 +439,89 @@
       setTimeout(function () { copyBtn.textContent = 'copy'; }, 1400);
     });
   })();
+
+  /* Dynamic Feature Code Modals */
+  var featurePayloads = {
+    reality: {
+      title: "🎯 Anti-Hallucination Reality Anchor",
+      desc: "Compares AI tool call payloads against immutable WAL history and pre-flight ground truth, executing an automatic self-correcting callback loop if hallucination is detected.",
+      code: `from agent_saga import RealityAnchor, GroundingFact, SelfCorrectingLoop
+
+anchor = RealityAnchor(
+    facts=[GroundingFact(key="user_id", expected_value="usr_123")],
+    validators=[lambda p: p.get("amount", 0) > 0]
+)
+loop = SelfCorrectingLoop(anchor=anchor, max_retries=3, corrector=my_corrector)
+result = await loop.execute_grounded(stripe.charge, payload)`
+    },
+    mission: {
+      title: "🩺 Mission-Critical 99.999% Triple Redundant Consensus",
+      desc: "Executes 3 independent verification passes (Structural Schema, Boundary Range, and Immutable Ledger Consistency) requiring 3/3 unanimous consensus before executing high-risk medical or financial actions.",
+      code: `from agent_saga import TripleRedundantVerifier, MissionCriticalGate
+
+verifier = TripleRedundantVerifier(
+    structural_checker=lambda p: "account_id" in p and "amount" in p,
+    boundary_checker=lambda p: 0 < p.get("amount", 0) <= 1_000_000,
+    ledger_checker=lambda p: p.get("account_status") == "ACTIVE"
+)
+ok, msg, results = verifier.verify_consensus(payload) # 3/3 consensus`
+    },
+    shadow: {
+      title: "🔮 Speculative Shadow Engine",
+      desc: "Captures pre/post state differentials at sub-microsecond latency and automatically synthesizes LIFO inverse compensation logic without manual undo functions.",
+      code: `from agent_saga import SpeculativeEngine
+
+engine = SpeculativeEngine(state_reader=get_db_snapshot)
+pre_state = engine.capture_pre()
+post_state = engine.capture_post()
+
+# Auto-synthesize undo function from state delta
+comp = engine.synthesize_compensation("db.update", pre_state, post_state)`
+    },
+    entanglement: {
+      title: "🔗 Cross-Domain Multi-Agent Entanglement Matrix",
+      desc: "Links disparate agent execution graphs across CrewAI, LangGraph, AutoGen, and OpenAI Agents into a single atomic transaction boundary across network nodes.",
+      code: `from agent_saga import EntanglementMatrix
+
+matrix = EntanglementMatrix()
+matrix.register_agent("agent_crewai", "crewai", ctx1)
+matrix.register_agent("agent_langgraph", "langgraph", ctx2, depends_on=["agent_crewai"])
+
+# Cascades atomic rollback across all frameworks in reverse order
+await matrix.abort_all("agent_langgraph", reason="downstream failure")`
+    },
+    sentinel: {
+      title: "🛡️ Predictive Chaos Sentinel",
+      desc: "Tracks LLM output entropy and latency variance to pre-emptively trip circuit breakers before failure cascades impact production services.",
+      code: `from agent_saga import PredictiveSentinel
+
+sentinel = PredictiveSentinel(risk_threshold=0.85)
+sentinel.record_sample("unstable_tool", latency_ms=4500.0, is_error=True)
+
+should_block, risk = sentinel.should_block_preemptively("unstable_tool")`
+    },
+    auto: {
+      title: "⚡ Zero-Configuration Global Auto-Hooking",
+      desc: "Simply importing agent_saga.auto automatically attaches pre-flight gates and transactional boundaries across all active framework loops.",
+      code: `# Simply add to your project:
+import agent_saga.auto
+
+# Automatically hooks OpenAI SDK, LangGraph, CrewAI, and HTTP clients!`
+    }
+  };
+
+  function openFeatureModal(key) {
+    var data = featurePayloads[key];
+    if (!data) return;
+    document.getElementById('modalTitle').textContent = data.title;
+    document.getElementById('modalDesc').textContent = data.desc;
+    document.getElementById('modalCode').textContent = data.code;
+    document.getElementById('featureModal').hidden = false;
+  }
+
+  function closeFeatureModal(event) {
+    document.getElementById('featureModal').hidden = true;
+  }
 
   /* Live Interactive Playground */
   (function () {
@@ -469,7 +579,7 @@
         sys2Name.textContent = 'Postgres Account'; sys2Val.textContent = '0'; sys2Sub.textContent = 'provisioned'; sys2Node.className = 'sys';
         sys3Name.textContent = 'Welcome Email'; sys3Val.textContent = '0'; sys3Sub.textContent = 'sent'; sys3Node.className = 'sys';
 
-        addRow('note', '⚡', 'Initializing E-Commerce Checkout Saga...', withSaga ? '+ agent-saga active' : 'Raw AI Agent');
+        addRow('note', '⚡', 'Initializing E-Commerce Checkout Saga...', withSaga ? '+ agent-saga v0.1.7 active' : 'Raw AI Agent');
         await wait(400);
 
         sys1Val.textContent = '$499.00'; sys1Sub.textContent = 'ch_9f2c charged'; sys1Node.className = 'sys dirty';
@@ -485,7 +595,7 @@
 
         if (!withSaga) {
           verdict.className = 'verdict bad';
-          verdict.innerHTML = '<span class="chip">CRITICAL FAILURE</span><span>Raw AI agent crashed! Customer was charged <b>$499.00</b> and DB account stranded in provisioning. No automatic rollback occurred!</span>';
+          verdict.innerHTML = '<span class="chip">CRITICAL FAILURE</span><span>Raw AI agent crashed! Customer charged <b>$499.00</b> and DB account stranded in provisioning. No automatic rollback occurred!</span>';
           verdict.hidden = false;
         } else {
           addRow('undo', '↺', '<b>postgres.delete_row</b> &nbsp;account removed', 'LIFO auto-revert');
@@ -503,7 +613,7 @@
         sys2Name.textContent = 'Dosage Gate'; sys2Val.textContent = '0.1-50mg'; sys2Sub.textContent = 'safe range'; sys2Node.className = 'sys';
         sys3Name.textContent = 'Pharmacy Dispense'; sys3Val.textContent = 'Idle'; sys3Sub.textContent = 'no order'; sys3Node.className = 'sys';
 
-        addRow('note', '⚡', 'Initializing Medical Examination Agent...', withSaga ? '+ agent-saga active' : 'Raw AI Agent');
+        addRow('note', '⚡', 'Initializing Medical Examination Agent...', withSaga ? '+ agent-saga v0.1.7 active' : 'Raw AI Agent');
         await wait(400);
 
         addRow('ok', '✓', '<b>patient.read_history</b> &nbsp;history loaded', 'read-only');
@@ -531,7 +641,7 @@
         sys2Name.textContent = 'Boundary Range'; sys2Val.textContent = 'Pending'; sys2Sub.textContent = 'Pass 2'; sys2Node.className = 'sys';
         sys3Name.textContent = 'Ledger Consistency'; sys3Val.textContent = 'Pending'; sys3Sub.textContent = 'Pass 3'; sys3Node.className = 'sys';
 
-        addRow('note', '⚡', 'Initializing FinTech $250,000 Wire Transfer...', withSaga ? '+ agent-saga active' : 'Raw AI Agent');
+        addRow('note', '⚡', 'Initializing FinTech $250,000 Wire Transfer...', withSaga ? '+ agent-saga v0.1.7 active' : 'Raw AI Agent');
         await wait(400);
 
         if (!withSaga) {
@@ -553,6 +663,66 @@
 
           verdict.className = 'verdict good';
           verdict.innerHTML = '<span class="chip">3/3 CONSENSUS</span><span><b>Triple Redundant Verifier</b> granted unanimous consensus! $250,000 wire executed with 100% tamper-evident audit log.</span>';
+          verdict.hidden = false;
+        }
+      } else if (mode === 'aerospace') {
+        sys1Name.textContent = 'Telemetry Jitter'; sys1Val.textContent = 'Normal'; sys1Sub.textContent = '12ms'; sys1Node.className = 'sys';
+        sys2Name.textContent = 'Response Entropy'; sys2Val.textContent = '0.12'; sys2Sub.textContent = 'low entropy'; sys2Node.className = 'sys';
+        sys3Name.textContent = 'Thruster Actuator'; sys3Val.textContent = 'ARMED'; sys3Sub.textContent = 'ready'; sys3Node.className = 'sys';
+
+        addRow('note', '⚡', 'Initializing Aerospace Flight Telemetry Control...', withSaga ? '+ agent-saga v0.1.7 active' : 'Raw AI Agent');
+        await wait(400);
+
+        if (!withSaga) {
+          sys3Val.textContent = 'FIRED!'; sys3Sub.textContent = 'CRASH!'; sys3Node.className = 'sys dirty';
+          addRow('fail', '✗', '<b>actuator.fire</b> &nbsp;Fired thruster during latency spike', 'SYSTEM DESTROYED');
+          verdict.className = 'verdict bad';
+          verdict.innerHTML = '<span class="chip">CATASTROPHIC FAILURE</span><span>Raw AI agent ignored network latency jitter & output entropy spike, firing thruster into invalid flight angle!</span>';
+          verdict.hidden = false;
+        } else {
+          sys1Val.textContent = 'SPIKE (4800ms)'; sys1Node.className = 'sys dirty';
+          sys2Val.textContent = 'ENTROPY (0.92)'; sys2Node.className = 'sys dirty';
+          addRow('fail', '✗', '<b>PredictiveSentinel</b> &nbsp;Risk 0.92 >= 0.85 threshold', 'PRE-EMPTIVE GATE TRIP');
+          await wait(400);
+          sys3Val.textContent = 'LOCKED SAFE'; sys3Sub.textContent = 'prevented ignition'; sys3Node.className = 'sys clean';
+          addRow('ok', '✓', '<b>Actuator Lock</b> &nbsp;Thruster firing pre-emptively blocked', 'Flight Safe');
+
+          verdict.className = 'verdict good';
+          verdict.innerHTML = '<span class="chip">PRE-EMPTIVE SAFETY</span><span><b>Predictive Chaos Sentinel</b> detected latency jitter & entropy spike, locking thruster actuators <i>before</i> a failure cascade could occur!</span>';
+          verdict.hidden = false;
+        }
+      } else if (mode === 'devops') {
+        sys1Name.textContent = 'K8s Cluster'; sys1Val.textContent = 'Running'; sys1Sub.textContent = 'Pod: api-prod'; sys1Node.className = 'sys';
+        sys2Name.textContent = 'VPC Subnet'; sys2Val.textContent = '10.0.1.0/24'; sys2Sub.textContent = 'active'; sys2Node.className = 'sys';
+        sys3Name.textContent = 'DNS Record'; sys3Val.textContent = 'api.acme.com'; sys3Sub.textContent = 'routed'; sys3Node.className = 'sys';
+
+        addRow('note', '⚡', 'Initializing Cloud DevOps Infrastructure Provisioning...', withSaga ? '+ agent-saga v0.1.7 active' : 'Raw AI Agent');
+        await wait(400);
+
+        sys2Val.textContent = 'Modified'; sys2Node.className = 'sys dirty';
+        addRow('ok', '✓', '<b>aws.create_subnet</b> &nbsp;10.0.1.0/24 created', 'inverse: delete_subnet');
+        await wait(400);
+
+        sys1Val.textContent = 'Deploying'; sys1Node.className = 'sys dirty';
+        addRow('ok', '✓', '<b>k8s.deploy_pod</b> &nbsp;api-prod container started', 'inverse: delete_pod');
+        await wait(400);
+
+        addRow('fail', '✗', '<b>dns.update_record</b> &nbsp;Cloudflare API key expired', 'PROVISIONING BROKEN');
+        await wait(400);
+
+        if (!withSaga) {
+          verdict.className = 'verdict bad';
+          verdict.innerHTML = '<span class="chip">STRANDED RESOUCES</span><span>Raw AI agent failed on DNS step, leaving orphaned VPC subnets and dangling K8s pods incurring cloud billing costs!</span>';
+          verdict.hidden = false;
+        } else {
+          addRow('undo', '↺', '<b>k8s.delete_pod</b> &nbsp;api-prod container terminated', 'LIFO auto-revert');
+          sys1Val.textContent = 'Terminated'; sys1Node.className = 'sys clean';
+          await wait(400);
+          addRow('undo', '↺', '<b>aws.delete_subnet</b> &nbsp;VPC subnet un-provisioned', 'LIFO auto-revert');
+          sys2Val.textContent = 'Unprovisioned'; sys2Node.className = 'sys clean';
+          
+          verdict.className = 'verdict good';
+          verdict.innerHTML = '<span class="chip">INFRASTRUCTURE CLEAN</span><span><b>agent-saga</b> unwound dangling VPC subnets & pods in exact LIFO order. Zero stranded cloud resources or rogue billing costs!</span>';
           verdict.hidden = false;
         }
       }
