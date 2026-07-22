@@ -85,3 +85,12 @@ def test_cli_replay_command(tmp_path):
     args = argparse.Namespace(wal_path=str(wal_file), saga_id="saga_test_99")
     ret = _cmd_replay(args)
     assert ret == 0
+
+
+def test_link_llm_trace():
+    from agent_saga.observability import link_llm_trace
+    res = link_llm_trace(saga_id="saga_123", trace_id="tr_456", prompt_context="Refactor stripe billing")
+    assert res["saga.id"] == "saga_123"
+    assert res["saga.llm_trace_id"] == "tr_456"
+    assert res["saga.prompt_context"] == "Refactor stripe billing"
+

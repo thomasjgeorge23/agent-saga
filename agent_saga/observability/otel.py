@@ -161,11 +161,31 @@ def rollback_span_name(tool: str) -> str:
     return f"{SPAN_ROLLBACK_PREFIX}{tool}"
 
 
+def link_llm_trace(saga_id: str, trace_id: str, prompt_context: Optional[str] = None, hallucination_score: float = 0.0) -> dict[str, Any]:
+    """Binds an LLM prompt trace (LangSmith, Phoenix, OpenTelemetry) directly to a Saga UUID.
+
+    When a transaction fails or rolls back, this association exposes the exact
+    hallucinated prompt that triggered the failure.
+    """
+    payload = {
+        ATTR_SAGA_ID: saga_id,
+        "saga.llm_trace_id": trace_id,
+        "saga.prompt_context": prompt_context or "",
+        "saga.hallucination_score": hallucination_score,
+    }
+    tracer = get_tracer()
+    if getattr(tracer, "enabled", False):
+        tracer.span("saga.llm_trace", attributes=payload)
+    logger.info("Linked Saga %s to LLM Trace %s (prompt: %s)", saga_id[:12], trace_id, (prompt_context or "")[:40])
+    return payload
+
+
 __all__ = [
     "SagaTracer", "NoOpTracer", "setup_telemetry", "disable_telemetry",
-    "get_tracer", "step_span_name", "rollback_span_name",
+    "get_tracer", "step_span_name", "rollback_span_name", "link_llm_trace",
     "SPAN_SAGA", "SPAN_STEP_PREFIX", "SPAN_ROLLBACK_PREFIX",
     "ATTR_SAGA_ID", "ATTR_SAGA_STATUS", "ATTR_STEP_ID", "ATTR_IS_COMPENSATION",
     "ATTR_SEMANTICS", "ATTR_TOOL",
     "STATUS_COMPLETED", "STATUS_ROLLED_BACK", "STATUS_FAILED",
 ]
+

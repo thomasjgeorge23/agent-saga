@@ -183,13 +183,15 @@ __all__ = [
     "step_scope",
     "current_correlation",
     "LOGGER_NAME",
+    "link_llm_trace",
 ]
 
 
 def __getattr__(name):
     """Expose the OTel surface without importing opentelemetry at import time."""
-    if name in ("SagaTracer", "setup_telemetry", "get_tracer", "NoOpTracer"):
+    if name in ("SagaTracer", "setup_telemetry", "get_tracer", "NoOpTracer", "link_llm_trace"):
         from . import otel
 
         return getattr(otel, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
