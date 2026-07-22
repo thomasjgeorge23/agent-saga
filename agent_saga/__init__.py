@@ -188,8 +188,13 @@ from .locks import AutoLockHeartbeat
 from .streaming import IncrementalCompensationTracker, streaming_step
 from .observability.otlp import OTLPExporter
 from .feedback import SelfHealingPromptFeedback
+from .scheduler import DurableTimerManager, CronSagaScheduler
+from .signals import SignalBus, QueryBus, get_signal_bus, get_query_bus
+from .orchestrator import ChildSaga, ParallelSagaGroup
+from .bpmn import BPMNExporter, BPMNImporter, BPMNNode
+from .determinism import ReplayVerifier, verify_replay_determinism, DeterminismResult
 
-__version__ = "0.1.9"
+__version__ = "0.2.0"
 __author__ = "SagaOps"
 
 __all__ = [
@@ -201,6 +206,20 @@ __all__ = [
     "streaming_step",
     "OTLPExporter",
     "SelfHealingPromptFeedback",
+    "DurableTimerManager",
+    "CronSagaScheduler",
+    "SignalBus",
+    "QueryBus",
+    "get_signal_bus",
+    "get_query_bus",
+    "ChildSaga",
+    "ParallelSagaGroup",
+    "BPMNExporter",
+    "BPMNImporter",
+    "BPMNNode",
+    "ReplayVerifier",
+    "verify_replay_determinism",
+    "DeterminismResult",
     "ActionSemantics",
     "AsyncWAL",
     "BackpressurePolicy",

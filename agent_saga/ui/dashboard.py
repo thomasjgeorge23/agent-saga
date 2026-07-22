@@ -53,7 +53,7 @@ def get_saga_ui_app(
             return handle()
         return lightweight_asgi
 
-    app = FastAPI(title="agent-saga UI Dashboard", version="0.1.9")
+    app = FastAPI(title="agent-saga UI Dashboard", version="0.2.0")
     reader = SagaWALReader(wal_path) if wal_path else None
 
     @app.get("/", response_class=HTMLResponse)
@@ -74,6 +74,13 @@ def get_saga_ui_app(
         if reader:
             return reader.list_sagas()
         return []
+
+    @app.get("/api/bpmn")
+    async def export_bpmn():
+        from ..bpmn import BPMNExporter
+        records = reader.list_sagas() if reader else []
+        xml_str = BPMNExporter.to_bpmn_xml(records)
+        return HTMLResponse(content=xml_str, media_type="application/xml")
 
     @app.get("/api/approvals")
     async def list_approvals():

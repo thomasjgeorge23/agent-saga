@@ -230,6 +230,24 @@ class SagaContext:
                     "target": "COMMITTED" if committed else "ROLLED_BACK",
                     "error": repr(exc)})
 
+    async def continue_as_new(self, new_saga_id: Optional[str] = None) -> SagaContext:
+        """Truncate event history for long-running / infinite sagas while preserving state.
+
+        Matches Temporal's `continue_as_new()` and Camunda Subprocess resets, allowing
+        agents with 10,000+ steps to restart event history cleanly.
+        """
+        old_id = self.saga_id
+        next_id = new_saga_id or f"{old_id}-continued"
+        self.wal.append("SAGA_CONTINUED_AS_NEW", {
+            "old_saga_id": old_id,
+            "new_saga_id": next_id,
+            "retained_steps": len(self.stack),
+        })
+        await self.wal.barrier()
+        new_ctx = SagaContext(saga_id=next_id, wal=self.wal)
+        new_ctx.stack = list(self.stack)
+        return new_ctx
+
     # -- lease -------------------------------------------------------------
     # The recovery daemon must distinguish "this saga is still running" from
     # "this saga's process is gone". A renewed lease is the only honest signal;

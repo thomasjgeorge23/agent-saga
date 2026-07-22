@@ -337,6 +337,21 @@ def dynamic_risk_rule(name: str, risk_evaluator: DynamicRiskEvaluator, reason: s
     return Rule(name=name, when=_predicate, verdict=Verdict.REQUIRE_APPROVAL, reason=reason)
 
 
+_DEFAULT_GATE: Optional[PreFlightGate] = None
+
+
+def get_gate() -> PreFlightGate:
+    global _DEFAULT_GATE
+    if _DEFAULT_GATE is None:
+        _DEFAULT_GATE = PreFlightGate()
+    return _DEFAULT_GATE
+
+
+def set_gate(gate: PreFlightGate) -> None:
+    global _DEFAULT_GATE
+    _DEFAULT_GATE = gate
+
+
 __all__ = [
     "PreFlightGate",
     "PreFlightViolation",
@@ -350,5 +365,7 @@ __all__ = [
     "DEFAULT_RULES",
     "DynamicRiskEvaluator",
     "dynamic_risk_rule",
+    "get_gate",
+    "set_gate",
 ]
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v0.1.9 — Supreme Transactional Reliability & Observability Engine for AI Agents</title>
+<title>agent-saga v0.2.0 — Supreme Transactional Reliability & Observability Engine for AI Agents</title>
 <meta name="description" content="Mission-critical transactional reliability, 99.999% anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, expanded connectors, and zero-configuration auto-rollback infrastructure for autonomous AI agents." />
 <style>
   :root {
@@ -224,7 +224,7 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top">agent-saga <span class="seq">v0.1.9</span></a>
+    <a class="brand" href="#top">agent-saga <span class="seq">v0.2.0</span></a>
     <nav class="nav-links">
       <a href="#categories">Industries</a>
       <a href="#sandbox">Live Input Sandbox</a>
@@ -241,11 +241,11 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">⚡ Supreme AI Reliability Infrastructure · PyPI v0.1.9</p>
+        <p class="eyebrow">⚡ Supreme AI Reliability Infrastructure · PyPI v0.2.0</p>
         <h1>The supreme transactional engine for <span class="amber">autonomous AI agents</span>.</h1>
         <p class="lede">
           From hobby builders and indie coders to high-precision medical examination, banking settlements, and flight control — 
-          <b>agent-saga v0.1.9</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, GitHub/AWS/Slack connectors, and automatic LIFO rollbacks.
+          <b>agent-saga v0.2.0</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, GitHub/AWS/Slack connectors, and automatic LIFO rollbacks.
         </p>
         <div class="install">
           <span class="prompt">$</span><code>pip install agent-saga</code>
@@ -261,7 +261,7 @@
       <div>
         <div class="wal">
           <div class="wal-bar">
-            <span class="dot"></span><span>Write-Ahead Log (WAL v0.1.9)</span>
+            <span class="dot"></span><span>Write-Ahead Log (WAL v0.2.0)</span>
             <span class="fn">SAGA_LIVE · 99.999% Grounded</span>
           </div>
           <div class="wal-body">
@@ -340,7 +340,7 @@
         <!-- MODE BANNER -->
         <div class="mode-banner">
           <div class="mode-banner-text" id="bannerText">
-            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.1.9 Active Protection)</span>
+            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.2.0 Active Protection)</span>
           </div>
           <div style="color: var(--dim); font-size: .8rem;">Toggle OFF to test Raw AI Failure Mode</div>
         </div>
@@ -369,7 +369,7 @@
           <!-- Real-Time Output Console -->
           <div class="output-console">
             <div class="console-header">
-              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.1.9)</span>
+              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.2.0)</span>
               <span id="consoleStatus">READY</span>
             </div>
             <div id="consoleBody" style="display: flex; flex-direction: column; gap: .65rem;">
@@ -479,7 +479,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 <footer>
   <div class="wrap foot-grid">
     <div>
-      <div class="brand">agent-saga <span class="seq">v0.1.9</span></div>
+      <div class="brand">agent-saga <span class="seq">v0.2.0</span></div>
       <p style="font-size: .88rem; color: var(--faint); margin-top: .4rem;">
         Licensed under Apache-2.0. Built for mission-critical enterprise AI agent reliability.
       </p>
@@ -487,7 +487,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
     <div style="margin-left: auto; display: flex; gap: 1.8rem; font-size: .95rem;">
       <a href="#install">Documentation</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">GitHub</a>
-      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.1.9</a>
+      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.2.0</a>
     </div>
   </div>
 </footer>
@@ -651,7 +651,7 @@ request = store.create(my_approval_request)`
 
     if (protectionActive) {
       label.textContent = "PROTECTION: ON (+ agent-saga)";
-      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.1.9 Active Protection)</span>';
+      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.2.0 Active Protection)</span>';
     } else {
       label.textContent = "PROTECTION: OFF (Raw AI Agent)";
       banner.innerHTML = '<span style="color: var(--irreversible);">● MODE: BEFORE (Raw AI Agent - Unprotected Failure Mode)</span>';
@@ -762,7 +762,7 @@ request = store.create(my_approval_request)`
       var drug = document.getElementById('inputDrug').value;
       var dosage = parseFloat(document.getElementById('inputDosage').value) || 0;
 
-      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.1.9 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>patient.read_records</b> &nbsp;Selected ${drug}`, 'read-only');
@@ -795,7 +795,7 @@ request = store.create(my_approval_request)`
       var iban = document.getElementById('inputIban').value;
       var amount = parseFloat(document.getElementById('inputAmount').value) || 0;
 
-      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.1.9 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (!protectionActive) {
@@ -821,7 +821,7 @@ request = store.create(my_approval_request)`
       var prTitle = document.getElementById('inputPR').value;
       var testRes = document.getElementById('inputTestResult').value;
 
-      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.1.9 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>github.create_pr</b> &nbsp;PR #101 (${prTitle}) created`, 'inverse: close_pr');
@@ -852,7 +852,7 @@ request = store.create(my_approval_request)`
       var channel = document.getElementById('inputChannel').value;
       var msgText = document.getElementById('inputMsg').value;
 
-      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.1.9 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>slack.post_message</b> &nbsp;"${msgText}"`, 'inverse: delete_message');
@@ -874,7 +874,7 @@ request = store.create(my_approval_request)`
       var robot = document.getElementById('inputRobot').value;
       var angle = parseFloat(document.getElementById('inputAngle').value) || 0;
 
-      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.1.9 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (angle > 180.0) {
