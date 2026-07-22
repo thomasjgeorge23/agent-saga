@@ -298,6 +298,50 @@ def _cmd_quarantine(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_reconcile(args: argparse.Namespace) -> int:
+    """Ask the external systems whether the log is telling the truth.
+
+    Exit codes are the product: 0 clean, 1 drift, 3 nothing could be verified.
+    Drift and "we could not check" are different problems needing different
+    people, so they do not share an exit code.
+    """
+    import asyncio
+
+    from .reconcile import Reconciliation
+
+    for module in args.imports or []:
+        __import__(module)          # registers @reconciler handlers
+
+    try:
+        records = _read_wal(args.wal_path)
+    except OSError as exc:
+        print(f"cannot read {args.wal_path}: {exc}")
+        return 2
+
+    report = asyncio.run(Reconciliation().run(records))
+    print(f"{args.wal_path}: {report.summary()}")
+
+    if report.drift:
+        print("\nDRIFT -- the system disagrees with the log:\n")
+        for finding in report.drift:
+            print(f"  - {finding}")
+    if report.unverifiable and args.verbose:
+        print("\nUnverifiable:\n")
+        for finding in report.unverifiable:
+            print(f"  - {finding}")
+    elif report.unverifiable:
+        handlers = sorted({f.handler for f in report.unverifiable})
+        print(f"\n{len(report.unverifiable)} effect(s) could not be verified "
+              f"(handlers: {', '.join(handlers)}). Register a @reconciler for "
+              f"them, or pass --verbose. These are asserted by the log alone.")
+
+    if report.drift:
+        return 1
+    if report.checked and not report.confirmed:
+        return 3
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="agent-saga", description="agent-saga tooling")
     sub = p.add_subparsers(dest="command", required=True)
@@ -405,6 +449,20 @@ def build_parser() -> argparse.ArgumentParser:
     quar.add_argument("--by", default="")
     quar.add_argument("--release", action="store_true", help="un-quarantine it")
     quar.set_defaults(func=_cmd_quarantine)
+
+    rec = sub.add_parser(
+        "reconcile",
+        help="ask the external systems whether the log is telling the truth")
+    rec.add_argument("--wal-path", default="./agent-saga.wal",
+                     help="path to the WAL file (default: ./agent-saga.wal)")
+    rec.add_argument("--import", dest="imports", action="append", default=[],
+                     metavar="MODULE",
+                     help="import a module so its @reconciler handlers register; "
+                          "repeatable. Without these, every effect is "
+                          "unverifiable by definition.")
+    rec.add_argument("--verbose", action="store_true",
+                     help="list every unverifiable effect, not just a count")
+    rec.set_defaults(func=_cmd_reconcile)
     return p
 
 

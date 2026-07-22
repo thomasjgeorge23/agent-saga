@@ -273,6 +273,55 @@ async def checkout():
 
 During shutdown, the lifespan manager gracefully cancels the recovery daemon, awaits any pending compensations for active sagas, releases held semantic locks, and flushes the write-ahead log.
 
+## Reconciliation
+
+Every other guarantee here ends at an API response. The refund returned 200, so
+the WAL says `COMPENSATED`, so the rollback report says clean. A bank does not
+accept that chain, and it's right not to — a 200 is an acknowledgement, not a
+fact about the ledger. It can come from an idempotency key that matched a
+*different* operation, a write that was later voided, a call that reached the
+wrong tenant, or a queue that accepted the work and dropped it.
+
+So this pass ignores what the log says and asks the external system what's true.
+
+```python
+from agent_saga import reconciler, Observation
+
+@reconciler("stripe.refund")            # same name as @compensator("stripe.refund")
+async def observe_refund(*, charge_id, credential_ref=None, **kw):
+    charge = await stripe.Charge.retrieve(charge_id)
+    return Observation(reversed_=charge.refunded, exists=True,
+                       detail=charge.status, amount=charge.amount)
+```
+
+```bash
+agent-saga reconcile --wal-path ./agent-saga.wal --import myapp.reconcilers
+# exit 0 clean · 1 drift · 3 nothing could be verified
+```
+
+**It also resolves `UNKNOWN`** — the hardest state in the engine. A timed-out
+`POST` to Stripe may well have charged the card, and no amount of in-process
+reasoning can settle it; asking the card network is the only way. That's the
+case worth the whole module:
+
+> `[DRIFT] stripe.charge: timed-out step DID land and is still standing — it was
+> never compensated (amount=4200)`
+
+**Unverifiable is never counted as confirmed.** If no `@reconciler` is
+registered, or the system couldn't tell us, or the check timed out, the effect is
+reported as unverifiable and the run is *not* clean. A reconciliation report that
+quietly folds "couldn't check" into "fine" is worse than no report — it's the one
+that gets shown to an auditor.
+
+`Observation` is deliberately tri-state (`True` / `False` / `None`) rather than
+boolean, so "I don't know" survives instead of being forced into a claim.
+
+Run it as a separate, later pass — not inline. Payment and CRM APIs are
+eventually consistent, so reading back immediately after a write reports drift
+that's merely latency, and a control that cries wolf gets muted.
+
+---
+
 ## Kill switch and quarantine
 
 The first question in an incident is *"how do I make it stop"*, and nothing else

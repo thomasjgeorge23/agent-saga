@@ -52,6 +52,13 @@ from .integrity import (
     redact_where,
 )
 from .integrity import verify as verify_chain
+from .reconcile import (
+    Finding,
+    Observation,
+    ReconcileReport,
+    Reconciliation,
+    reconciler,
+)
 from .killswitch import (
     FileSwitchStore,
     Halted,
@@ -180,6 +187,11 @@ __all__ = [
     "arg_exceeds",
     "tool_is",
     "verify_chain",
+    "reconciler",
+    "Reconciliation",
+    "Observation",
+    "ReconcileReport",
+    "Finding",
     "KillSwitch",
     "Halted",
     "FileSwitchStore",
