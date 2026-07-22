@@ -182,11 +182,25 @@ from .wal import (
 )
 from .serialization import SagaJSONEncoder, dumps as saga_dumps, loads as saga_loads
 from .frameworks import saga_lifespan
+from .config import SagaEngine, SagaConfig
+from .encryption import KeyRingEncryptor
+from .locks import AutoLockHeartbeat
+from .streaming import IncrementalCompensationTracker, streaming_step
+from .observability.otlp import OTLPExporter
+from .feedback import SelfHealingPromptFeedback
 
-__version__ = "0.1.8"
+__version__ = "0.1.9"
 __author__ = "SagaOps"
 
 __all__ = [
+    "SagaEngine",
+    "SagaConfig",
+    "KeyRingEncryptor",
+    "AutoLockHeartbeat",
+    "IncrementalCompensationTracker",
+    "streaming_step",
+    "OTLPExporter",
+    "SelfHealingPromptFeedback",
     "ActionSemantics",
     "AsyncWAL",
     "BackpressurePolicy",

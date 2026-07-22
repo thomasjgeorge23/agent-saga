@@ -77,6 +77,22 @@ class FernetEncryptor:
         return self._fernet.decrypt(token)
 
 
+class KeyRingEncryptor(FernetEncryptor):
+    """Explicit Key Ring for key rotation.
+
+    Uses `primary_key` to encrypt new WAL records, and falls back to
+    `fallback_keys` (old keys) when decrypting historical records.
+    """
+
+    def __init__(self, primary_key: str | bytes, fallback_keys: Optional[list[str | bytes]] = None):
+        keys: list[str | bytes] = [primary_key]
+        if fallback_keys:
+            keys.extend(fallback_keys)
+        super().__init__(key=keys)
+        self.primary_key = primary_key
+        self.fallback_keys = fallback_keys or []
+
+
 def generate_key() -> str:
     """A fresh Fernet key, urlsafe-base64. Store it in your secret manager and
     hand it back via AGENT_SAGA_WAL_KEY or set_wal_encryptor -- losing it means
@@ -153,6 +169,7 @@ def is_encrypted_line(line: str) -> bool:
 __all__ = [
     "WALEncryptor",
     "FernetEncryptor",
+    "KeyRingEncryptor",
     "EncryptedRecordError",
     "generate_key",
     "set_wal_encryptor",

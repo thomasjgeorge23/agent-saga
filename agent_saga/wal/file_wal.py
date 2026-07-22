@@ -110,7 +110,10 @@ class FileWAL(BufferedWAL):
 
     async def _close_sink(self) -> None:
         if self._fh:
-            self._fh.close()
+            try:
+                self._fh.close()
+            except Exception:
+                pass
             self._fh = None
         if self._flush_pool is not None:
             # The flush task has already finished, so nothing is queued; this
@@ -168,25 +171,6 @@ class FileWAL(BufferedWAL):
         return self.records()
 
     async def compact(self, *, keep_saga_ids: set) -> int:
-        """Rewrite the log keeping only records for the given sagas.
-
-        The default backend grew without bound: a single node running for months
-        accumulates every saga it ever ran, and the recovery daemon reads the
-        whole file on every sweep. That is the same flaw the Redis backend was
-        hardened against, on the backend most people actually run.
-
-        A file can be filtered properly rather than only trimmed from the head,
-        so this reclaims every resolved saga, not just a leading run.
-
-        Safety:
-          * the io lock is held, so no flush can be writing while the file is
-            swapped underneath it;
-          * survivors are written to a temp file, fsynced, then os.replace'd --
-            atomic on POSIX and Windows, so a crash mid-compaction leaves either
-            the old complete log or the new one, never a truncated hybrid;
-          * appends during compaction land in the in-memory buffer (append() never
-            touches the file) and are flushed to the new file afterwards.
-        """
         from ..encryption import encode_line
 
         if self.path is None:
@@ -204,24 +188,20 @@ class FileWAL(BufferedWAL):
         if self._fh is not None:
             self._fh.flush()
             _os.fsync(self._fh.fileno())
+            self._fh.close()
+            self._fh = None
 
         from ..integrity import GAP_EVENT
 
         records = self.records()
-        # Attestations are log metadata, not saga records, and must outlive the
-        # sagas they describe: a later compaction that dropped them would erase
-        # the proof that an earlier deletion was legitimate housekeeping, and
-        # the gap it explains would start reading as tampering.
         survivors = [r for r in records
                      if r.get("saga_id") in keep_saga_ids or r.get("event") == GAP_EVENT]
         removed = len(records) - len(survivors)
         if removed <= 0:
+            if self.path and self.path.exists():
+                self._fh = open(self.path, "a", encoding="utf-8")
             return 0
 
-        # Housekeeping that deletes records must say so, or a verifier cannot
-        # tell it from an attacker erasing the record of a charge -- both look
-        # like missing sequence numbers. Appended (not spliced in at the gap),
-        # so it chains from the current head without re-hashing anything.
         if self.chain:
             from ..integrity import digest_of, gap_attestation
 
@@ -239,10 +219,6 @@ class FileWAL(BufferedWAL):
             fh.flush()
             _os.fsync(fh.fileno())
 
-        # Close before replacing: Windows refuses to rename over an open handle.
-        if self._fh is not None:
-            self._fh.close()
-            self._fh = None
         try:
             _os.replace(tmp, self.path)
         except Exception:

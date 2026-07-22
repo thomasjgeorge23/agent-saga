@@ -497,7 +497,46 @@ def set_semantic_locks(manager: SemanticLockManager) -> None:
     _SEMANTIC_LOCKS = manager
 
 
+class AutoLockHeartbeat:
+    """Async context manager that automatically renews semantic lock lease
+    during prolonged operations (e.g. 40s+ LLM token streaming or reasoning)."""
+
+    def __init__(self, resource_id: str, saga_id: str, manager: Optional[Any] = None, interval: float = 5.0):
+        self.resource_id = resource_id
+        self.saga_id = saga_id
+        self.manager = manager or get_semantic_locks()
+        self.interval = interval
+        self._task: Optional[asyncio.Task] = None
+
+    async def __aenter__(self):
+        self._task = asyncio.create_task(self._renew_loop())
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+    async def _renew_loop(self):
+        try:
+            while True:
+                await asyncio.sleep(self.interval)
+                renew = getattr(self.manager, "renew", None)
+                if renew:
+                    if asyncio.iscoroutinefunction(renew):
+                        await renew(self.resource_id, self.saga_id, self.interval * 3)
+                    else:
+                        renew(self.resource_id, self.saga_id, self.interval * 3)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+
+
 __all__ = ["RecoveryLock", "FileLock", "InProcessLock",
            "SemanticLockManager", "RedisSemanticLocks",
            "SemanticLockConflictError", "LockAcquisitionTimeoutError",
-           "get_semantic_locks", "set_semantic_locks"]
+           "get_semantic_locks", "set_semantic_locks", "AutoLockHeartbeat"]

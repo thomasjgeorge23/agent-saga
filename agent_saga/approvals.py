@@ -643,10 +643,26 @@ class PostgresApprovalStore:
         return [r for r in self._memory_backup.values() if not r.decided]
 
 
+_APPROVAL_STORE: Any = None
+
+
+def get_approval_store(store_path: str = "./approvals.json") -> ApprovalStore:
+    global _APPROVAL_STORE
+    if _APPROVAL_STORE is None:
+        _APPROVAL_STORE = FileApprovalStore(store_path)
+    return _APPROVAL_STORE
+
+
+def set_approval_store(store: ApprovalStore) -> None:
+    global _APPROVAL_STORE
+    _APPROVAL_STORE = store
+
+
 __all__ = [
     "ApprovalRequest", "ApprovalStore", "FileApprovalStore", "RedisApprovalStore", "PostgresApprovalStore",
     "ApprovalGateway", "ApprovalPolicy", "EscalationLevel",
     "Notifier", "ConsoleNotifier", "WebhookNotifier", "slack_payload",
     "request_id", "PENDING", "GRANTED", "DENIED", "EXPIRED",
+    "get_approval_store", "set_approval_store",
 ]
 
