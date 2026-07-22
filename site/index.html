@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v0.1.7 — Supreme Transactional Reliability & Anti-Hallucination Engine for AI Agents</title>
-<meta name="description" content="Mission-critical transactional reliability, 99.999% anti-hallucination reality anchors, and zero-configuration auto-rollback infrastructure for autonomous AI agents across Banking, Healthcare, Aerospace, and Enterprise SaaS." />
+<title>agent-saga v0.1.7 — Supreme Transactional Reliability Engine for AI Agents</title>
+<meta name="description" content="Mission-critical transactional reliability, 99.999% anti-hallucination reality anchors, and zero-configuration auto-rollback infrastructure for autonomous AI agents across Hobbyists, Developers, Banking, Healthcare, Aerospace, and Enterprise SaaS." />
 <style>
   :root {
     --bg: #070c16; --panel: #0f172a; --elev: #1e293b;
@@ -34,13 +34,12 @@
     overflow-x: hidden;
   }
   
-  /* Canvas Background */
   #heroCanvas {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    pointer-events: none; opacity: 0.4; z-index: 0;
+    pointer-events: none; opacity: 0.45; z-index: 0;
   }
 
-  .wrap { width: min(1280px, 92vw); margin-inline: auto; position: relative; z-index: 1; }
+  .wrap { width: min(1320px, 92vw); margin-inline: auto; position: relative; z-index: 1; }
   section { padding: clamp(4rem, 8vw, 7.5rem) 0; position: relative; }
   a { color: inherit; }
   ::selection { background: var(--accent); color: #070c16; }
@@ -50,12 +49,12 @@
     text-transform: uppercase; color: var(--accent); margin: 0 0 1rem;
     display: inline-flex; align-items: center; gap: .6rem; font-weight: 700;
     background: color-mix(in srgb, var(--accent) 12%, transparent);
-    padding: .3rem .8rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    padding: .3rem .85rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   }
   h1, h2, h3 { text-wrap: balance; line-height: 1.08; letter-spacing: -.03em; }
   h1 { font-size: clamp(2.6rem, 6vw, 4.5rem); font-weight: 900; margin: 0 0 1.2rem; }
-  h2 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 850; margin: 0 0 1.1rem; }
-  .lede { color: var(--dim); font-size: clamp(1.1rem, 1.8vw, 1.28rem); max-width: 68ch; }
+  h2 { font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 850; margin: 0 0 1.1rem; }
+  .lede { color: var(--dim); font-size: clamp(1.1rem, 1.8vw, 1.28rem); max-width: 72ch; }
 
   /* Nav */
   header.nav {
@@ -63,9 +62,9 @@
     background: color-mix(in srgb, var(--bg) 85%, transparent);
     border-bottom: 1px solid var(--border);
   }
-  .nav-in { display: flex; align-items: center; gap: 1.5rem; height: 70px; }
+  .nav-in { display: flex; align-items: center; gap: 1.5rem; height: 72px; }
   .brand { display: flex; align-items: center; gap: .6rem; font-weight: 900;
-    letter-spacing: -.03em; font-size: 1.3rem; text-decoration: none; }
+    letter-spacing: -.03em; font-size: 1.35rem; text-decoration: none; }
   .brand .seq { font-family: var(--mono); font-weight: 700; font-size: .75rem;
     color: var(--accent); border: 1px solid var(--border-strong); border-radius: 6px;
     padding: .15rem .55rem; letter-spacing: .05em; background: var(--elev); }
@@ -150,27 +149,36 @@
   .tab-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
   .tab-btn.active { color: #070c16; background: var(--accent); border-color: var(--accent); }
 
+  /* COMPARISON MODE BANNER */
+  .mode-banner { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.8rem; background: color-mix(in srgb, var(--accent) 10%, var(--elev)); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: .88rem; }
+  .mode-banner-text { display: flex; align-items: center; gap: .6rem; font-weight: 700; }
+
   .sandbox-grid { display: grid; grid-template-columns: 1fr; }
-  @media (min-width: 960px) { .sandbox-grid { grid-template-columns: 420px 1fr; } }
+  @media (min-width: 980px) { .sandbox-grid { grid-template-columns: 440px 1fr; } }
   
   .input-panel { padding: 2rem; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 1.2rem; background: var(--panel); }
-  @media (min-width: 960px) { .input-panel { border-bottom: 0; border-right: 1px solid var(--border); } }
+  @media (min-width: 980px) { .input-panel { border-bottom: 0; border-right: 1px solid var(--border); } }
   
   .form-group { display: flex; flex-direction: column; gap: .4rem; }
   .form-group label { font-family: var(--mono); font-size: .78rem; color: var(--dim); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
   .form-group input, .form-group select, .form-group textarea {
     font-family: var(--mono); font-size: .9rem; background: var(--elev); color: var(--text);
-    border: 1px solid var(--border-strong); border-radius: 10px; padding: .65rem .9rem; outline: none; transition: border-color .15s ease;
+    border: 1px solid var(--border-strong); border-radius: 10px; padding: .68rem .95rem; outline: none; transition: border-color .15s ease;
   }
   .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
 
-  .toggle-row { display: flex; align-items: center; justify-content: space-between; background: var(--elev); padding: .8rem 1rem; border-radius: 12px; border: 1px solid var(--border); }
-  .toggle-title { font-family: var(--mono); font-size: .82rem; font-weight: 700; }
+  .toggle-box { display: flex; align-items: center; justify-content: space-between; background: var(--elev); padding: .9rem 1.2rem; border-radius: 14px; border: 1px solid var(--border-strong); }
+  .toggle-box-title { font-family: var(--mono); font-size: .85rem; font-weight: 800; }
 
-  .output-console { padding: 2rem; min-height: 420px; font-family: var(--mono); font-size: .86rem; display: flex; flex-direction: column; gap: .7rem; background: #050810; position: relative; }
+  .switch { width: 60px; height: 32px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--bg); position: relative; cursor: pointer; flex: 0 0 auto; transition: background .25s ease; }
+  .switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+  .switch .knob { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--text); transition: transform .25s ease; }
+  .switch[aria-checked="true"] .knob { transform: translateX(28px); background: #070c16; }
+
+  .output-console { padding: 2rem; min-height: 440px; font-family: var(--mono); font-size: .86rem; display: flex; flex-direction: column; gap: .75rem; background: #050810; position: relative; }
   .console-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: .8rem; margin-bottom: .5rem; color: var(--faint); font-size: .78rem; }
   
-  .tr { display: grid; grid-template-columns: 1.6rem 1fr auto; gap: .8rem; align-items: center; padding: .65rem .9rem; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); animation: fadeIn .25s ease both; }
+  .tr { display: grid; grid-template-columns: 1.6rem 1fr auto; gap: .8rem; align-items: center; padding: .65rem .95rem; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); animation: fadeIn .25s ease both; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
   .tr.ok .ic { color: var(--reversible); font-weight: bold; }
   .tr.fail { border-color: var(--irreversible); background: color-mix(in srgb, var(--irreversible) 12%, var(--panel)); }
@@ -236,7 +244,7 @@
         <p class="eyebrow">⚡ Supreme AI Reliability Infrastructure · PyPI v0.1.7</p>
         <h1>The supreme transactional engine for <span class="amber">autonomous AI agents</span>.</h1>
         <p class="lede">
-          When AI models execute real-world actions — database writes, Stripe charges, medical prescriptions, or financial transfers — they operate non-deterministically. 
+          From hobby builders and indie coders to high-precision medical examination, banking settlements, and flight control — 
           <b>agent-saga v0.1.7</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, zero-config auto-hooking, and automatic LIFO rollbacks.
         </p>
         <div class="install">
@@ -268,14 +276,28 @@
     </div>
   </section>
 
-  <!-- INDUSTRY CATEGORIES -->
+  <!-- INDUSTRY CATEGORIES (HOBBYIST TO HIGH PRECISE) -->
   <section id="categories">
     <div class="wrap">
-      <p class="eyebrow">Universal Domain Integration</p>
-      <h2>Built for where AI errors cannot be tolerated.</h2>
-      <p class="lede">From high-frequency banking to medical examination, flight control, and cloud infrastructure, agent-saga powers mission-critical reliability across all software fields.</p>
+      <p class="eyebrow">Universal Spectrum Coverage</p>
+      <h2>From Hobby Makers & Coders to High-Precision Aerospace.</h2>
+      <p class="lede">Whether building an indie side project, auto-refactoring code, executing $10M banking transfers, or diagnosing patient treatments, agent-saga powers mission-critical reliability everywhere.</p>
       
       <div class="category-grid">
+        <div class="cat-card">
+          <span class="cat-badge">Hobbyists & Makers</span>
+          <span class="cat-icon">🛠️</span>
+          <h3>IoT & Hardware Robotics</h3>
+          <p>Enforces hardware actuator angle limits and battery voltage bounds, preventing physical servo burnout or runaway robot motor commands.</p>
+        </div>
+
+        <div class="cat-card">
+          <span class="cat-badge">Coders & Software Engineers</span>
+          <span class="cat-icon">💻</span>
+          <h3>Autonomous Coding & Git Workflows</h3>
+          <p>Wraps AI refactoring and DB migrations in atomic transactions. If automated tests fail, un-installs broken packages and auto-reverts git commits LIFO.</p>
+        </div>
+
         <div class="cat-card">
           <span class="cat-badge">Banking & FinTech</span>
           <span class="cat-icon">🏦</span>
@@ -291,64 +313,67 @@
         </div>
 
         <div class="cat-card">
-          <span class="cat-badge">Aerospace & Robotics</span>
+          <span class="cat-badge">Aerospace & Defense</span>
           <span class="cat-icon">🚀</span>
-          <h3>Flight Control & Telemetry</h3>
+          <h3>Flight Telemetry & Actuators</h3>
           <p>Monitors telemetry data entropy and latency jitter using the Predictive Chaos Sentinel, pre-emptively tripping safety gates before actuator failure cascades occur.</p>
         </div>
 
         <div class="cat-card">
-          <span class="cat-badge">Enterprise SaaS</span>
-          <span class="cat-icon">💼</span>
-          <h3>Salesforce & DB Automation</h3>
-          <p>Automatically records field-level inverse patches for CRM updates and SQL writes, guaranteeing full LIFO state restoration if an agent task fails mid-run.</p>
-        </div>
-
-        <div class="cat-card">
-          <span class="cat-badge">Cloud DevOps</span>
-          <span class="cat-icon">☁️</span>
-          <h3>Kubernetes & Infrastructure</h3>
-          <p>Wraps cloud resource provisioning in atomic transaction boundaries. If a cluster node fails, all provisioned VMs, load balancers, and DNS entries are un-provisioned safely.</p>
-        </div>
-
-        <div class="cat-card">
-          <span class="cat-badge">E-Commerce & Logistics</span>
-          <span class="cat-icon">📦</span>
-          <h3>Inventory & Order Settlement</h3>
-          <p>Coordinates multi-agent inventory reservation, payment charging, and shipping API dispatches, ensuring zero stranded inventory or orphaned charges.</p>
+          <span class="cat-badge">Legal & Compliance</span>
+          <span class="cat-icon">⚖️</span>
+          <h3>Contract Archival & Audit Logs</h3>
+          <p>Provides tamper-evident SHA-256 hash-chained WORM logs for all agent actions, fulfilling strict SOC2, HIPAA, and PCI-DSS compliance audits out of the box.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- PRACTICAL CUSTOM INPUT SANDBOX CONSOLE -->
+  <!-- PRACTICAL CUSTOM INPUT SANDBOX CONSOLE WITH BEFORE/AFTER TOGGLE -->
   <section id="sandbox">
     <div class="wrap">
-      <p class="eyebrow">Interactive Input Console</p>
-      <h2>Practically test agent-saga with your own custom input data.</h2>
-      <p class="lede">Enter custom dosages, transfer amounts, or parameters below. Run the simulation to practically test how raw AI agents fail versus how agent-saga verifies and protects your system in real-time.</p>
+      <p class="eyebrow">Interactive Practical Playground</p>
+      <h2>Practically test your own input data: Before vs. After agent-saga.</h2>
+      <p class="lede">Type custom input parameters below. Use the prominent toggle switch to compare how raw AI models crash and corrupt data (BEFORE) versus how agent-saga verifies and auto-restores state (AFTER).</p>
 
       <div class="sandbox-shell">
+        <!-- MODE BANNER -->
+        <div class="mode-banner">
+          <div class="mode-banner-text" id="bannerText">
+            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.1.7 Active Protection)</span>
+          </div>
+          <div style="color: var(--dim); font-size: .8rem;">Toggle OFF to test Raw AI Failure Mode</div>
+        </div>
+
         <div class="sandbox-nav">
           <button class="tab-btn active" onclick="selectTab('medical')">🩺 Medical Prescription</button>
           <button class="tab-btn" onclick="selectTab('banking')">🏦 Banking Wire Transfer</button>
-          <button class="tab-btn" onclick="selectTab('ecommerce')">🛒 E-Commerce Order</button>
+          <button class="tab-btn" onclick="selectTab('coding')">💻 Autonomous Coding & Git</button>
+          <button class="tab-btn" onclick="selectTab('ecommerce')">🛒 E-Commerce Checkout</button>
+          <button class="tab-btn" onclick="selectTab('robotics')">🤖 Maker IoT & Robotics</button>
         </div>
 
         <div class="sandbox-grid">
           <!-- Input Form Panel -->
-          <div class="input-panel" id="formContainer">
-            <!-- Dynamic Form Rendered via JS -->
+          <div class="input-panel">
+            <div class="toggle-box">
+              <div class="toggle-box-title" id="toggleStateLabel">PROTECTION: ON (+ agent-saga)</div>
+              <button class="switch" id="sandboxToggle" role="switch" aria-checked="true" onclick="toggleSandboxProtection()"><span class="knob"></span></button>
+            </div>
+
+            <div id="formFields" style="display: flex; flex-direction: column; gap: 1.2rem;">
+              <!-- Dynamic Form Rendered via JS -->
+            </div>
           </div>
 
           <!-- Real-Time Output Console -->
           <div class="output-console">
             <div class="console-header">
-              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL)</span>
+              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.1.7)</span>
               <span id="consoleStatus">READY</span>
             </div>
-            <div id="consoleBody" style="display: flex; flex-direction: column; gap: .6rem;">
-              <div style="color: var(--faint); margin: auto;">Enter your custom input parameters on the left and click <b>Execute AI Transaction</b>.</div>
+            <div id="consoleBody" style="display: flex; flex-direction: column; gap: .65rem;">
+              <div style="color: var(--faint); margin: auto;">Enter your custom parameters on the left and click <b>Execute AI Simulation</b>.</div>
             </div>
           </div>
         </div>
@@ -623,15 +648,40 @@ import agent_saga.auto
     document.getElementById('featureModal').hidden = true;
   }
 
-  /* PRACTICAL CUSTOM INPUT SANDBOX CONSOLE */
+  /* PRACTICAL CUSTOM INPUT SANDBOX CONSOLE WITH DYNAMIC TOGGLE */
   var currentTab = 'medical';
+  var protectionActive = true;
 
-  function renderForm() {
-    var container = document.getElementById('formContainer');
+  function toggleSandboxProtection() {
+    protectionActive = !protectionActive;
+    var btn = document.getElementById('sandboxToggle');
+    var label = document.getElementById('toggleStateLabel');
+    var banner = document.getElementById('bannerText');
+
+    if (btn) btn.setAttribute('aria-checked', String(protectionActive));
+
+    if (protectionActive) {
+      label.textContent = "PROTECTION: ON (+ agent-saga)";
+      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.1.7 Active Protection)</span>';
+    } else {
+      label.textContent = "PROTECTION: OFF (Raw AI Agent)";
+      banner.innerHTML = '<span style="color: var(--irreversible);">● MODE: BEFORE (Raw AI Agent - Unprotected Failure Mode)</span>';
+    }
+  }
+
+  function selectTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    renderFormFields();
+  }
+
+  function renderFormFields() {
+    var container = document.getElementById('formFields');
     if (currentTab === 'medical') {
       container.innerHTML = `
         <div class="form-group">
-          <label>Patient Name</label>
+          <label>Patient Name & ID</label>
           <input id="inputPatient" type="text" value="Jane Doe (ID: P_9042)" />
         </div>
         <div class="form-group">
@@ -642,11 +692,7 @@ import agent_saga.auto
           <label>Prescribed Dosage (mg) [Safe Max: 50mg]</label>
           <input id="inputDosage" type="number" value="500" />
         </div>
-        <div class="toggle-row">
-          <span class="toggle-title">Enable agent-saga v0.1.7</span>
-          <button class="switch" id="sagaTabToggle" role="switch" aria-checked="true" onclick="toggleSagaMode()"><span class="knob"></span></button>
-        </div>
-        <button class="btn primary" onclick="runPracticalSimulation()" style="width: 100%; justify-content: center;">Execute AI Medical Prescriber →</button>
+        <button class="btn primary" onclick="runSimulation()" style="width: 100%; justify-content: center;">Execute AI Simulation →</button>
       `;
     } else if (currentTab === 'banking') {
       container.innerHTML = `
@@ -662,11 +708,26 @@ import agent_saga.auto
           <label>Wire Transfer Amount ($) [Limit: $1M]</label>
           <input id="inputAmount" type="number" value="250000" />
         </div>
-        <div class="toggle-row">
-          <span class="toggle-title">Enable agent-saga v0.1.7</span>
-          <button class="switch" id="sagaTabToggle" role="switch" aria-checked="true" onclick="toggleSagaMode()"><span class="knob"></span></button>
+        <button class="btn primary" onclick="runSimulation()" style="width: 100%; justify-content: center;">Execute AI Simulation →</button>
+      `;
+    } else if (currentTab === 'coding') {
+      container.innerHTML = `
+        <div class="form-group">
+          <label>Target Git Repository</label>
+          <input id="inputRepo" type="text" value="github.com/org/payment-service" />
         </div>
-        <button class="btn primary" onclick="runPracticalSimulation()" style="width: 100%; justify-content: center;">Execute AI Wire Transfer →</button>
+        <div class="form-group">
+          <label>Refactoring Instruction</label>
+          <input id="inputInstruction" type="text" value="Refactor database schema and update Stripe API" />
+        </div>
+        <div class="form-group">
+          <label>Simulated Build Result</label>
+          <select id="inputTestResult">
+            <option value="fail">Integration Test Failed (Assertion Error)</option>
+            <option value="pass">All Unit Tests Passed</option>
+          </select>
+        </div>
+        <button class="btn primary" onclick="runSimulation()" style="width: 100%; justify-content: center;">Execute AI Simulation →</button>
       `;
     } else if (currentTab === 'ecommerce') {
       container.innerHTML = `
@@ -678,73 +739,59 @@ import agent_saga.auto
           <label>Order Total Amount ($)</label>
           <input id="inputOrder" type="number" value="499" />
         </div>
+        <button class="btn primary" onclick="runSimulation()" style="width: 100%; justify-content: center;">Execute AI Simulation →</button>
+      `;
+    } else if (currentTab === 'robotics') {
+      container.innerHTML = `
         <div class="form-group">
-          <label>Simulate Relay Failure</label>
-          <select id="inputFailure">
-            <option value="smtp">SMTP Welcome Email Relay Failure</option>
-            <option value="inventory">Out of Stock Inventory Error</option>
-          </select>
+          <label>Robot Arm ID</label>
+          <input id="inputRobot" type="text" value="ARM_ROBOT_X1" />
         </div>
-        <div class="toggle-row">
-          <span class="toggle-title">Enable agent-saga v0.1.7</span>
-          <button class="switch" id="sagaTabToggle" role="switch" aria-checked="true" onclick="toggleSagaMode()"><span class="knob"></span></button>
+        <div class="form-group">
+          <label>Target Servo Angle (Degrees) [Safe: 0 - 180°]</label>
+          <input id="inputAngle" type="number" value="320" />
         </div>
-        <button class="btn primary" onclick="runPracticalSimulation()" style="width: 100%; justify-content: center;">Execute AI Order Checkout →</button>
+        <button class="btn primary" onclick="runSimulation()" style="width: 100%; justify-content: center;">Execute AI Simulation →</button>
       `;
     }
   }
 
-  var sandboxWithSaga = true;
-
-  function toggleSagaMode() {
-    sandboxWithSaga = !sandboxWithSaga;
-    var btn = document.getElementById('sagaTabToggle');
-    if (btn) btn.setAttribute('aria-checked', String(sandboxWithSaga));
-  }
-
-  function selectTab(tab) {
-    currentTab = tab;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
-    renderForm();
-  }
-
   function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-  async function runPracticalSimulation() {
+  async function runSimulation() {
     var consoleBody = document.getElementById('consoleBody');
     var status = document.getElementById('consoleStatus');
     var verdict = document.getElementById('sandboxVerdict');
     consoleBody.innerHTML = ''; verdict.hidden = true; status.textContent = 'EXECUTING...';
+
+    function logRow(kind, icon, msg, meta) {
+      consoleBody.innerHTML += `<div class="tr ${kind}"><span class="ic">${icon}</span><span class="msg">${msg}</span><span class="meta">${meta || ''}</span></div>`;
+    }
 
     if (currentTab === 'medical') {
       var patient = document.getElementById('inputPatient').value;
       var drug = document.getElementById('inputDrug').value;
       var dosage = parseFloat(document.getElementById('inputDosage').value) || 0;
 
-      function logRow(kind, icon, msg, meta) {
-        consoleBody.innerHTML += `<div class="tr ${kind}"><span class="ic">${icon}</span><span class="msg">${msg}</span><span class="meta">${meta || ''}</span></div>`;
-      }
-
-      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, sandboxWithSaga ? '+ agent-saga' : 'Raw AI');
-      await wait(400);
+      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      await wait(350);
 
       logRow('ok', '✓', `<b>patient.read_records</b> &nbsp;Selected ${drug}`, 'read-only');
-      await wait(400);
+      await wait(350);
 
       if (dosage > 50.0) {
-        if (!sandboxWithSaga) {
+        if (!protectionActive) {
           logRow('fail', '✗', `<b>pharmacy.dispense</b> &nbsp;DISPATCHED ${dosage}mg ${drug}!`, 'LETHAL OVERDOSE');
           verdict.className = 'verdict bad';
-          verdict.innerHTML = `<span class="chip">LETHAL OVERDOSE</span><span>Raw AI hallucinated a <b>${dosage}mg</b> dosage of ${drug} (Max safe limit: 50mg) and dispatched order to pharmacy without verification!</span>`;
+          verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI hallucinated a <b>${dosage}mg</b> dosage of ${drug} (Max safe limit: 50mg) and dispatched order to pharmacy without pre-flight verification!</span>`;
           verdict.hidden = false;
         } else {
           logRow('fail', '✗', `<b>RealityAnchor</b> &nbsp;${dosage}mg exceeds safe boundary (0.1mg - 50.0mg)`, 'PRE-FLIGHT INTERCEPTED');
-          await wait(400);
+          await wait(350);
           logRow('undo', '↺', `<b>SelfCorrectingLoop</b> &nbsp;Auto-corrected prescription to safe 15.0mg`, 'auto-re-ground');
           logRow('ok', '✓', `<b>pharmacy.dispense</b> &nbsp;DISPATCHED 15.0mg ${drug}`, 'VERIFIED SAFE');
           verdict.className = 'verdict good';
-          verdict.innerHTML = `<span class="chip">99.999% SAFE</span><span><b>agent-saga</b> intercepted the ${dosage}mg overdose pre-flight! Reality Anchor auto-corrected prescription for ${patient} to safe 15.0mg clinical dosage.</span>`;
+          verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga 99.999% SAFE)</span><span><b>agent-saga</b> intercepted the ${dosage}mg overdose pre-flight! Reality Anchor auto-corrected prescription for ${patient} to safe 15.0mg clinical dosage.</span>`;
           verdict.hidden = false;
         }
       } else {
@@ -759,59 +806,116 @@ import agent_saga.auto
       var iban = document.getElementById('inputIban').value;
       var amount = parseFloat(document.getElementById('inputAmount').value) || 0;
 
-      function logRow(kind, icon, msg, meta) {
-        consoleBody.innerHTML += `<div class="tr ${kind}"><span class="ic">${icon}</span><span class="msg">${msg}</span><span class="meta">${meta || ''}</span></div>`;
-      }
+      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      await wait(350);
 
-      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, sandboxWithSaga ? '+ agent-saga' : 'Raw AI');
-      await wait(400);
-
-      if (!sandboxWithSaga) {
+      if (!protectionActive) {
         logRow('fail', '✗', `<b>wire.execute</b> &nbsp;$${amount.toLocaleString()} sent without 3/3 consensus`, 'RISK EXPOSED');
         verdict.className = 'verdict bad';
-        verdict.innerHTML = `<span class="chip">UNPROTECTED</span><span>Raw AI agent executed $${amount.toLocaleString()} wire transfer to ${iban} without multi-pass consensus checks!</span>`;
+        verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI agent executed $${amount.toLocaleString()} wire transfer to ${iban} without multi-pass consensus checks!</span>`;
         verdict.hidden = false;
       } else {
         logRow('ok', '✓', `<b>Pass 1 (Schema)</b> &nbsp;Source ${source} & IBAN ${iban} valid`, '1/3 Pass');
-        await wait(300);
+        await wait(250);
         logRow('ok', '✓', `<b>Pass 2 (Boundary)</b> &nbsp;$${amount.toLocaleString()} <= $1,000,000 limit`, '2/3 Pass');
-        await wait(300);
+        await wait(250);
         logRow('ok', '✓', `<b>Pass 3 (Ledger)</b> &nbsp;Source Account Status ACTIVE verified`, '3/3 Pass');
-        await wait(300);
+        await wait(250);
         logRow('ok', '✓', `<b>stripe.wire_execute</b> &nbsp;$${amount.toLocaleString()} transferred to ${iban}`, 'COMPENSABLE');
 
         verdict.className = 'verdict good';
-        verdict.innerHTML = `<span class="chip">3/3 CONSENSUS</span><span><b>Triple Redundant Verifier</b> granted 3/3 consensus! $${amount.toLocaleString()} wire executed with 100% WORM audit log.</span>`;
+        verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga 3/3 CONSENSUS)</span><span><b>Triple Redundant Verifier</b> granted 3/3 consensus! $${amount.toLocaleString()} wire executed with 100% WORM audit log.</span>`;
+        verdict.hidden = false;
+      }
+    } else if (currentTab === 'coding') {
+      var repo = document.getElementById('inputRepo').value;
+      var instruction = document.getElementById('inputInstruction').value;
+      var testRes = document.getElementById('inputTestResult').value;
+
+      logRow('note', '⚡', `Initializing Autonomous Coding Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      await wait(350);
+
+      logRow('ok', '✓', `<b>git.create_branch</b> &nbsp;refactor-branch created`, 'inverse: git delete');
+      await wait(350);
+      logRow('ok', '✓', `<b>code.apply_patch</b> &nbsp;${instruction}`, 'inverse: git revert');
+      await wait(350);
+
+      if (testRes === 'fail') {
+        logRow('fail', '✗', `<b>pytest.run</b> &nbsp;Integration Test Failed (AssertionError)`, 'BUILD BROKEN');
+        await wait(350);
+
+        if (!protectionActive) {
+          verdict.className = 'verdict bad';
+          verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI agent pushed broken refactored code to repo without auto-reverting, leaving main branch broken!</span>`;
+          verdict.hidden = false;
+        } else {
+          logRow('undo', '↺', `<b>git.revert_commit</b> &nbsp;Patch auto-reverted`, 'LIFO rollback');
+          await wait(350);
+          logRow('undo', '↺', `<b>git.delete_branch</b> &nbsp;Branch cleaned up`, 'LIFO rollback');
+          verdict.className = 'verdict good';
+          verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga RESTORED)</span><span><b>agent-saga</b> auto-reverted broken commits in exact LIFO order! Repository state remains 100% clean.</span>`;
+          verdict.hidden = false;
+        }
+      } else {
+        logRow('ok', '✓', `<b>pytest.run</b> &nbsp;All tests passed (595/595)`, 'PASS');
+        logRow('ok', '✓', `<b>git.merge_pr</b> &nbsp;Merged successfully`, 'COMMITTED');
+        verdict.className = 'verdict good';
+        verdict.innerHTML = `<span class="chip">COMMITTED SAFE</span><span>All automated integration tests passed! Code changes committed with complete WAL history.</span>`;
         verdict.hidden = false;
       }
     } else if (currentTab === 'ecommerce') {
       var email = document.getElementById('inputEmail').value;
       var order = parseFloat(document.getElementById('inputOrder').value) || 0;
 
-      function logRow(kind, icon, msg, meta) {
-        consoleBody.innerHTML += `<div class="tr ${kind}"><span class="ic">${icon}</span><span class="msg">${msg}</span><span class="meta">${meta || ''}</span></div>`;
-      }
-
-      logRow('note', '⚡', `Initializing E-Commerce Checkout for <b>${email}</b> ($${order})...`, sandboxWithSaga ? '+ agent-saga' : 'Raw AI');
-      await wait(400);
+      logRow('note', '⚡', `Initializing E-Commerce Checkout for <b>${email}</b> ($${order})...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      await wait(350);
 
       logRow('ok', '✓', `<b>stripe.charge</b> &nbsp;$${order} charged`, 'inverse: refund');
-      await wait(400);
+      await wait(350);
       logRow('ok', '✓', `<b>postgres.insert_order</b> &nbsp;Order provisioned for ${email}`, 'inverse: delete');
-      await wait(400);
+      await wait(350);
       logRow('fail', '✗', `<b>email.send_welcome</b> &nbsp;SMTP relay connection refused`, 'CRASH');
-      await wait(400);
+      await wait(350);
 
-      if (!sandboxWithSaga) {
+      if (!protectionActive) {
         verdict.className = 'verdict bad';
-        verdict.innerHTML = `<span class="chip">CRITICAL FAILURE</span><span>Raw AI agent crashed on email delivery! Customer was charged <b>$${order}</b> and order stranded in DB.</span>`;
+        verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI agent crashed on email delivery! Customer was charged <b>$${order}</b> and order stranded in DB.</span>`;
         verdict.hidden = false;
       } else {
         logRow('undo', '↺', `<b>postgres.delete_order</b> &nbsp;Order row un-provisioned`, 'LIFO auto-revert');
-        await wait(400);
+        await wait(350);
         logRow('undo', '↺', `<b>stripe.refund</b> &nbsp;$${order} refunded`, 'idempotent refund');
         verdict.className = 'verdict good';
-        verdict.innerHTML = `<span class="chip">100% RESTORED</span><span><b>agent-saga</b> unwound all side effects in exact LIFO order! Net $0.00, zero stranded order rows.</span>`;
+        verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga RESTORED)</span><span><b>agent-saga</b> unwound all side effects in exact LIFO order! Net $0.00 balance, zero stranded order rows.</span>`;
+        verdict.hidden = false;
+      }
+    } else if (currentTab === 'robotics') {
+      var robot = document.getElementById('inputRobot').value;
+      var angle = parseFloat(document.getElementById('inputAngle').value) || 0;
+
+      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      await wait(350);
+
+      if (angle > 180.0) {
+        if (!protectionActive) {
+          logRow('fail', '✗', `<b>servo.set_angle</b> &nbsp;Commanded ${angle}° angle!`, 'BURNOUT ERROR');
+          verdict.className = 'verdict bad';
+          verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI commanded ${angle}° rotation (Max limit: 180°), causing physical servo gear strip & motor burnout!</span>`;
+          verdict.hidden = false;
+        } else {
+          logRow('fail', '✗', `<b>PreFlightGate</b> &nbsp;${angle}° exceeds mechanical joint boundary (0 - 180°)`, 'INTERCEPTED PRE-FLIGHT');
+          await wait(350);
+          logRow('undo', '↺', `<b>SafetyBoundary</b> &nbsp;Command clamped to safe 90.0° resting angle`, 'auto-clamped');
+          logRow('ok', '✓', `<b>servo.set_angle</b> &nbsp;Set angle to 90.0°`, 'HARDWARE PROTECTED');
+          verdict.className = 'verdict good';
+          verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga SAFE)</span><span><b>agent-saga</b> intercepted illegal ${angle}° joint angle pre-flight! Servo gear burnout prevented.</span>`;
+          verdict.hidden = false;
+        }
+      } else {
+        logRow('ok', '✓', `<b>PreFlightGate</b> &nbsp;${angle}° verified within 180° safe boundary`, 'PASS');
+        logRow('ok', '✓', `<b>servo.set_angle</b> &nbsp;Set angle to ${angle}°`, 'COMPLETED');
+        verdict.className = 'verdict good';
+        verdict.innerHTML = `<span class="chip">HARDWARE SAFE</span><span>Angle of ${angle}° verified safe and executed on ${robot}.</span>`;
         verdict.hidden = false;
       }
     }
@@ -819,7 +923,7 @@ import agent_saga.auto
   }
 
   // Initial render
-  renderForm();
+  renderFormFields();
 </script>
 </body>
 </html>
