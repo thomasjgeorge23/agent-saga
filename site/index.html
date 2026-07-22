@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v0.1.7 — Supreme Transactional Reliability Engine for AI Agents</title>
-<meta name="description" content="Mission-critical transactional reliability, 99.999% anti-hallucination reality anchors, and zero-configuration auto-rollback infrastructure for autonomous AI agents across Hobbyists, Developers, Banking, Healthcare, Aerospace, and Enterprise SaaS." />
+<title>agent-saga v0.1.8 — Supreme Transactional Reliability & Observability Engine for AI Agents</title>
+<meta name="description" content="Mission-critical transactional reliability, 99.999% anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, expanded connectors, and zero-configuration auto-rollback infrastructure for autonomous AI agents." />
 <style>
   :root {
     --bg: #070c16; --panel: #0f172a; --elev: #1e293b;
@@ -149,7 +149,7 @@
   .tab-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
   .tab-btn.active { color: #070c16; background: var(--accent); border-color: var(--accent); }
 
-  /* COMPARISON MODE BANNER */
+  /* MODE BANNER */
   .mode-banner { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.8rem; background: color-mix(in srgb, var(--accent) 10%, var(--elev)); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: .88rem; }
   .mode-banner-text { display: flex; align-items: center; gap: .6rem; font-weight: 700; }
 
@@ -224,7 +224,7 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top">agent-saga <span class="seq">v0.1.7</span></a>
+    <a class="brand" href="#top">agent-saga <span class="seq">v0.1.8</span></a>
     <nav class="nav-links">
       <a href="#categories">Industries</a>
       <a href="#sandbox">Live Input Sandbox</a>
@@ -241,11 +241,11 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">⚡ Supreme AI Reliability Infrastructure · PyPI v0.1.7</p>
+        <p class="eyebrow">⚡ Supreme AI Reliability Infrastructure · PyPI v0.1.8</p>
         <h1>The supreme transactional engine for <span class="amber">autonomous AI agents</span>.</h1>
         <p class="lede">
           From hobby builders and indie coders to high-precision medical examination, banking settlements, and flight control — 
-          <b>agent-saga v0.1.7</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, zero-config auto-hooking, and automatic LIFO rollbacks.
+          <b>agent-saga v0.1.8</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, GitHub/AWS/Slack connectors, and automatic LIFO rollbacks.
         </p>
         <div class="install">
           <span class="prompt">$</span><code>pip install agent-saga</code>
@@ -261,15 +261,15 @@
       <div>
         <div class="wal">
           <div class="wal-bar">
-            <span class="dot"></span><span>Write-Ahead Log (WAL v0.1.7)</span>
+            <span class="dot"></span><span>Write-Ahead Log (WAL v0.1.8)</span>
             <span class="fn">SAGA_LIVE · 99.999% Grounded</span>
           </div>
           <div class="wal-body">
             <div class="logline"><span class="seq">001</span><span class="ev"><b>SAGA_START</b> user_tenant_402</span><span class="tag t-rev">reversible</span></div>
             <div class="logline"><span class="seq">002</span><span class="ev">REALITY_ANCHOR <b>verify_dosage</b></span><span class="tag t-rev">3/3 consensus</span></div>
-            <div class="logline"><span class="seq">003</span><span class="ev">STEP_COMMITTED <b>stripe.wire_transfer</b></span><span class="tag t-comp">compensable</span></div>
-            <div class="logline roll"><span class="seq">004</span><span class="ev">PRE_FLIGHT_GATE <b>intercepted overdose</b></span><span class="tag t-irr">blocked</span></div>
-            <div class="logline done"><span class="seq">005</span><span class="ev">COMPENSATED <b>stripe.refund_wire</b></span><span class="tag t-comp">↺ auto-reverted</span></div>
+            <div class="logline"><span class="seq">003</span><span class="ev">STEP_COMMITTED <b>github.create_pr</b></span><span class="tag t-comp">compensable</span></div>
+            <div class="logline roll"><span class="seq">004</span><span class="ev">PRE_FLIGHT_GATE <b>intercepted error</b></span><span class="tag t-irr">blocked</span></div>
+            <div class="logline done"><span class="seq">005</span><span class="ev">COMPENSATED <b>github.close_pr</b></span><span class="tag t-comp">↺ auto-reverted</span></div>
           </div>
         </div>
       </div>
@@ -294,8 +294,8 @@
         <div class="cat-card">
           <span class="cat-badge">Coders & Software Engineers</span>
           <span class="cat-icon">💻</span>
-          <h3>Autonomous Coding & Git Workflows</h3>
-          <p>Wraps AI refactoring and DB migrations in atomic transactions. If automated tests fail, un-installs broken packages and auto-reverts git commits LIFO.</p>
+          <h3>GitHub & Cloud Infrastructure</h3>
+          <p>Plug-and-play GitHub/GitLab PR auto-reverts and AWS/GCP/K8s infrastructure auto-cleanup if deployment or coding agent tasks fail.</p>
         </div>
 
         <div class="cat-card">
@@ -313,17 +313,17 @@
         </div>
 
         <div class="cat-card">
-          <span class="cat-badge">Aerospace & Defense</span>
-          <span class="cat-icon">🚀</span>
-          <h3>Flight Telemetry & Actuators</h3>
-          <p>Monitors telemetry data entropy and latency jitter using the Predictive Chaos Sentinel, pre-emptively tripping safety gates before actuator failure cascades occur.</p>
+          <span class="cat-badge">Observability & Tracing</span>
+          <span class="cat-icon">📊</span>
+          <h3>LangSmith, Phoenix & OTEL</h3>
+          <p>Stamps Saga UUID and prompt context into OpenTelemetry spans and LLM trace providers, linking hallucinated prompts directly to rollback causes.</p>
         </div>
 
         <div class="cat-card">
-          <span class="cat-badge">Legal & Compliance</span>
-          <span class="cat-icon">⚖️</span>
-          <h3>Contract Archival & Audit Logs</h3>
-          <p>Provides tamper-evident SHA-256 hash-chained WORM logs for all agent actions, fulfilling strict SOC2, HIPAA, and PCI-DSS compliance audits out of the box.</p>
+          <span class="cat-badge">Risk Team Dashboard</span>
+          <span class="cat-icon">🛡️</span>
+          <h3>Interactive Web UI & Replay</h3>
+          <p>Clean Web UI (<code>agent-saga ui</code>) and CLI Time-Travel Replay (<code>agent-saga replay &lt;id&gt;</code>) for risk teams to inspect, approve, or debug failed sagas.</p>
         </div>
       </div>
     </div>
@@ -340,7 +340,7 @@
         <!-- MODE BANNER -->
         <div class="mode-banner">
           <div class="mode-banner-text" id="bannerText">
-            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.1.7 Active Protection)</span>
+            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.1.8 Active Protection)</span>
           </div>
           <div style="color: var(--dim); font-size: .8rem;">Toggle OFF to test Raw AI Failure Mode</div>
         </div>
@@ -348,8 +348,8 @@
         <div class="sandbox-nav">
           <button class="tab-btn active" onclick="selectTab('medical')">🩺 Medical Prescription</button>
           <button class="tab-btn" onclick="selectTab('banking')">🏦 Banking Wire Transfer</button>
-          <button class="tab-btn" onclick="selectTab('coding')">💻 Autonomous Coding & Git</button>
-          <button class="tab-btn" onclick="selectTab('ecommerce')">🛒 E-Commerce Checkout</button>
+          <button class="tab-btn" onclick="selectTab('coding')">💻 GitHub & Cloud DevOps</button>
+          <button class="tab-btn" onclick="selectTab('messaging')">💬 Slack & Discord Bots</button>
           <button class="tab-btn" onclick="selectTab('robotics')">🤖 Maker IoT & Robotics</button>
         </div>
 
@@ -369,7 +369,7 @@
           <!-- Real-Time Output Console -->
           <div class="output-console">
             <div class="console-header">
-              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.1.7)</span>
+              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.1.8)</span>
               <span id="consoleStatus">READY</span>
             </div>
             <div id="consoleBody" style="display: flex; flex-direction: column; gap: .65rem;">
@@ -390,39 +390,39 @@
       <h2>Click any feature to inspect its live code payload & architecture.</h2>
       
       <div class="feat-grid">
-        <div class="feat-card" onclick="openFeatureModal('reality')">
-          <h3>🎯 Anti-Hallucination Reality Anchor</h3>
-          <p>Intercepts candidate tool calls, validating arguments against immutable WAL history and pre-flight invariants before side effects hit production APIs.</p>
+        <div class="feat-card" onclick="openFeatureModal('otel')">
+          <h3>📊 OpenTelemetry & LangSmith Tracing</h3>
+          <p>Binds Saga UUIDs to OpenTelemetry spans, LangSmith runs, and Phoenix traces, identifying the exact prompt context that caused a transaction rollback.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('mission')">
-          <h3>🩺 Mission-Critical 99.999% Consensus</h3>
-          <p>Executes 3 independent verification passes (Schema Structural, Range Boundary, Ledger Consistency) requiring unanimous 3/3 consensus for medical/banking actions.</p>
+        <div class="feat-card" onclick="openFeatureModal('connectors')">
+          <h3>🔌 Expanded Native Connectors</h3>
+          <p>Plug-and-play safety connectors for GitHub PR/Commit auto-revert, AWS/GCP/K8s infra auto-cleanup, and Slack/Discord message redactions.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('shadow')">
-          <h3>🔮 Speculative Shadow Engine</h3>
-          <p>Captures sub-microsecond pre/post state differentials and auto-synthesizes inverse compensation functions without requiring manually written undo code.</p>
+        <div class="feat-card" onclick="openFeatureModal('dynamic_risk')">
+          <h3>🛡️ Dynamic AI Risk Policies</h3>
+          <p>Evaluates anomaly risk scores in real-time. If an anomaly score exceeds threshold, spend limits dynamically scale down and escalate to human review.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('entanglement')">
-          <h3>🔗 Cross-Domain Agent Entanglement</h3>
-          <p>Binds execution graphs across CrewAI, LangGraph, AutoGen, and OpenAI Agents into a single atomic transaction boundary across network nodes.</p>
+        <div class="feat-card" onclick="openFeatureModal('postgres_store')">
+          <h3>🗄️ Relational Postgres Approval Store</h3>
+          <p>Stores pending human approvals directly in PostgreSQL (<code>PostgresApprovalStore</code>) for enterprise risk teams without requiring Redis infrastructure.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('sentinel')">
-          <h3>🛡️ Predictive Chaos Sentinel</h3>
-          <p>Evaluates latency variance and LLM response entropy, pre-emptively tripping safety gates before API failure cascades occur.</p>
+        <div class="feat-card" onclick="openFeatureModal('replay')">
+          <h3>⏳ Time-Travel Debugging & Replay</h3>
+          <p>Run <code>agent-saga replay &lt;saga_id&gt;</code> to simulate historical failed sagas locally from WAL data without touching live production APIs.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('auto')">
-          <h3>⚡ Zero-Configuration Auto-Hook</h3>
-          <p>Simply run <code>pip install agent-saga</code> and <code>import agent_saga.auto</code> to auto-attach pre-flight gates across all active framework loops.</p>
+        <div class="feat-card" onclick="openFeatureModal('ui')">
+          <h3>💻 Risk Team Dashboard (agent-saga ui)</h3>
+          <p>Out-of-the-box web UI server (<code>agent-saga ui</code>) providing risk teams with visual approval queues, token auth, and live trace inspection.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
       </div>
@@ -442,24 +442,24 @@
           pip install agent-saga
         </div>
 
-        <h3 style="margin-top: 1.8rem;">2. Zero-Configuration Global Auto-Hooking</h3>
+        <h3 style="margin-top: 1.8rem;">2. OpenTelemetry & LangSmith Tracing Setup</h3>
         <div class="docs-code">
-import agent_saga.auto
+from agent_saga.observability import setup_telemetry, link_llm_trace
 
-# Automatically hooks OpenAI SDK, LangGraph, CrewAI, and HTTP clients across your process!
+# Enable OpenTelemetry tracing
+setup_telemetry()
+
+# Link LLM prompt trace to Saga UUID
+link_llm_trace(saga_id="saga_123", trace_id="tr_9988", prompt_context="Refactor payment engine")
         </div>
 
-        <h3 style="margin-top: 1.8rem;">3. Explicit Transaction Scope</h3>
+        <h3 style="margin-top: 1.8rem;">3. GitHub & Cloud Connector Safety</h3>
         <div class="docs-code">
-from agent_saga import saga_scope, COMPENSABLE, Compensation
+from agent_saga.connectors import GitHubConnector, CloudConnector
 
-async with saga_scope() as saga:
-    charge = await saga.execute(
-        tool="stripe.charge",
-        semantics=COMPENSABLE,
-        forward=lambda: stripe.charge(customer="cus_123", amount=49900),
-        compensate=lambda r: Compensation(fn=refund, kwargs={"charge_id": r["id"]})
-    )
+gh = GitHubConnector()
+pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-branch")
+# Auto-closes PR if downstream step fails!
         </div>
       </div>
     </div>
@@ -479,7 +479,7 @@ async with saga_scope() as saga:
 <footer>
   <div class="wrap foot-grid">
     <div>
-      <div class="brand">agent-saga <span class="seq">v0.1.7</span></div>
+      <div class="brand">agent-saga <span class="seq">v0.1.8</span></div>
       <p style="font-size: .88rem; color: var(--faint); margin-top: .4rem;">
         Licensed under Apache-2.0. Built for mission-critical enterprise AI agent reliability.
       </p>
@@ -487,7 +487,7 @@ async with saga_scope() as saga:
     <div style="margin-left: auto; display: flex; gap: 1.8rem; font-size: .95rem;">
       <a href="#install">Documentation</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">GitHub</a>
-      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.1.7</a>
+      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.1.8</a>
     </div>
   </div>
 </footer>
@@ -567,71 +567,60 @@ async with saga_scope() as saga:
 
   /* Dynamic Feature Code Modals */
   var featurePayloads = {
-    reality: {
-      title: "🎯 Anti-Hallucination Reality Anchor",
-      desc: "Compares AI tool call payloads against immutable WAL history and pre-flight ground truth, executing an automatic self-correcting callback loop if hallucination is detected.",
-      code: `from agent_saga import RealityAnchor, GroundingFact, SelfCorrectingLoop
+    otel: {
+      title: "📊 OpenTelemetry & LangSmith Tracing",
+      desc: "Stamps Saga UUID and prompt context into OpenTelemetry spans and LLM trace providers, linking hallucinated prompts directly to rollback causes.",
+      code: `from agent_saga.observability import setup_telemetry, link_llm_trace
 
-anchor = RealityAnchor(
-    facts=[GroundingFact(key="user_id", expected_value="usr_123")],
-    validators=[lambda p: p.get("amount", 0) > 0]
-)
-loop = SelfCorrectingLoop(anchor=anchor, max_retries=3, corrector=my_corrector)
-result = await loop.execute_grounded(stripe.charge, payload)`
+setup_telemetry()
+link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor payment module")`
     },
-    mission: {
-      title: "🩺 Mission-Critical 99.999% Triple Redundant Consensus",
-      desc: "Executes 3 independent verification passes (Structural Schema, Boundary Range, and Immutable Ledger Consistency) requiring 3/3 unanimous consensus before executing high-risk medical or financial actions.",
-      code: `from agent_saga import TripleRedundantVerifier, MissionCriticalGate
+    connectors: {
+      title: "🔌 Expanded Native Connectors",
+      desc: "Plug-and-play safety connectors for GitHub PR/Commit auto-revert, AWS/GCP/K8s infra auto-cleanup, and Slack/Discord message redactions.",
+      code: `from agent_saga.connectors import GitHubConnector, CloudConnector, MessagingConnector
 
-verifier = TripleRedundantVerifier(
-    structural_checker=lambda p: "account_id" in p and "amount" in p,
-    boundary_checker=lambda p: 0 < p.get("amount", 0) <= 1_000_000,
-    ledger_checker=lambda p: p.get("account_status") == "ACTIVE"
-)
-ok, msg, results = verifier.verify_consensus(payload) # 3/3 consensus`
+gh = GitHubConnector()
+pr = await gh.create_pull_request(repo="acme/service", title="Fix bug", head="feature-1")
+# Auto-closes PR #101 if downstream execution fails!`
     },
-    shadow: {
-      title: "🔮 Speculative Shadow Engine",
-      desc: "Captures pre/post state differentials at sub-microsecond latency and automatically synthesizes LIFO inverse compensation logic without manual undo functions.",
-      code: `from agent_saga import SpeculativeEngine
+    dynamic_risk: {
+      title: "🛡️ Dynamic AI Risk Policies",
+      desc: "Evaluates real-time anomaly risk scores. If an anomaly score exceeds threshold (e.g. 0.70), maximum limits scale down and escalate to human review.",
+      code: `from agent_saga.gate import DynamicRiskEvaluator, dynamic_risk_rule
 
-engine = SpeculativeEngine(state_reader=get_db_snapshot)
-pre_state = engine.capture_pre()
-post_state = engine.capture_post()
-
-# Auto-synthesize undo function from state delta
-comp = engine.synthesize_compensation("db.update", pre_state, post_state)`
+evaluator = DynamicRiskEvaluator(risk_scorer=my_anomaly_model, risk_threshold=0.70)
+rule = dynamic_risk_rule("high-anomaly", evaluator)`
     },
-    entanglement: {
-      title: "🔗 Cross-Domain Multi-Agent Entanglement Matrix",
-      desc: "Links disparate agent execution graphs across CrewAI, LangGraph, AutoGen, and OpenAI Agents into a single atomic transaction boundary across network nodes.",
-      code: `from agent_saga import EntanglementMatrix
+    postgres_store: {
+      title: "🗄️ Relational Postgres Approval Store",
+      desc: "Stores pending human approvals directly in PostgreSQL (PostgresApprovalStore) for enterprise risk teams without requiring Redis infrastructure.",
+      code: `from agent_saga.approvals import PostgresApprovalStore
 
-matrix = EntanglementMatrix()
-matrix.register_agent("agent_crewai", "crewai", ctx1)
-matrix.register_agent("agent_langgraph", "langgraph", ctx2, depends_on=["agent_crewai"])
-
-# Cascades atomic rollback across all frameworks in reverse order
-await matrix.abort_all("agent_langgraph", reason="downstream failure")`
+store = PostgresApprovalStore(table_name="saga_approvals")
+request = store.create(my_approval_request)`
     },
-    sentinel: {
-      title: "🛡️ Predictive Chaos Sentinel",
-      desc: "Tracks LLM output entropy and latency variance to pre-emptively trip circuit breakers before failure cascades impact production services.",
-      code: `from agent_saga import PredictiveSentinel
+    replay: {
+      title: "⏳ Time-Travel Debugging & Replay",
+      desc: "CLI command agent-saga replay <saga_id> reconstructs historical saga steps locally from WAL data without hitting live production APIs.",
+      code: `$ agent-saga replay saga_402 --wal-path ./agent-saga.wal
 
-sentinel = PredictiveSentinel(risk_threshold=0.85)
-sentinel.record_sample("unstable_tool", latency_ms=4500.0, is_error=True)
-
-should_block, risk = sentinel.should_block_preemptively("unstable_tool")`
+=======================================================
+  TIME-TRAVEL DEBUGGER: Replaying Saga 'saga_402'
+=======================================================
+ [001] SAGA_START             tool=init                 payload={}
+ [002] STEP_COMMITTED         tool=github.create_pr     payload={"pr_number": 101}`
     },
-    auto: {
-      title: "⚡ Zero-Configuration Global Auto-Hooking",
-      desc: "Simply importing agent_saga.auto automatically attaches pre-flight gates and transactional boundaries across all active framework loops.",
-      code: `# Simply add to your project:
-import agent_saga.auto
+    ui: {
+      title: "💻 Risk Team Dashboard (agent-saga ui)",
+      desc: "Clean web UI dashboard serving approval queues, token authorization, and live WAL record inspection.",
+      code: `$ agent-saga ui --wal-path ./agent-saga.wal --port 8080
 
-# Automatically hooks OpenAI SDK, LangGraph, CrewAI, and HTTP clients!`
+===============================================
+ AgentSaga - Time-Travel Debugger
+===============================================
+  WAL     : ./agent-saga.wal
+  Serving : http://127.0.0.1:8080`
     }
   };
 
@@ -662,7 +651,7 @@ import agent_saga.auto
 
     if (protectionActive) {
       label.textContent = "PROTECTION: ON (+ agent-saga)";
-      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.1.7 Active Protection)</span>';
+      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.1.8 Active Protection)</span>';
     } else {
       label.textContent = "PROTECTION: OFF (Raw AI Agent)";
       banner.innerHTML = '<span style="color: var(--irreversible);">● MODE: BEFORE (Raw AI Agent - Unprotected Failure Mode)</span>';
@@ -713,31 +702,31 @@ import agent_saga.auto
     } else if (currentTab === 'coding') {
       container.innerHTML = `
         <div class="form-group">
-          <label>Target Git Repository</label>
-          <input id="inputRepo" type="text" value="github.com/org/payment-service" />
+          <label>GitHub Repository</label>
+          <input id="inputRepo" type="text" value="acme/payment-service" />
         </div>
         <div class="form-group">
-          <label>Refactoring Instruction</label>
-          <input id="inputInstruction" type="text" value="Refactor database schema and update Stripe API" />
+          <label>Pull Request Title</label>
+          <input id="inputPR" type="text" value="Fix Stripe Billing Webhook" />
         </div>
         <div class="form-group">
           <label>Simulated Build Result</label>
           <select id="inputTestResult">
-            <option value="fail">Integration Test Failed (Assertion Error)</option>
-            <option value="pass">All Unit Tests Passed</option>
+            <option value="fail">CI Build Failed (PR #101 Auto-Closed)</option>
+            <option value="pass">CI Build Passed</option>
           </select>
         </div>
         <button class="btn primary" onclick="runSimulation()" style="width: 100%; justify-content: center;">Execute AI Simulation →</button>
       `;
-    } else if (currentTab === 'ecommerce') {
+    } else if (currentTab === 'messaging') {
       container.innerHTML = `
         <div class="form-group">
-          <label>Customer Email</label>
-          <input id="inputEmail" type="text" value="alex@acme.com" />
+          <label>Slack Channel</label>
+          <input id="inputChannel" type="text" value="#deployments" />
         </div>
         <div class="form-group">
-          <label>Order Total Amount ($)</label>
-          <input id="inputOrder" type="number" value="499" />
+          <label>Agent Bot Message</label>
+          <input id="inputMsg" type="text" value="Deploying v2.0.0 to prod..." />
         </div>
         <button class="btn primary" onclick="runSimulation()" style="width: 100%; justify-content: center;">Execute AI Simulation →</button>
       `;
@@ -773,7 +762,7 @@ import agent_saga.auto
       var drug = document.getElementById('inputDrug').value;
       var dosage = parseFloat(document.getElementById('inputDosage').value) || 0;
 
-      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.1.8 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>patient.read_records</b> &nbsp;Selected ${drug}`, 'read-only');
@@ -806,7 +795,7 @@ import agent_saga.auto
       var iban = document.getElementById('inputIban').value;
       var amount = parseFloat(document.getElementById('inputAmount').value) || 0;
 
-      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.1.8 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (!protectionActive) {
@@ -829,71 +818,63 @@ import agent_saga.auto
       }
     } else if (currentTab === 'coding') {
       var repo = document.getElementById('inputRepo').value;
-      var instruction = document.getElementById('inputInstruction').value;
+      var prTitle = document.getElementById('inputPR').value;
       var testRes = document.getElementById('inputTestResult').value;
 
-      logRow('note', '⚡', `Initializing Autonomous Coding Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.1.8 ON' : 'Raw AI OFF');
       await wait(350);
 
-      logRow('ok', '✓', `<b>git.create_branch</b> &nbsp;refactor-branch created`, 'inverse: git delete');
-      await wait(350);
-      logRow('ok', '✓', `<b>code.apply_patch</b> &nbsp;${instruction}`, 'inverse: git revert');
+      logRow('ok', '✓', `<b>github.create_pr</b> &nbsp;PR #101 (${prTitle}) created`, 'inverse: close_pr');
       await wait(350);
 
       if (testRes === 'fail') {
-        logRow('fail', '✗', `<b>pytest.run</b> &nbsp;Integration Test Failed (AssertionError)`, 'BUILD BROKEN');
+        logRow('fail', '✗', `<b>ci.build</b> &nbsp;Integration Build Failed`, 'BUILD BROKEN');
         await wait(350);
 
         if (!protectionActive) {
           verdict.className = 'verdict bad';
-          verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI agent pushed broken refactored code to repo without auto-reverting, leaving main branch broken!</span>`;
+          verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI agent left broken PR #101 open in repository without cleanup!</span>`;
           verdict.hidden = false;
         } else {
-          logRow('undo', '↺', `<b>git.revert_commit</b> &nbsp;Patch auto-reverted`, 'LIFO rollback');
-          await wait(350);
-          logRow('undo', '↺', `<b>git.delete_branch</b> &nbsp;Branch cleaned up`, 'LIFO rollback');
+          logRow('undo', '↺', `<b>github.close_pr</b> &nbsp;PR #101 auto-closed`, 'LIFO rollback');
           verdict.className = 'verdict good';
-          verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga RESTORED)</span><span><b>agent-saga</b> auto-reverted broken commits in exact LIFO order! Repository state remains 100% clean.</span>`;
+          verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga RESTORED)</span><span><b>agent-saga</b> GitHub Connector auto-closed PR #101 in exact LIFO order!</span>`;
           verdict.hidden = false;
         }
       } else {
-        logRow('ok', '✓', `<b>pytest.run</b> &nbsp;All tests passed (595/595)`, 'PASS');
-        logRow('ok', '✓', `<b>git.merge_pr</b> &nbsp;Merged successfully`, 'COMMITTED');
+        logRow('ok', '✓', `<b>ci.build</b> &nbsp;All tests passed (601/601)`, 'PASS');
+        logRow('ok', '✓', `<b>github.merge_pr</b> &nbsp;PR #101 merged`, 'COMMITTED');
         verdict.className = 'verdict good';
-        verdict.innerHTML = `<span class="chip">COMMITTED SAFE</span><span>All automated integration tests passed! Code changes committed with complete WAL history.</span>`;
+        verdict.innerHTML = `<span class="chip">COMMITTED SAFE</span><span>All automated integration tests passed! PR #101 merged with complete WAL history.</span>`;
         verdict.hidden = false;
       }
-    } else if (currentTab === 'ecommerce') {
-      var email = document.getElementById('inputEmail').value;
-      var order = parseFloat(document.getElementById('inputOrder').value) || 0;
+    } else if (currentTab === 'messaging') {
+      var channel = document.getElementById('inputChannel').value;
+      var msgText = document.getElementById('inputMsg').value;
 
-      logRow('note', '⚡', `Initializing E-Commerce Checkout for <b>${email}</b> ($${order})...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.1.8 ON' : 'Raw AI OFF');
       await wait(350);
 
-      logRow('ok', '✓', `<b>stripe.charge</b> &nbsp;$${order} charged`, 'inverse: refund');
+      logRow('ok', '✓', `<b>slack.post_message</b> &nbsp;"${msgText}"`, 'inverse: delete_message');
       await wait(350);
-      logRow('ok', '✓', `<b>postgres.insert_order</b> &nbsp;Order provisioned for ${email}`, 'inverse: delete');
-      await wait(350);
-      logRow('fail', '✗', `<b>email.send_welcome</b> &nbsp;SMTP relay connection refused`, 'CRASH');
+      logRow('fail', '✗', `<b>deploy.execute</b> &nbsp;Invalid Kubernetes Deployment Manifest`, 'CRASH');
       await wait(350);
 
       if (!protectionActive) {
         verdict.className = 'verdict bad';
-        verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI agent crashed on email delivery! Customer was charged <b>$${order}</b> and order stranded in DB.</span>`;
+        verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI agent crashed but left incorrect deployment notification standing in Slack!</span>`;
         verdict.hidden = false;
       } else {
-        logRow('undo', '↺', `<b>postgres.delete_order</b> &nbsp;Order row un-provisioned`, 'LIFO auto-revert');
-        await wait(350);
-        logRow('undo', '↺', `<b>stripe.refund</b> &nbsp;$${order} refunded`, 'idempotent refund');
+        logRow('undo', '↺', `<b>slack.delete_message</b> &nbsp;Message in ${channel} deleted`, 'LIFO auto-revert');
         verdict.className = 'verdict good';
-        verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga RESTORED)</span><span><b>agent-saga</b> unwound all side effects in exact LIFO order! Net $0.00 balance, zero stranded order rows.</span>`;
+        verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga RESTORED)</span><span><b>agent-saga</b> Messaging Connector auto-deleted incorrect Slack bot message!</span>`;
         verdict.hidden = false;
       }
     } else if (currentTab === 'robotics') {
       var robot = document.getElementById('inputRobot').value;
       var angle = parseFloat(document.getElementById('inputAngle').value) || 0;
 
-      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.1.7 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.1.8 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (angle > 180.0) {

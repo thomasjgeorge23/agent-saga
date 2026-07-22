@@ -17,6 +17,9 @@ from ._secrets import (
     resolve_credential,
     set_credential_resolver,
 )
+from .github import GitHubConnector
+from .cloud import CloudConnector
+from .messaging import MessagingConnector
 
 __all__ = [
     "CredentialError",
@@ -24,4 +27,8 @@ __all__ = [
     "assert_no_secrets",
     "resolve_credential",
     "set_credential_resolver",
+    "GitHubConnector",
+    "CloudConnector",
+    "MessagingConnector",
 ]
+

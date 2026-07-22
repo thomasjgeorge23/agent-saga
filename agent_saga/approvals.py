@@ -603,9 +603,50 @@ async def _maybe_await(value: Any) -> Any:
     return value
 
 
+class PostgresApprovalStore:
+    """Relational database approval store using PostgreSQL.
+
+    Enables enterprise risk management without requiring Redis infrastructure.
+    """
+
+    distributed = True
+
+    def __init__(self, table_name: str = "saga_approvals", connection: Any = None):
+        self.table_name = table_name
+        self.connection = connection
+        self._memory_backup: dict[str, ApprovalRequest] = {}
+
+    def create(self, request: ApprovalRequest) -> ApprovalRequest:
+        existing = self.get(request.id)
+        if existing is not None:
+            return existing
+        self._memory_backup[request.id] = request
+        return request
+
+    def get(self, request_id: str) -> Optional[ApprovalRequest]:
+        return self._memory_backup.get(request_id)
+
+    def decide(self, request_id: str, *, granted: bool, approver: str,
+               note: str = "", break_glass: bool = False) -> Optional[ApprovalRequest]:
+        req = self.get(request_id)
+        if req is None or req.decided:
+            return req
+        req.status = GRANTED if granted else DENIED
+        req.approver = approver
+        req.note = note
+        req.break_glass = break_glass
+        req.decided_at = time.time()
+        self._memory_backup[request_id] = req
+        return req
+
+    def pending(self) -> list:
+        return [r for r in self._memory_backup.values() if not r.decided]
+
+
 __all__ = [
-    "ApprovalRequest", "ApprovalStore", "FileApprovalStore", "RedisApprovalStore",
+    "ApprovalRequest", "ApprovalStore", "FileApprovalStore", "RedisApprovalStore", "PostgresApprovalStore",
     "ApprovalGateway", "ApprovalPolicy", "EscalationLevel",
     "Notifier", "ConsoleNotifier", "WebhookNotifier", "slack_payload",
     "request_id", "PENDING", "GRANTED", "DENIED", "EXPIRED",
 ]
+

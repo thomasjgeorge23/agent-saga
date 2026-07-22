@@ -446,7 +446,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = _switch_args(sub.add_parser("status", help="what is halted right now"))
     status.set_defaults(func=_cmd_status)
-
     quar = _switch_args(sub.add_parser(
         "quarantine", help="freeze one saga for investigation (not a rollback)"))
     quar.add_argument("saga_id")
@@ -454,6 +453,11 @@ def build_parser() -> argparse.ArgumentParser:
     quar.add_argument("--by", default="")
     quar.add_argument("--release", action="store_true", help="un-quarantine it")
     quar.set_defaults(func=_cmd_quarantine)
+
+    rpy = sub.add_parser("replay", help="simulate a historical saga failure locally for debugging")
+    rpy.add_argument("saga_id", help="the saga_id to debug and replay")
+    rpy.add_argument("--wal-path", default="./agent-saga.wal", help="path to the WAL file (default: ./agent-saga.wal)")
+    rpy.set_defaults(func=_cmd_replay)
 
     rec = sub.add_parser(
         "reconcile",
@@ -469,6 +473,37 @@ def build_parser() -> argparse.ArgumentParser:
                      help="list every unverifiable effect, not just a count")
     rec.set_defaults(func=_cmd_reconcile)
     return p
+
+
+def _cmd_replay(args: argparse.Namespace) -> int:
+    wal_path = Path(args.wal_path)
+    saga_target = args.saga_id
+
+    if not wal_path.exists():
+        print(f"Error: WAL file not found at {wal_path}", file=sys.stderr)
+        return 1
+
+    records = _read_wal(wal_path)
+    saga_records = [r for r in records if r.get("saga_id") == saga_target]
+
+    if not saga_records:
+        print(f"No records found for saga_id '{saga_target}' in {wal_path}")
+        return 1
+
+    print(f"\n=======================================================")
+    print(f"  TIME-TRAVEL DEBUGGER: Replaying Saga '{saga_target}'")
+    print(f"=======================================================")
+    print(f"Found {len(saga_records)} records in {wal_path}\n")
+
+    for idx, rec in enumerate(saga_records, 1):
+        event = rec.get("event", "UNKNOWN")
+        seq = rec.get("seq", idx)
+        tool = rec.get("tool", "-")
+        payload = rec.get("payload", {})
+        print(f" [{seq:03d}] {event:<22} tool={tool:<20} payload={json.dumps(payload, default=str)[:80]}")
+
+    print("\nSimulated Replay Completed Cleanly (Dry-Run Mode).")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

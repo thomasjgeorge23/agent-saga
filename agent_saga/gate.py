@@ -307,6 +307,36 @@ class PreFlightGate:
         return Decision(Verdict.ALLOW, "default-allow", "No policy rule matched.")
 
 
+class DynamicRiskEvaluator:
+    """Evaluates real-time anomaly risk scores for candidate tool calls.
+
+    If an anomaly score exceeds `risk_threshold`, the evaluator dynamically lowers
+    the maximum allowed spending threshold or escalates the action to REQUIRE_APPROVAL.
+    """
+
+    def __init__(self, risk_scorer: Callable[[GateContext], float], risk_threshold: float = 0.70):
+        self.risk_scorer = risk_scorer
+        self.risk_threshold = risk_threshold
+
+    def evaluate(self, ctx: GateContext) -> tuple[float, bool]:
+        """Returns (risk_score, is_high_risk)."""
+        try:
+            score = float(self.risk_scorer(ctx))
+        except Exception as exc:
+            logger.warning("Risk scorer raised exception: %r; defaulting to high risk (1.0)", exc)
+            score = 1.0
+        return score, score >= self.risk_threshold
+
+
+def dynamic_risk_rule(name: str, risk_evaluator: DynamicRiskEvaluator, reason: str = "Dynamic AI anomaly risk threshold exceeded") -> Rule:
+    """Creates a rule that triggers REQUIRE_APPROVAL when dynamic risk score is high."""
+    def _predicate(ctx: GateContext) -> bool:
+        score, high_risk = risk_evaluator.evaluate(ctx)
+        return high_risk
+
+    return Rule(name=name, when=_predicate, verdict=Verdict.REQUIRE_APPROVAL, reason=reason)
+
+
 __all__ = [
     "PreFlightGate",
     "PreFlightViolation",
@@ -318,4 +348,7 @@ __all__ = [
     "arg_exceeds",
     "tool_is",
     "DEFAULT_RULES",
+    "DynamicRiskEvaluator",
+    "dynamic_risk_rule",
 ]
+
