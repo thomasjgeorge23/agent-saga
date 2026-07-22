@@ -129,6 +129,11 @@ class PreFlightGate:
         # wake a human to approve a call it will refuse regardless.
         self._check_kill_switch(ctx)
 
+        # Phase 0.5: is this call worth making? Before limits, so a call to a
+        # dependency known to be down does not consume budget on its way to
+        # being refused.
+        self._check_breaker(ctx)
+
         reservation = None
         if self.limits:
             reservation = await self._reserve(ctx)
@@ -157,6 +162,19 @@ class PreFlightGate:
         except Halted as exc:
             raise PreFlightViolation(
                 Decision(Verdict.BLOCK, f"kill-switch:{exc.scope}", str(exc)),
+                ctx) from exc
+
+    def _check_breaker(self, ctx: GateContext) -> None:
+        from .breaker import CircuitOpen, get_breaker
+
+        breaker = get_breaker()
+        if breaker is None:
+            return
+        try:
+            breaker.check(ctx.tool)
+        except CircuitOpen as exc:
+            raise PreFlightViolation(
+                Decision(Verdict.BLOCK, f"circuit-open:{ctx.tool}", str(exc)),
                 ctx) from exc
 
     # -- limits ------------------------------------------------------------

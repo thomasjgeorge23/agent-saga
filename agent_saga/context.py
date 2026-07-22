@@ -443,6 +443,12 @@ class SagaContext:
             # "did not happen", and still attempt idempotent compensation.
             step.state = StepState.UNKNOWN
             step.error = repr(exc)
+            # Tell the breaker. Reached only when the tool actually ran and
+            # raised -- a PreFlightViolation is thrown by the gate above and
+            # never arrives here, which is deliberate: counting refusals would
+            # trip the breaker exactly when the controls were working, and it
+            # would then block the calls that were still fine.
+            _tell_breaker(tool, ok=False, error=repr(exc))
             if compensate is not None:
                 step.compensation = _derive(compensate, None, tool)
             self.wal.append(
@@ -459,6 +465,7 @@ class SagaContext:
         #    ids, the message ts. This is what a statically declared workflow
         #    cannot do when the agent picked the action at runtime.
         step.state = StepState.COMMITTED
+        _tell_breaker(tool, ok=True)
         if compensate is not None:
             step.compensation = _derive(compensate, result, tool)
             self._warn_if_unrecoverable(step)
@@ -601,6 +608,29 @@ class SagaContext:
         (logger.info if report.clean else logger.error)("rollback complete: %s",
                                                          report.summary())
         return report
+
+
+def _tell_breaker(tool: str, *, ok: bool, error: str = "") -> None:
+    """Report an outcome to the circuit breaker, if one is installed.
+
+    Only forward steps are reported. Compensations deliberately are not: a
+    breaker that learned from rollback failures would open on the connector
+    whose compensations are failing, and then refuse the remaining
+    compensations -- turning a dependency outage into stranded money.
+    """
+    from .breaker import get_breaker
+
+    breaker = get_breaker()
+    if breaker is None:
+        return
+    try:
+        if ok:
+            breaker.record_success(tool)
+        else:
+            breaker.record_failure(tool, error)
+    except Exception as exc:
+        # Observability must never break the transaction it is observing.
+        logger.warning("could not update circuit breaker for %r: %r", tool, exc)
 
 
 async def _invoke(fn: Callable[..., Any], kwargs: dict, timeout: Optional[float]) -> Any:

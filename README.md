@@ -324,6 +324,54 @@ async def checkout():
 
 During shutdown, the lifespan manager gracefully cancels the recovery daemon, awaits any pending compensations for active sagas, releases held semantic locks, and flushes the write-ahead log.
 
+## Circuit breaker
+
+Limits cap what an agent is *allowed* to do. This caps what's *worth* doing:
+when Stripe has been timing out for ninety seconds, the hundredth charge attempt
+won't succeed either — and each one costs a saga, a WAL fsync, a compensation of
+unknown outcome, and thirty seconds of an agent's life.
+
+```python
+from agent_saga import CircuitBreaker, BreakerPolicy, set_breaker
+
+set_breaker(CircuitBreaker(BreakerPolicy(
+    failure_threshold=5,      # consecutive failures, or…
+    failure_rate=0.5,         # …50% of calls failing,
+    min_volume=10,            #    once there's enough volume to mean anything
+    window=60,
+    cool_down=30,             # then one trial call
+), wal=wal))
+```
+
+It's the only control here that needs **outcome feedback**, which is why it
+couldn't be built alongside the budgets: a limit decides before the call and
+never learns what happened; a breaker is nothing but what happened.
+
+Three behaviours where the obvious answer is wrong:
+
+- **A refusal is not a failure.** Over budget, blocked by policy, denied by a
+  human — those mean the system *worked*. Counting them would trip the breaker
+  exactly when the controls were doing their job, and it would then block the
+  calls that were still fine. Only a tool that actually ran and raised counts.
+- **A breaker never blocks a rollback.** If the forward path is failing, the
+  compensations are precisely what you need to run. Blocking them because their
+  connector looks sick would strand money mid-transaction — turning a dependency
+  outage into a financial one. Compensation failures don't feed it either, or it
+  would open on the connector whose refunds are failing and then refuse the rest
+  of them.
+- **This one fails *open*, and that isn't an inconsistency.** A budget that can't
+  be verified must refuse, because failing open means overspending. A breaker is
+  an *availability* protection: refusing all work because its own store is down
+  would be an outage it invented. It degrades to per-process state and keeps
+  going. The rule throughout: **fail toward the behaviour you'd have without the
+  feature** — for a budget that's "refuse", for a breaker it's "make the call".
+
+Checked before limits, so a call to a dependency known to be down doesn't consume
+budget on its way to being refused. Trips, probes and recoveries land in the
+hash-chained WAL.
+
+---
+
 ## Reconciliation
 
 Every other guarantee here ends at an API response. The refund returned 200, so

@@ -52,6 +52,14 @@ from .integrity import (
     redact_where,
 )
 from .integrity import verify as verify_chain
+from .breaker import (
+    BreakerPolicy,
+    CircuitBreaker,
+    CircuitOpen,
+    InProcessBreakerStore,
+    get_breaker,
+    set_breaker,
+)
 from .reconcile import (
     Finding,
     Observation,
@@ -187,6 +195,12 @@ __all__ = [
     "arg_exceeds",
     "tool_is",
     "verify_chain",
+    "CircuitBreaker",
+    "BreakerPolicy",
+    "CircuitOpen",
+    "InProcessBreakerStore",
+    "get_breaker",
+    "set_breaker",
     "reconciler",
     "Reconciliation",
     "Observation",
