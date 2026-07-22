@@ -68,12 +68,16 @@ class SnapshotGC:
         *,
         recovery_journal: Optional[str | Path] = None,
         grace_seconds: float = 3600.0,
+        ttl_days: Optional[float] = None,
+        max_snapshots_per_key: Optional[int] = None,
         dry_run: bool = False,
     ):
         self.wal_path = Path(wal_path)
         self.store = store or get_snapshot_store()
         self.recovery_journal = Path(recovery_journal) if recovery_journal else None
         self.grace_seconds = grace_seconds
+        self.ttl_days = ttl_days
+        self.max_snapshots_per_key = max_snapshots_per_key
         self.dry_run = dry_run
 
     # -- read saga lifecycles from the WAL (and optional recovery journal) ---

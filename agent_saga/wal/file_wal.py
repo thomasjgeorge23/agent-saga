@@ -48,6 +48,8 @@ class FileWAL(BufferedWAL):
         encryptor: Any = _UNSET,
         barrier_timeout: Optional[float] = DEFAULT_BARRIER_TIMEOUT,
         chain: bool = True,
+        max_size_mb: float = 0,
+        rotate_daily: bool = False,
     ):
         super().__init__(max_buffer=max_buffer, backpressure=backpressure,
                          encryptor=encryptor, barrier_timeout=barrier_timeout,
@@ -55,6 +57,25 @@ class FileWAL(BufferedWAL):
         self.path = Path(path) if path else None
         self._fh = None
         self._flush_pool = None
+        self.max_size_mb = max_size_mb
+        self.rotate_daily = rotate_daily
+
+    def _maybe_rotate(self) -> None:
+        if not self.path or not self.path.exists():
+            return
+        should_rotate = False
+        if self.max_size_mb > 0:
+            size_mb = self.path.stat().st_size / (1024 * 1024)
+            if size_mb >= self.max_size_mb:
+                should_rotate = True
+        if should_rotate:
+            import time
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            rotated_path = self.path.with_name(f"{self.path.stem}_{timestamp}{self.path.suffix}")
+            if self._fh:
+                self._fh.close()
+                self._fh = None
+            os.rename(self.path, rotated_path)
 
     # -- sink --------------------------------------------------------------
 
@@ -140,6 +161,9 @@ class FileWAL(BufferedWAL):
         """Runs on the private worker thread. Single writer, so no lock."""
         from ..encryption import encode_line
 
+        self._maybe_rotate()
+        if self._fh is None and self.path:
+            self._fh = open(self.path, "a", encoding="utf-8")
         assert self._fh is not None
         self._fh.write("".join(encode_line(r, self._encryptor) + "\n" for r in batch))
         self._fh.flush()

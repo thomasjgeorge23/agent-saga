@@ -118,20 +118,26 @@ class PreFlightGate:
         *,
         approval_provider: Optional[ApprovalProvider] = None,
         limits: Sequence[Any] = (),
+        risk_scorer: Optional[Callable[[GateContext], float]] = None,
+        risk_threshold: float = 0.70,
     ):
         self.rules = list(rules)
         self.approval_provider = approval_provider
         self.limits = list(limits)
+        self.risk_scorer = risk_scorer
+        self.risk_threshold = risk_threshold
 
     async def evaluate(self, ctx: GateContext) -> Decision:
-        # Phase 0: is this system allowed to do anything at all? First, so a
-        # halted system does not spend budget deciding to refuse, and does not
-        # wake a human to approve a call it will refuse regardless.
+        # Phase 0: is this system allowed to do anything at all?
         self._check_kill_switch(ctx)
 
-        # Phase 0.5: is this call worth making? Before limits, so a call to a
-        # dependency known to be down does not consume budget on its way to
-        # being refused.
+        # Dynamic AI Risk Scorer check
+        if self.risk_scorer is not None:
+            score = self.risk_scorer(ctx)
+            if score >= self.risk_threshold:
+                return Decision(Verdict.REQUIRE_APPROVAL, "risk_scorer", f"Dynamic AI Risk Score {score:.2f} >= threshold {self.risk_threshold:.2f}")
+
+        # Phase 0.5: is this call worth making?
         self._check_breaker(ctx)
 
         reservation = None

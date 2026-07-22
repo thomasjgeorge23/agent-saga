@@ -12,10 +12,53 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
-import secrets
-import sys
-from pathlib import Path
+import time
+from .integrity import verify, export_worm
+
+
+def _cmd_export(args: argparse.Namespace) -> int:
+    wal_path = Path(args.wal_path)
+    output_path = Path(args.output) if args.output else (Path(args.out) if getattr(args, "out", None) else None)
+    fmt = getattr(args, "format", "json").lower()
+    allow_broken = getattr(args, "allow_broken", False)
+
+    if not wal_path.exists():
+        print(f"cannot read {wal_path}: [Errno 2] No such file or directory: {wal_path!r}", file=sys.stderr)
+        return 2
+
+    records = _read_wal(wal_path)
+    report = verify(records)
+    if not report.intact and not allow_broken:
+        print(f"refusing to export: {report.summary()}", file=sys.stderr)
+        return 1
+
+    if getattr(args, "out", None):
+        export_worm(records, args.out, source=str(wal_path), report=report)
+        print(f"Exported WORM bundle with {len(records)} record(s) to {args.out}")
+        return 0
+
+    if fmt == "csv":
+        import csv
+        if records:
+            keys = sorted({k for r in records for k in r.keys()})
+            if output_path:
+                with open(output_path, "w", newline="", encoding="utf-8") as fh:
+                    writer = csv.DictWriter(fh, fieldnames=keys)
+                    writer.writeheader()
+                    writer.writerows(records)
+            else:
+                print(",".join(keys))
+                for r in records:
+                    print(",".join(str(r.get(k, "")) for k in keys))
+    else: # json
+        js_out = json.dumps(records, indent=2, default=str)
+        if output_path:
+            output_path.write_text(js_out, encoding="utf-8")
+        else:
+            print(js_out)
+
+    print(f"Exported {len(records)} WAL records successfully.")
+    return 0
 
 
 def _cmd_ui(args: argparse.Namespace) -> int:
@@ -198,6 +241,11 @@ def _approval_store(args: argparse.Namespace):
     return FileApprovalStore(args.dir)
 
 
+def _format_local_time(ts: float) -> str:
+    import datetime
+    return datetime.datetime.fromtimestamp(ts).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
 def _cmd_approvals(args: argparse.Namespace) -> int:
     store = _approval_store(args)
 
@@ -207,7 +255,9 @@ def _cmd_approvals(args: argparse.Namespace) -> int:
             print("no pending approvals")
             return 0
         for request in pending:
-            print(request.summary())
+            import time
+            local_ts = _format_local_time(getattr(request, "requested_at", time.time()))
+            print(f"{request.summary()} (local time: {local_ts})")
             for key, value in request.context.items():
                 print(f"      {key}: {value}")
         return 0
@@ -233,6 +283,13 @@ def _cmd_approvals(args: argparse.Namespace) -> int:
         return 1
     print(f"{request.status} by {request.approver}"
           + (" (BREAK-GLASS: requires post-hoc review)" if request.break_glass else ""))
+    return 0
+
+
+def _cmd_studio(args: argparse.Namespace) -> int:
+    from .ui.server import serve
+    print(f"Starting agent-saga Studio on http://{args.host}:{args.port} (WAL: {args.wal_path})...")
+    serve(args.wal_path, host=args.host, port=args.port)
     return 0
 
 
@@ -347,9 +404,29 @@ def _cmd_reconcile(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_recover(args: argparse.Namespace) -> int:
+    from .recovery import RecoveryDaemon
+    daemon = RecoveryDaemon(args.wal_path, dry_run=args.dry_run)
+    outcomes = asyncio.run(daemon.recover_all())
+    print(f"Recovery Sweep Completed. {len(outcomes)} saga(s) processed. (Dry-Run: {args.dry_run})")
+    for o in outcomes:
+        print(f"  - Saga '{o.saga_id}': {o.resolution.value} ({o.reason})")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="agent-saga", description="agent-saga tooling")
+    p = argparse.ArgumentParser(
+        prog="agent-saga",
+        description="Inspect and operate agent-saga state: human approvals, "
+                    "kill-switches, audit logs, and the time-travel debugger.",
+    )
+    p.add_argument("--version", action="version", version="agent-saga 0.2.1")
     sub = p.add_subparsers(dest="command", required=True)
+
+    recov = sub.add_parser("recover", help="run recovery daemon sweep over orphaned sagas")
+    recov.add_argument("--wal-path", default="./agent-saga.wal", help="path to WAL file")
+    recov.add_argument("--dry-run", action="store_true", help="run in observation-only mode without executing compensations")
+    recov.set_defaults(func=_cmd_recover)
 
     ui = sub.add_parser("ui", help="launch the time-travel debugger over a WAL file")
     ui.add_argument("--wal-path", default="./agent-saga.wal",
@@ -363,6 +440,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="mint a random bearer token and print the URL to open")
     ui.set_defaults(func=_cmd_ui)
 
+    studio = sub.add_parser("studio", help="unified studio launcher for web dashboard and tail")
+    studio.add_argument("--wal-path", default="./agent-saga.wal", help="path to WAL file")
+    studio.add_argument("--port", type=int, default=8080, help="port (default: 8080)")
+    studio.add_argument("--host", default="127.0.0.1", help="bind host")
+    studio.set_defaults(func=_cmd_studio)
+
     verify = sub.add_parser(
         "verify", help="check the WAL hash chain for tampering")
     verify.add_argument("--wal-path", default="./agent-saga.wal",
@@ -373,13 +456,15 @@ def build_parser() -> argparse.ArgumentParser:
     verify.set_defaults(func=_cmd_verify)
 
     export = sub.add_parser(
-        "export", help="write a verified WORM bundle for an auditor")
+        "export", help="export WAL records to structured CSV or JSON for audit teams")
     export.add_argument("--wal-path", default="./agent-saga.wal",
                         help="path to the WAL file (default: ./agent-saga.wal)")
-    export.add_argument("--out", required=True,
-                        help="output directory for the bundle")
+    export.add_argument("--format", default="json", choices=["json", "csv"],
+                        help="output format (csv or json)")
+    export.add_argument("--out", "--output", dest="out", default=None,
+                        help="output directory or file path")
     export.add_argument("--allow-broken", action="store_true",
-                        help="export even if verification fails (labelled broken)")
+                        help="export even if verification fails")
     export.set_defaults(func=_cmd_export)
 
     mcp = sub.add_parser(
@@ -476,6 +561,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_replay(args: argparse.Namespace) -> int:
+    from pathlib import Path
     wal_path = Path(args.wal_path)
     saga_target = args.saga_id
 

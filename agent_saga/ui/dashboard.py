@@ -53,8 +53,16 @@ def get_saga_ui_app(
             return handle()
         return lightweight_asgi
 
-    app = FastAPI(title="agent-saga UI Dashboard", version="0.2.0")
+    app = FastAPI(title="agent-saga UI Dashboard", version="0.2.1")
     reader = SagaWALReader(wal_path) if wal_path else None
+
+    async def verify_auth(x_api_key: Optional[str] = Header(None, alias="X-API-Key"), authorization: Optional[str] = Header(None)):
+        if not token:
+            return True
+        provided = x_api_key or (authorization.replace("Bearer ", "") if authorization and authorization.startswith("Bearer ") else None)
+        if provided != token:
+            raise HTTPException(status_code=401, detail="Invalid API Key or Bearer Token")
+        return True
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard():
@@ -64,26 +72,50 @@ def get_saga_ui_app(
         return "<html><body><h1>agent-saga UI Dashboard Active</h1></body></html>"
 
     @app.get("/api/meta")
-    async def get_meta():
+    async def get_meta(authed: bool = Depends(verify_auth)):
         if reader:
             return reader.meta()
         return {"status": "active", "total_sagas": 0}
 
     @app.get("/api/sagas")
-    async def list_sagas():
+    async def list_sagas(authed: bool = Depends(verify_auth)):
         if reader:
             return reader.list_sagas()
         return []
 
     @app.get("/api/bpmn")
-    async def export_bpmn():
+    async def export_bpmn(authed: bool = Depends(verify_auth)):
         from ..bpmn import BPMNExporter
         records = reader.list_sagas() if reader else []
         xml_str = BPMNExporter.to_bpmn_xml(records)
         return HTMLResponse(content=xml_str, media_type="application/xml")
 
+    @app.get("/api/entanglement")
+    async def get_entanglement(authed: bool = Depends(verify_auth)):
+        from ..entanglement import get_entanglement_matrix
+        matrix = get_entanglement_matrix()
+        return matrix.summary()
+
+    @app.get("/api/live-tail")
+    async def live_tail(authed: bool = Depends(verify_auth)):
+        from fastapi.responses import StreamingResponse
+        import asyncio
+
+        async def event_stream():
+            last_idx = 0
+            while True:
+                if reader:
+                    sagas = reader.list_sagas()
+                    if len(sagas) > last_idx:
+                        new_records = sagas[last_idx:]
+                        last_idx = len(sagas)
+                        yield f"data: {json.dumps(new_records)}\n\n"
+                await asyncio.sleep(1.0)
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
+
     @app.get("/api/approvals")
-    async def list_approvals():
+    async def list_approvals(authed: bool = Depends(verify_auth)):
         store = get_approval_store()
         pending = store.list_pending()
         return [
@@ -98,7 +130,7 @@ def get_saga_ui_app(
         ]
 
     @app.post("/api/approvals/{token}/approve")
-    async def approve_request(token: str, by: str = "ui-admin"):
+    async def approve_request(token: str, by: str = "ui-admin", authed: bool = Depends(verify_auth)):
         store = get_approval_store()
         ok = store.resolve(token, approved=True, by=by)
         if not ok:
@@ -106,7 +138,7 @@ def get_saga_ui_app(
         return {"status": "approved", "token": token}
 
     @app.post("/api/approvals/{token}/deny")
-    async def deny_request(token: str, by: str = "ui-admin"):
+    async def deny_request(token: str, by: str = "ui-admin", authed: bool = Depends(verify_auth)):
         store = get_approval_store()
         ok = store.resolve(token, approved=False, by=by)
         if not ok:
@@ -114,7 +146,7 @@ def get_saga_ui_app(
         return {"status": "denied", "token": token}
 
     @app.get("/api/killswitch")
-    async def killswitch_status():
+    async def killswitch_status(authed: bool = Depends(verify_auth)):
         ks = get_kill_switch()
         return {"tripped": ks.is_tripped()}
 

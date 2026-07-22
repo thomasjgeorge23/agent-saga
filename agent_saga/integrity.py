@@ -304,10 +304,25 @@ def redact_record(record: dict, *, reason: str = "erasure-request") -> dict:
     return kept
 
 
+def _has_dotted_path(record: dict, path: str) -> bool:
+    parts = path.split(".")
+    curr = record
+    for p in parts:
+        if isinstance(curr, dict) and p in curr:
+            curr = curr[p]
+        else:
+            return False
+    return True
+
+
 def redact_where(records: list[dict], predicate, *,
                  reason: str = "erasure-request") -> tuple[list[dict], int]:
-    """Redact every record the predicate selects. Returns (records, count)."""
+    """Redact every record the predicate selects (supports callable or dotted path string e.g. 'kwargs.card.cvv'). Returns (records, count)."""
     out, count = [], 0
+    if isinstance(predicate, str):
+        path_str = predicate
+        predicate = lambda r: _has_dotted_path(r, path_str)
+
     for record in records:
         if predicate(record) and not record.get(REDACTED_FIELD):
             out.append(redact_record(record, reason=reason))

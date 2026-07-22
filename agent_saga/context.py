@@ -82,9 +82,16 @@ class SagaContext:
         halt_on_compensation_failure: bool = True,
         default_timeout: Optional[float] = None,
         saga_id: Optional[str] = None,
+        name: Optional[str] = None,
+        slug: Optional[str] = None,
         lease_ttl: float = DEFAULT_LEASE_TTL,
         durable_commit: bool = True,
     ):
+        self.name = name or slug
+        self.slug = self.name
+        if not saga_id:
+            uid = str(uuid.uuid4())
+            saga_id = f"{self.name}-{uid[:8]}" if self.name else uid
         self.durable_commit = durable_commit
         """Fsync the compensation descriptor before returning to the agent.
         Turning this off halves durable-path latency and makes crash recovery

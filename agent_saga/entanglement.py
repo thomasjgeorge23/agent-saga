@@ -18,6 +18,16 @@ logger = logging.getLogger("agent_saga.entanglement")
 
 HEADER_ENTANGLEMENT_ID = "X-Saga-Entanglement-Id"
 HEADER_PARENT_STEP = "X-Saga-Parent-Step"
+HEADER_CORRELATION_ID = "X-Saga-Correlation-Id"
+
+
+def get_correlation_headers(ctx: SagaContext) -> dict[str, str]:
+    """Builds distributed cross-process HTTP correlation headers for multi-agent calls."""
+    return {
+        HEADER_CORRELATION_ID: ctx.saga_id,
+        HEADER_ENTANGLEMENT_ID: ctx.saga_id,
+        HEADER_PARENT_STEP: str(len(ctx.stack)),
+    }
 
 
 @dataclass

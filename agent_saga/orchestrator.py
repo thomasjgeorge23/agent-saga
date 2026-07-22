@@ -37,16 +37,17 @@ class ChildSaga:
 class ParallelSagaGroup:
     """Executes parallel tool tasks (fan-out) and waits for all to join (fan-in)."""
 
-    def __init__(self, group_name: str, parent_ctx: SagaContext):
+    def __init__(self, group_name: str, parent_ctx: SagaContext, mode: str = "fail_fast"):
         self.group_name = group_name
         self.parent_ctx = parent_ctx
+        self.mode = mode.lower()  # fail_fast, fail_all, best_effort
         self.tasks: list[Callable[[SagaContext], Any]] = []
 
     def add_task(self, task_fn: Callable[[SagaContext], Any]) -> None:
         self.tasks.append(task_fn)
 
     async def execute_all(self) -> list[Any]:
-        """Runs all tasks concurrently in parallel child saga contexts."""
+        """Runs all tasks concurrently in parallel child saga contexts according to mode."""
         child_contexts: list[SagaContext] = []
         coroutines = []
 
@@ -54,20 +55,34 @@ class ParallelSagaGroup:
             child_ctx = SagaContext(saga_id=f"{self.parent_ctx.saga_id}-parallel-{idx}", wal=self.parent_ctx.wal)
             child_contexts.append(child_ctx)
             if asyncio.iscoroutinefunction(task_fn):
-                coroutines.append(task_fn(child_ctx))
+                async def _wrap_async(fn=task_fn, ctx=child_ctx):
+                    if not ctx.wal._task:
+                        await ctx.wal.start()
+                    return await fn(ctx)
+                coroutines.append(_wrap_async())
             else:
-                async def _wrap(fn=task_fn, ctx=child_ctx):
+                async def _wrap_sync(fn=task_fn, ctx=child_ctx):
+                    if not ctx.wal._task:
+                        await ctx.wal.start()
                     return fn(ctx)
-                coroutines.append(_wrap())
+                coroutines.append(_wrap_sync())
 
         results = await asyncio.gather(*coroutines, return_exceptions=True)
 
-        failures = [r for r in results if isinstance(r, Exception)]
+        failures = [(idx, r) for idx, r in enumerate(results) if isinstance(r, Exception)]
+
         if failures:
-            logger.error("Parallel group %s had %d failure(s), rolling back group...", self.group_name, len(failures))
-            for c_ctx in child_contexts:
-                await c_ctx.rollback()
-            raise failures[0]
+            logger.error("Parallel group %s (mode=%s) had %d failure(s)", self.group_name, self.mode, len(failures))
+
+            if self.mode == "best_effort":
+                # Rollback only failed child contexts; return results list with exceptions
+                for idx, exc in failures:
+                    await child_contexts[idx].rollback()
+            elif self.mode == "fail_all" or self.mode == "fail_fast":
+                # Rollback all child contexts
+                for c_ctx in child_contexts:
+                    await c_ctx.rollback()
+                raise failures[0][1]
 
         return results
 

@@ -46,23 +46,17 @@ def current_saga() -> Optional[SagaContext]:
 @contextlib.asynccontextmanager
 async def saga_scope(
     *,
+    name: Optional[str] = None,
+    slug: Optional[str] = None,
     gate: Optional[PreFlightGate] = None,
     wal: Optional[AsyncWAL] = None,
     halt_on_compensation_failure: bool = True,
 ) -> AsyncIterator[SagaContext]:
-    """The one transactional boundary. `@saga`, `saga_run`, and any framework
-    adapter all go through here, so the begin/rollback/finish/lease lifecycle
-    lives in exactly one place.
-
-    On any exception inside the scope, compensations run LIFO and a `SagaAborted`
-    is raised carrying the `RollbackReport`. A caller that wants the report
-    instead of the exception catches `SagaAborted` and reads `.report`.
-    """
     own_wal = wal is None and _DEFAULT_WAL is None
     _wal = wal or _DEFAULT_WAL or AsyncWAL()
     if own_wal:
         await _wal.start()
-    ctx = SagaContext(gate=gate, wal=_wal,
+    ctx = SagaContext(gate=gate, wal=_wal, name=name or slug,
                       halt_on_compensation_failure=halt_on_compensation_failure)
     _active_sagas.add(ctx)
     token = _current.set(ctx)

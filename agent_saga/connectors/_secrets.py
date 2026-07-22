@@ -77,44 +77,44 @@ _SUSPICIOUS_KEYS = re.compile(
 )
 
 
-def _find_secret_value(value: Any, path: str) -> Optional[tuple[str, str]]:
+def _find_secret_value(value: Any, path: str, custom_patterns: Optional[list[tuple[re.Pattern | str, str]]] = None) -> Optional[tuple[str, str]]:
     """Walk nested dicts and lists; return (path, label) for the first string
     matching a credential pattern, else None.
-
-    Only *values* are matched here, at any depth. The patterns are specific
-    (`sk_live_...`, JWTs, DB URIs), so recursing them through a row snapshot or
-    Stripe metadata has a low false-positive rate. Key *names* are deliberately
-    NOT recursed into these payloads -- a column literally named `token` or
-    `auth_provider` is user data, not a leak, and flagging it would break real
-    connectors.
     """
+    patterns = list(_PATTERNS)
+    if custom_patterns:
+        for p, label in custom_patterns:
+            compiled = p if isinstance(p, re.Pattern) else re.compile(p)
+            patterns.append((compiled, label))
+
     if isinstance(value, str):
-        for pattern, label in _PATTERNS:
-            if pattern.match(value):
+        for pattern, label in patterns:
+            if pattern.search(value) or pattern.match(value):
                 return path, label
         return None
     if isinstance(value, dict):
         for k, v in value.items():
-            hit = _find_secret_value(v, f"{path}.{k}" if path else str(k))
+            hit = _find_secret_value(v, f"{path}.{k}" if path else str(k), custom_patterns)
             if hit:
                 return hit
     elif isinstance(value, (list, tuple)):
         for i, v in enumerate(value):
-            hit = _find_secret_value(v, f"{path}[{i}]")
+            hit = _find_secret_value(v, f"{path}[{i}]", custom_patterns)
             if hit:
                 return hit
     return None
 
 
-def assert_no_secrets(kwargs: dict, *, where: str) -> None:
+def assert_no_secrets(kwargs: dict, *, where: str, custom_patterns: Optional[list[tuple[re.Pattern | str, str]]] = None) -> None:
     """Fail loudly while the developer is still writing the connector.
 
     Catches a credential-shaped value anywhere in the kwargs -- including nested
     dicts and lists such as a Postgres row snapshot or Stripe metadata, not just
     top-level strings -- plus top-level kwarg *names* that look like credentials
     (those names are connector-authored, so strictness there is safe).
+    Supports custom team regex patterns via custom_patterns.
     """
-    hit = _find_secret_value(kwargs, "")
+    hit = _find_secret_value(kwargs, "", custom_patterns)
     if hit:
         path, label = hit
         loc = f"value at {path!r}" if path else "value"

@@ -22,6 +22,11 @@ from .locks import SemanticLockManager, set_semantic_locks
 from .limits import set_limit_store
 
 
+class SagaConfigError(RuntimeError):
+    """Raised when a SagaConfig backend fails eager startup validation."""
+    pass
+
+
 @dataclass
 class SagaConfig:
     store: Any = None
@@ -32,7 +37,17 @@ class SagaConfig:
     telemetry: bool = True
     breaker: Any = None
 
+    def validate(self) -> None:
+        """Eagerly validates that configured backends are reachable and valid."""
+        if self.encryption is not None:
+            if not hasattr(self.encryption, "encrypt") or not hasattr(self.encryption, "decrypt"):
+                raise SagaConfigError("Configured encryption object does not implement encrypt/decrypt interface")
+        if self.semantic_locks is not None:
+            if not hasattr(self.semantic_locks, "acquire") or not hasattr(self.semantic_locks, "release"):
+                raise SagaConfigError("Configured semantic_locks object does not implement acquire/release interface")
+
     def apply(self) -> None:
+        self.validate()
         if self.encryption is not None:
             set_wal_encryptor(self.encryption)
         if self.semantic_locks is not None:
@@ -69,4 +84,4 @@ class SagaEngine:
         return cfg
 
 
-__all__ = ["SagaConfig", "SagaEngine"]
+__all__ = ["SagaConfig", "SagaEngine", "SagaConfigError"]

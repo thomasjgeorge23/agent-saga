@@ -83,6 +83,7 @@ from .approvals import (
     EscalationLevel,
     FileApprovalStore,
     RedisApprovalStore,
+    PostgresApprovalStore,
     WebhookNotifier,
 )
 from .registry import compensator, registered, resolve
@@ -182,7 +183,7 @@ from .wal import (
 )
 from .serialization import SagaJSONEncoder, dumps as saga_dumps, loads as saga_loads
 from .frameworks import saga_lifespan
-from .config import SagaEngine, SagaConfig
+from .config import SagaEngine, SagaConfig, SagaConfigError
 from .encryption import KeyRingEncryptor
 from .locks import AutoLockHeartbeat
 from .streaming import IncrementalCompensationTracker, streaming_step
@@ -193,13 +194,29 @@ from .signals import SignalBus, QueryBus, get_signal_bus, get_query_bus
 from .orchestrator import ChildSaga, ParallelSagaGroup
 from .bpmn import BPMNExporter, BPMNImporter, BPMNNode
 from .determinism import ReplayVerifier, verify_replay_determinism, DeterminismResult
+from .slack_app import SlackBlockKitApp
+from .tenant import TenantContext, get_current_tenant, set_current_tenant
+from .cloud import SagaCloudClient
+from .schemas import SchemaContractError, validate_schema
+from .testing import ChaosRunner, ChaosResult, verify_saga_replay
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __author__ = "SagaOps"
 
 __all__ = [
+    "SlackBlockKitApp",
+    "TenantContext",
+    "get_current_tenant",
+    "set_current_tenant",
+    "SagaCloudClient",
+    "SchemaContractError",
+    "validate_schema",
+    "ChaosRunner",
+    "ChaosResult",
+    "verify_saga_replay",
     "SagaEngine",
     "SagaConfig",
+    "SagaConfigError",
     "KeyRingEncryptor",
     "AutoLockHeartbeat",
     "IncrementalCompensationTracker",
@@ -275,6 +292,7 @@ __all__ = [
     "EscalationLevel",
     "FileApprovalStore",
     "RedisApprovalStore",
+    "PostgresApprovalStore",
     "WebhookNotifier",
     "ConsoleNotifier",
     "ChainReport",
