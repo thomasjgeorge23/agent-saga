@@ -455,3 +455,45 @@ def test_setup_telemetry_never_raises():
     from agent_saga.observability.otel import setup_telemetry
     tracer = setup_telemetry()
     assert tracer is not None and hasattr(tracer, "span")
+
+
+# -- #23 KeyRingEncryptor automatic key rotation ------------------------------
+
+def test_keyring_auto_rotation_on_interval():
+    pytest.importorskip("cryptography")
+    from agent_saga.encryption import KeyRingEncryptor, generate_key
+
+    clock = {"t": 1_000_000.0}
+    events = []
+    k0 = generate_key()
+    enc = KeyRingEncryptor(k0, rotation_interval_days=90,
+                           on_rotate=events.append, _clock=lambda: clock["t"])
+
+    tok_old = enc.encrypt(b"under-key0")
+    assert not events and enc.primary_key == k0        # not due yet
+
+    clock["t"] += 91 * 86400                            # past the interval
+    tok_new = enc.encrypt(b"under-key1")
+    assert len(events) == 1                             # rotated
+    assert k0 in enc.fallback_keys                      # old key demoted
+    assert enc.primary_key != k0
+    # rotation event carries fingerprints, never the raw key
+    assert "new_primary_fingerprint" in events[0] and str(k0) not in str(events[0])
+    # historical + new records both decrypt
+    assert enc.decrypt(tok_old) == b"under-key0"
+    assert enc.decrypt(tok_new) == b"under-key1"
+    # no second rotation immediately after
+    enc.encrypt(b"x")
+    assert len(events) == 1
+
+
+def test_keyring_explicit_rotate_and_fallback_cap():
+    pytest.importorskip("cryptography")
+    from agent_saga.encryption import KeyRingEncryptor, generate_key
+    enc = KeyRingEncryptor(generate_key(), max_fallback_keys=2)
+    first = enc.primary_key
+    enc.rotate()
+    assert first in enc.fallback_keys and enc.primary_key != first
+    for _ in range(5):
+        enc.rotate()
+    assert len(enc.fallback_keys) == 2                  # capped
