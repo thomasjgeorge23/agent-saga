@@ -1,17 +1,53 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
-.pytest_cache/
-bench/results-*.json
-*.jsonl
-*.wal
-.claims/
-.venv/
+*.py[cod]
+*$py.class
 
-# build artifacts
+# Pytest & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Build & Packaging
 dist/
 build/
 *.egg-info/
+*.egg
 
-# proprietary trade secrets
+# AI Tools, Subagents & Assistant Artifacts
+.claude/
+.gemini/
+.antigravity/
+.cursor/
+.copilot/
+brain/
+scratch/
+logs/
+*.log
+
+# Runtime Data, WAL & Approval State
+*.wal
+*.jsonl
+.agent_saga_snapshots/
+approvals.json/
+.claims/
+bench/results-*.json
+
+# IDE & Editor Configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Secrets & Environment Files
 TRADE_SECRETS_PROPRIETARY.md
 .saga_secrets/
+.env
+.env.*
