@@ -497,3 +497,48 @@ def test_keyring_explicit_rotate_and_fallback_cap():
     for _ in range(5):
         enc.rotate()
     assert len(enc.fallback_keys) == 2                  # capped
+
+
+# -- #24 LangChainSagaCallback auto LLM-trace linking -------------------------
+
+def test_langchain_callback_links_on_llm_end():
+    from agent_saga import LangChainSagaCallback
+    cb = LangChainSagaCallback(saga_id="onboard-42",
+                               hallucination_scorer=lambda resp: 0.87)
+    cb.on_llm_start(serialized={}, prompts=["Summarize the contract"], run_id="run-abc")
+    cb.on_llm_end(response=object(), run_id="run-abc")
+    link = cb.links[0]
+    assert link["saga.id"] == "onboard-42"
+    assert link["saga.llm_trace_id"] == "run-abc"
+    assert link["saga.hallucination_score"] == 0.87
+    assert "contract" in link["saga.prompt_context"]
+
+
+def test_langchain_callback_uses_context_saga_id():
+    from agent_saga import LangChainSagaCallback
+    from agent_saga.observability import set_saga_id, reset_saga_id
+    tok = set_saga_id("ctx-saga-99")
+    try:
+        cb = LangChainSagaCallback()          # no explicit saga id
+        cb.on_llm_start(prompts=["hi"], run_id="r2")
+        cb.on_llm_end(response=None, run_id="r2")
+    finally:
+        reset_saga_id(tok)
+    assert cb.links[0]["saga.id"] == "ctx-saga-99"
+
+
+def test_langchain_callback_links_on_error():
+    from agent_saga import LangChainSagaCallback
+    cb = LangChainSagaCallback(saga_id="s3")
+    cb.on_llm_error(error=ValueError("rate limited"), run_id="r3")
+    assert cb.links and "llm_error" in cb.links[0]["saga.prompt_context"]
+
+
+def test_langchain_callback_never_raises_into_llm_call():
+    # A scorer that explodes must not surface into the LLM call being observed.
+    from agent_saga import LangChainSagaCallback
+    def boom(resp): raise RuntimeError("scorer down")
+    cb = LangChainSagaCallback(saga_id="s", hallucination_scorer=boom)
+    cb.on_llm_start(prompts=["x"], run_id="r")
+    cb.on_llm_end(response=object(), run_id="r")   # must not raise
+    assert cb.links and cb.links[0]["saga.hallucination_score"] == 0.0

@@ -164,6 +164,7 @@ from .observability.otel import (
     get_tracer,
     setup_telemetry,
 )
+from .observability.langchain import LangChainSagaCallback
 from .snapshot import (
     AttributeSnapshot,
     MappingSnapshot,
@@ -367,6 +368,7 @@ __all__ = [
     "setup_telemetry",
     "get_tracer",
     "SagaTracer",
+    "LangChainSagaCallback",
     "NoOpTracer",
     "__version__",
     "SagaJSONEncoder",
