@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v0.2.0 — Supreme Transactional Reliability & Observability Engine for AI Agents</title>
-<meta name="description" content="Mission-critical transactional reliability, 99.999% anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, expanded connectors, and zero-configuration auto-rollback infrastructure for autonomous AI agents." />
+<title>agent-saga v0.2.3 — Supreme Transactional Reliability & Observability Engine for AI Agents</title>
+<meta name="description" content="Mission-critical transactional reliability, 99.999% anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, self-hosted cloud control plane, BPMN visual designer, pytest-agent-saga, and zero-configuration auto-rollback infrastructure for autonomous AI agents." />
 <style>
   :root {
     --bg: #070c16; --panel: #0f172a; --elev: #1e293b;
@@ -224,7 +224,7 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top">agent-saga <span class="seq">v0.2.0</span></a>
+    <a class="brand" href="#top">agent-saga <span class="seq">v0.2.3</span></a>
     <nav class="nav-links">
       <a href="#categories">Industries</a>
       <a href="#sandbox">Live Input Sandbox</a>
@@ -241,11 +241,11 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">⚡ Supreme AI Reliability Infrastructure · PyPI v0.2.0</p>
+        <p class="eyebrow">⚡ Supreme AI Reliability Infrastructure · PyPI v0.2.3</p>
         <h1>The supreme transactional engine for <span class="amber">autonomous AI agents</span>.</h1>
         <p class="lede">
           From hobby builders and indie coders to high-precision medical examination, banking settlements, and flight control — 
-          <b>agent-saga v0.2.0</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, GitHub/AWS/Slack connectors, and automatic LIFO rollbacks.
+          <b>agent-saga v0.2.3</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, GitHub/AWS/Slack connectors, and automatic LIFO rollbacks.
         </p>
         <div class="install">
           <span class="prompt">$</span><code>pip install agent-saga</code>
@@ -261,7 +261,7 @@
       <div>
         <div class="wal">
           <div class="wal-bar">
-            <span class="dot"></span><span>Write-Ahead Log (WAL v0.2.0)</span>
+            <span class="dot"></span><span>Write-Ahead Log (WAL v0.2.3)</span>
             <span class="fn">SAGA_LIVE · 99.999% Grounded</span>
           </div>
           <div class="wal-body">
@@ -340,7 +340,7 @@
         <!-- MODE BANNER -->
         <div class="mode-banner">
           <div class="mode-banner-text" id="bannerText">
-            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.2.0 Active Protection)</span>
+            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.2.3 Active Protection)</span>
           </div>
           <div style="color: var(--dim); font-size: .8rem;">Toggle OFF to test Raw AI Failure Mode</div>
         </div>
@@ -369,7 +369,7 @@
           <!-- Real-Time Output Console -->
           <div class="output-console">
             <div class="console-header">
-              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.2.0)</span>
+              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.2.3)</span>
               <span id="consoleStatus">READY</span>
             </div>
             <div id="consoleBody" style="display: flex; flex-direction: column; gap: .65rem;">
@@ -390,39 +390,57 @@
       <h2>Click any feature to inspect its live code payload & architecture.</h2>
       
       <div class="feat-grid">
+        <div class="feat-card" onclick="openFeatureModal('cloud_server')">
+          <h3>☁️ Self-Hosted Control Plane (cloud-server)</h3>
+          <p>Run your own control plane backend (<code>agent-saga cloud-server</code>) matching the <code>sagaops.dev</code> SaaS REST API for audit ingest, approvals, and fleet budget sync.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('bpmn_designer')">
+          <h3>📐 BPMN 2.0 Visual Workflow Designer</h3>
+          <p>Interactive web canvas tab on the dashboard to visually design agent compensation flows and export typed <code>@saga_scope</code> Python code in 1 click.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('pytest_plugin')">
+          <h3>🧪 Standalone pytest-agent-saga Package</h3>
+          <p>Dedicated Pytest companion package (<code>pip install pytest-agent-saga</code>) providing isolated WAL fixtures, multi-point chaos runners, and deterministic replay assertions.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('redact_path')">
+          <h3>🛡️ Array & Dotted Redaction (redact_path)</h3>
+          <p>Surgically mask nested fields including list indices (e.g. <code>redact_path(records, "kwargs.items.0.cvv")</code>) without writing custom lambda functions.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('self_healing')">
+          <h3>🔄 Multi-Turn Agent Self-Healing Loop</h3>
+          <p>Bounded correction loop (<code>SelfHealingLoop</code>) that feeds gate refusal reasons back to the agent with exponential backoff and human escalation fallback.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('embedding_risk')">
+          <h3>🧠 Zero-Config Embedding Risk Scorer</h3>
+          <p>Dynamic anomaly risk scoring against known-bad tool calls (<code>EmbeddingRiskScorer</code>) with zero external dependencies and offline execution.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('slack_app')">
+          <h3>💬 Slack OAuth & Slash Command Integration</h3>
+          <p>Interactive Slack Block Kit app with OAuth URL construction (<code>build_oauth_install_url</code>) and <code>/saga-approve</code> slash command handling.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
         <div class="feat-card" onclick="openFeatureModal('otel')">
           <h3>📊 OpenTelemetry & LangSmith Tracing</h3>
-          <p>Binds Saga UUIDs to OpenTelemetry spans, LangSmith runs, and Phoenix traces, identifying the exact prompt context that caused a transaction rollback.</p>
-          <span class="feat-inspect-hint">Click to inspect code →</span>
-        </div>
-
-        <div class="feat-card" onclick="openFeatureModal('connectors')">
-          <h3>🔌 Expanded Native Connectors</h3>
-          <p>Plug-and-play safety connectors for GitHub PR/Commit auto-revert, AWS/GCP/K8s infra auto-cleanup, and Slack/Discord message redactions.</p>
-          <span class="feat-inspect-hint">Click to inspect code →</span>
-        </div>
-
-        <div class="feat-card" onclick="openFeatureModal('dynamic_risk')">
-          <h3>🛡️ Dynamic AI Risk Policies</h3>
-          <p>Evaluates anomaly risk scores in real-time. If an anomaly score exceeds threshold, spend limits dynamically scale down and escalate to human review.</p>
-          <span class="feat-inspect-hint">Click to inspect code →</span>
-        </div>
-
-        <div class="feat-card" onclick="openFeatureModal('postgres_store')">
-          <h3>🗄️ Relational Postgres Approval Store</h3>
-          <p>Stores pending human approvals directly in PostgreSQL (<code>PostgresApprovalStore</code>) for enterprise risk teams without requiring Redis infrastructure.</p>
-          <span class="feat-inspect-hint">Click to inspect code →</span>
-        </div>
-
-        <div class="feat-card" onclick="openFeatureModal('replay')">
-          <h3>⏳ Time-Travel Debugging & Replay</h3>
-          <p>Run <code>agent-saga replay &lt;saga_id&gt;</code> to simulate historical failed sagas locally from WAL data without touching live production APIs.</p>
+          <p>Binds Saga UUIDs to OpenTelemetry spans, LangChain callbacks, and Phoenix traces, identifying the exact prompt context that caused a rollback.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
         <div class="feat-card" onclick="openFeatureModal('ui')">
-          <h3>💻 Risk Team Dashboard (agent-saga ui)</h3>
-          <p>Out-of-the-box web UI server (<code>agent-saga ui</code>) providing risk teams with visual approval queues, token auth, and live trace inspection.</p>
+          <h3>💻 Protected Web Dashboard (agent-saga ui)</h3>
+          <p>Web UI dashboard serving visual approval queues, SSE live WAL streaming, spend limit gauges, and token authentication.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
       </div>
@@ -479,7 +497,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 <footer>
   <div class="wrap foot-grid">
     <div>
-      <div class="brand">agent-saga <span class="seq">v0.2.0</span></div>
+      <div class="brand">agent-saga <span class="seq">v0.2.3</span></div>
       <p style="font-size: .88rem; color: var(--faint); margin-top: .4rem;">
         Licensed under Apache-2.0. Built for mission-critical enterprise AI agent reliability.
       </p>
@@ -487,7 +505,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
     <div style="margin-left: auto; display: flex; gap: 1.8rem; font-size: .95rem;">
       <a href="#install">Documentation</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">GitHub</a>
-      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.2.0</a>
+      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.2.3</a>
     </div>
   </div>
 </footer>
@@ -567,6 +585,72 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 
   /* Dynamic Feature Code Modals */
   var featurePayloads = {
+    cloud_server: {
+      title: "☁️ Self-Hosted Control Plane Server (cloud-server)",
+      desc: "Run a self-hosted control plane backend matching the sagaops.dev REST API for audit log ingestion, cross-fleet budget tracking, and approvals.",
+      code: `$ agent-saga cloud-server --host 127.0.0.1 --port 8090
+
+from agent_saga.cloud import SagaCloudClient
+
+client = SagaCloudClient(api_key="sk_live_123", endpoint="http://127.0.0.1:8090/v1")
+await client.push_wal_records(records)`
+    },
+    bpmn_designer: {
+      title: "📐 BPMN 2.0 Visual Workflow Designer",
+      desc: "Interactive web canvas on the dashboard allowing risk officers and developers to design compensation flows and export typed @saga_scope code.",
+      code: `from agent_saga import saga_scope, ActionSemantics
+
+@saga_scope(name="visual_bpmn_saga")
+async def execute_bpmn_workflow(ctx):
+    # Step 1: Reserve Flight
+    await ctx.execute(tool="reserve_flight", semantics=ActionSemantics.COMPENSABLE, ...)
+    # Step 2: Book Hotel
+    await ctx.execute(tool="book_hotel", semantics=ActionSemantics.COMPENSABLE, ...)`
+    },
+    pytest_plugin: {
+      title: "🧪 Standalone pytest-agent-saga Package",
+      desc: "Dedicated Pytest companion package providing isolated WAL fixtures, multi-point chaos failure injection, and deterministic replay assertions.",
+      code: `$ pip install pytest-agent-saga
+
+async def test_order_saga(saga_wal, chaos_runner):
+    # Test saga under synthetic step failure injection
+    result = await chaos_runner.run(my_order_saga, fail_point=2)
+    assert result.rolled_back is True`
+    },
+    redact_path: {
+      title: "🛡️ Array & Dotted Redaction (redact_path)",
+      desc: "Surgically mask nested fields including list indices without writing custom lambda functions.",
+      code: `from agent_saga.integrity import redact_path
+
+records = [{"seq": 1, "kwargs": {"items": [{"card": "1234", "cvv": "999"}]}}]
+cleaned, count = redact_path(records, "kwargs.items.0.cvv")
+# cleaned[0]["kwargs"]["items"][0]["cvv"] -> "[REDACTED]"`
+    },
+    self_healing: {
+      title: "🔄 Multi-Turn Agent Self-Healing Loop",
+      desc: "Drives an agent through a bounded correction loop: feeds refusal reasons back into the prompt context with exponential backoff.",
+      code: `from agent_saga.feedback import SelfHealingLoop
+
+healer = SelfHealingLoop(max_retries=3)
+outcome = await healer.run(agent_fn=my_agent, evaluator=my_evaluator)`
+    },
+    embedding_risk: {
+      title: "🧠 Zero-Config Embedding Risk Scorer",
+      desc: "Evaluates dynamic anomaly risk by scoring tool calls against a corpus of known-bad actions without external ML dependencies.",
+      code: `from agent_saga.gate import EmbeddingRiskScorer
+
+scorer = EmbeddingRiskScorer()
+scorer.add_known_bad("drop_database", "wire_transfer_unapproved")
+score = scorer.score("delete_all_users") # -> 0.81 (HIGH)`
+    },
+    slack_app: {
+      title: "💬 Slack OAuth & Slash Command Integration",
+      desc: "Slack Block Kit interactive app supporting OAuth install URLs and /saga-approve slash commands.",
+      code: `from agent_saga.slack_app import SlackBlockKitApp
+
+url = SlackBlockKitApp.build_oauth_install_url(client_id="123", redirect_uri="https://app.io/oauth")
+res = SlackBlockKitApp.handle_slash_command("/saga-approve approve req-101 Verified", user_name="alice")`
+    },
     otel: {
       title: "📊 OpenTelemetry & LangSmith Tracing",
       desc: "Stamps Saga UUID and prompt context into OpenTelemetry spans and LLM trace providers, linking hallucinated prompts directly to rollback causes.",
@@ -575,52 +659,16 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 setup_telemetry()
 link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor payment module")`
     },
-    connectors: {
-      title: "🔌 Expanded Native Connectors",
-      desc: "Plug-and-play safety connectors for GitHub PR/Commit auto-revert, AWS/GCP/K8s infra auto-cleanup, and Slack/Discord message redactions.",
-      code: `from agent_saga.connectors import GitHubConnector, CloudConnector, MessagingConnector
-
-gh = GitHubConnector()
-pr = await gh.create_pull_request(repo="acme/service", title="Fix bug", head="feature-1")
-# Auto-closes PR #101 if downstream execution fails!`
-    },
-    dynamic_risk: {
-      title: "🛡️ Dynamic AI Risk Policies",
-      desc: "Evaluates real-time anomaly risk scores. If an anomaly score exceeds threshold (e.g. 0.70), maximum limits scale down and escalate to human review.",
-      code: `from agent_saga.gate import DynamicRiskEvaluator, dynamic_risk_rule
-
-evaluator = DynamicRiskEvaluator(risk_scorer=my_anomaly_model, risk_threshold=0.70)
-rule = dynamic_risk_rule("high-anomaly", evaluator)`
-    },
-    postgres_store: {
-      title: "🗄️ Relational Postgres Approval Store",
-      desc: "Stores pending human approvals directly in PostgreSQL (PostgresApprovalStore) for enterprise risk teams without requiring Redis infrastructure.",
-      code: `from agent_saga.approvals import PostgresApprovalStore
-
-store = PostgresApprovalStore(table_name="saga_approvals")
-request = store.create(my_approval_request)`
-    },
-    replay: {
-      title: "⏳ Time-Travel Debugging & Replay",
-      desc: "CLI command agent-saga replay <saga_id> reconstructs historical saga steps locally from WAL data without hitting live production APIs.",
-      code: `$ agent-saga replay saga_402 --wal-path ./agent-saga.wal
-
-=======================================================
-  TIME-TRAVEL DEBUGGER: Replaying Saga 'saga_402'
-=======================================================
- [001] SAGA_START             tool=init                 payload={}
- [002] STEP_COMMITTED         tool=github.create_pr     payload={"pr_number": 101}`
-    },
     ui: {
-      title: "💻 Risk Team Dashboard (agent-saga ui)",
-      desc: "Clean web UI dashboard serving approval queues, token authorization, and live WAL record inspection.",
-      code: `$ agent-saga ui --wal-path ./agent-saga.wal --port 8080
+      title: "💻 Protected Web Dashboard (agent-saga ui)",
+      desc: "Clean web UI dashboard serving approval queues, SSE live WAL streaming, spend limit gauges, and token authentication.",
+      code: `$ agent-saga ui --wal-path ./agent-saga.wal --port 8080 --auth
 
 ===============================================
  AgentSaga - Time-Travel Debugger
 ===============================================
   WAL     : ./agent-saga.wal
-  Serving : http://127.0.0.1:8080`
+  Serving : http://127.0.0.1:8080?token=a8f9c1...`
     }
   };
 
@@ -651,7 +699,7 @@ request = store.create(my_approval_request)`
 
     if (protectionActive) {
       label.textContent = "PROTECTION: ON (+ agent-saga)";
-      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.2.0 Active Protection)</span>';
+      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.2.3 Active Protection)</span>';
     } else {
       label.textContent = "PROTECTION: OFF (Raw AI Agent)";
       banner.innerHTML = '<span style="color: var(--irreversible);">● MODE: BEFORE (Raw AI Agent - Unprotected Failure Mode)</span>';
@@ -762,7 +810,7 @@ request = store.create(my_approval_request)`
       var drug = document.getElementById('inputDrug').value;
       var dosage = parseFloat(document.getElementById('inputDosage').value) || 0;
 
-      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>patient.read_records</b> &nbsp;Selected ${drug}`, 'read-only');
@@ -795,7 +843,7 @@ request = store.create(my_approval_request)`
       var iban = document.getElementById('inputIban').value;
       var amount = parseFloat(document.getElementById('inputAmount').value) || 0;
 
-      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (!protectionActive) {
@@ -821,7 +869,7 @@ request = store.create(my_approval_request)`
       var prTitle = document.getElementById('inputPR').value;
       var testRes = document.getElementById('inputTestResult').value;
 
-      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>github.create_pr</b> &nbsp;PR #101 (${prTitle}) created`, 'inverse: close_pr');
@@ -852,7 +900,7 @@ request = store.create(my_approval_request)`
       var channel = document.getElementById('inputChannel').value;
       var msgText = document.getElementById('inputMsg').value;
 
-      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>slack.post_message</b> &nbsp;"${msgText}"`, 'inverse: delete_message');
@@ -874,7 +922,7 @@ request = store.create(my_approval_request)`
       var robot = document.getElementById('inputRobot').value;
       var angle = parseFloat(document.getElementById('inputAngle').value) || 0;
 
-      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.2.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (angle > 180.0) {
