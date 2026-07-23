@@ -339,10 +339,101 @@ def _cmd_approvals(args: argparse.Namespace) -> int:
     return 0
 
 
+def _tail_wal(wal_path: str, stop: "threading.Event") -> None:
+    """Follow a WAL file and print each new event as it lands -- a `tail -f` for
+    saga activity. Deliberately tolerant of a truncated final line and of the
+    file not existing yet (studio may start before the first saga runs)."""
+    from .encryption import decode_line
+
+    pos = 0            # byte offset of the last complete line consumed
+    printed_wait = False
+    while not stop.is_set():
+        try:
+            if not os.path.exists(wal_path):
+                if not printed_wait:
+                    print(f"  [tail] waiting for {wal_path} ...", flush=True)
+                    printed_wait = True
+                stop.wait(0.5)
+                continue
+            # Binary + byte offsets: text-mode tell() during iteration raises,
+            # and only complete (newline-terminated) lines are safe to decode.
+            with open(wal_path, "rb") as fh:
+                fh.seek(pos)
+                data = fh.read()
+            last_nl = data.rfind(b"\n")
+            if last_nl != -1:
+                complete, pos = data[:last_nl + 1], pos + last_nl + 1
+                for raw in complete.split(b"\n"):
+                    if not raw.strip():
+                        continue
+                    try:
+                        rec = decode_line(raw.decode("utf-8", errors="ignore"), None)
+                    except Exception:
+                        continue
+                    ev = rec.get("event", "?")
+                    sid = rec.get("name") or rec.get("saga_id", "-")
+                    extra = rec.get("tool") or rec.get("step_id") or ""
+                    print(f"  [tail] {ev:<18} {sid} {extra}".rstrip(), flush=True)
+        except OSError:
+            pass
+        stop.wait(0.4)
+
+
 def _cmd_studio(args: argparse.Namespace) -> int:
-    from .ui.server import serve
-    print(f"Starting agent-saga Studio on http://{args.host}:{args.port} (WAL: {args.wal_path})...")
-    serve(args.wal_path, host=args.host, port=args.port)
+    import threading
+    from .ui.server import make_server
+
+    stop = threading.Event()
+    workers: list[threading.Thread] = []
+
+    token = args.token or os.environ.get("AGENT_SAGA_UI_TOKEN")
+    if args.auth and not token:
+        token = secrets.token_urlsafe(24)
+
+    # Recovery daemon on its own thread + event loop, sweeping continuously.
+    if args.recover:
+        def _run_recovery() -> None:
+            from .recovery import RecoveryDaemon
+            daemon = RecoveryDaemon(args.wal_path, dry_run=args.dry_run)
+            try:
+                asyncio.run(daemon.watch(interval=args.recover_interval))
+            except Exception:
+                logging.getLogger("agent_saga.cli").exception("recovery daemon stopped")
+        t = threading.Thread(target=_run_recovery, name="saga-recoveryd", daemon=True)
+        t.start()
+        workers.append(t)
+
+    if args.tail:
+        t = threading.Thread(target=_tail_wal, args=(args.wal_path, stop),
+                             name="saga-tail", daemon=True)
+        t.start()
+        workers.append(t)
+
+    services = ["dashboard"]
+    if args.recover:
+        services.append(f"recovery daemon ({'dry-run' if args.dry_run else 'active'})")
+    if args.tail:
+        services.append("WAL tail")
+    print(f"agent-saga Studio  (WAL: {args.wal_path})")
+    print(f"  running: {', '.join(services)}")
+    print(f"  dashboard: http://{args.host}:{args.port}"
+          + (f"/?token={token}" if token else ""))
+    print("  Ctrl-C to stop.\n", flush=True)
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    try:
+        httpd = make_server(args.wal_path, args.host, args.port, token=token)
+    except OSError as exc:
+        print(f"error: could not bind {args.host}:{args.port} — {exc}", file=sys.stderr)
+        stop.set()
+        return 1
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\n  stopping studio ...", flush=True)
+    finally:
+        stop.set()
+        httpd.server_close()
     return 0
 
 
@@ -493,10 +584,23 @@ def build_parser() -> argparse.ArgumentParser:
                     help="mint a random bearer token and print the URL to open")
     ui.set_defaults(func=_cmd_ui)
 
-    studio = sub.add_parser("studio", help="unified studio launcher for web dashboard and tail")
+    studio = sub.add_parser(
+        "studio",
+        help="one-command local dev: dashboard + recovery daemon + WAL tail in one process")
     studio.add_argument("--wal-path", "--wal", default="./agent-saga.wal", help="path to WAL file")
     studio.add_argument("--port", type=int, default=8080, help="port (default: 8080)")
     studio.add_argument("--host", default="127.0.0.1", help="bind host")
+    studio.add_argument("--recover", action="store_true",
+                        help="also run the recovery daemon, sweeping for orphaned sagas")
+    studio.add_argument("--recover-interval", type=float, default=5.0,
+                        help="seconds between recovery sweeps (default: 5)")
+    studio.add_argument("--dry-run", action="store_true",
+                        help="recovery daemon observes only, runs no compensations")
+    studio.add_argument("--tail", action="store_true",
+                        help="stream new WAL events to the console as they land")
+    studio.add_argument("--token", default=None, help="bearer token to protect the dashboard")
+    studio.add_argument("--auth", action="store_true",
+                        help="mint a random bearer token if none is given")
     studio.set_defaults(func=_cmd_studio)
 
     verify = sub.add_parser(

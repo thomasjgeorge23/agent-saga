@@ -195,3 +195,45 @@ def test_cron_scheduler_cancel():
     sched.schedule_cron("nightly", "0 0 * * *", "run_report")
     assert sched.cancel("nightly") is True
     assert sched.cancel("nightly") is False
+
+
+# -- #15 unified `agent-saga studio` launcher ---------------------------------
+
+def test_studio_parser_accepts_all_services():
+    from agent_saga.cli import build_parser
+    args = build_parser().parse_args(
+        ["studio", "--wal", "x.wal", "--port", "9099",
+         "--recover", "--tail", "--dry-run", "--recover-interval", "2"])
+    assert args.recover and args.tail and args.dry_run
+    assert args.port == 9099 and args.recover_interval == 2.0
+
+
+@aio
+async def test_studio_wal_tail_streams_events(tmp_path):
+    import threading, io, time, asyncio
+    from contextlib import redirect_stdout
+    from agent_saga.cli import _tail_wal
+    from agent_saga.wal.file_wal import FileWAL
+
+    path = tmp_path / "tail.wal"
+    buf, stop = io.StringIO(), threading.Event()
+
+    def run():
+        with redirect_stdout(buf):
+            _tail_wal(str(path), stop)
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    try:
+        time.sleep(0.4)
+        wal = FileWAL(path)
+        await wal.start()
+        wal.append("SAGA_START", {"saga_id": "s1", "name": "onboard-acme"})
+        await wal.barrier()
+        await wal.close()
+        time.sleep(0.9)
+    finally:
+        stop.set()
+        t.join(timeout=2)
+    out = buf.getvalue()
+    assert "SAGA_START" in out and "onboard-acme" in out
