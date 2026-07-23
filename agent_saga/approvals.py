@@ -612,28 +612,176 @@ async def _maybe_await(value: Any) -> Any:
     return value
 
 
-class PostgresApprovalStore:
-    """Relational database approval store using PostgreSQL.
+# Columns persisted for each approval, in a stable order for INSERT/SELECT.
+_PG_COLUMNS = (
+    "id", "saga_id", "step_id", "tool", "rule", "reason", "saga_name",
+    "context", "requested_at", "expires_at", "status", "level", "approver",
+    "decided_at", "note", "break_glass",
+)
 
-    Enables enterprise risk management without requiring Redis infrastructure.
+
+class PostgresApprovalStore:
+    """Relational approval store on PostgreSQL, for a fleet that already runs
+    Postgres and would rather not add Redis.
+
+    Connections are the scarce resource. Pass a *pool* via ``from_pool`` and each
+    operation borrows a connection and returns it immediately, so a busy risk
+    queue cannot exhaust the database's connection slots. A single injected
+    ``connection`` is also supported (simplest setup), and with neither the store
+    degrades to an in-memory map so tests and local runs work with no database.
+
+    The connection is used through the DB-API 2.0 surface (``cursor()``,
+    ``execute``, ``fetchone``/``fetchall``, ``commit``) that psycopg2/psycopg
+    expose, so any DB-API-compatible pool or connection works.
     """
 
     distributed = True
 
-    def __init__(self, table_name: str = "saga_approvals", connection: Any = None):
+    def __init__(self, table_name: str = "saga_approvals", connection: Any = None,
+                 *, pool: Any = None):
+        if not table_name.isidentifier():
+            raise ValueError(f"invalid table_name identifier: {table_name!r}")
         self.table_name = table_name
         self.connection = connection
+        self._pool = pool
         self._memory_backup: dict[str, ApprovalRequest] = {}
+        if connection is not None or pool is not None:
+            self._ensure_schema()
+
+    @classmethod
+    def from_pool(cls, pool: Any, table_name: str = "saga_approvals") -> "PostgresApprovalStore":
+        """Build a store backed by a DB-API connection pool (e.g. psycopg2's
+        ThreadedConnectionPool, or any object with getconn()/putconn() or a
+        connection() context manager). Connections are borrowed per operation."""
+        return cls(table_name=table_name, pool=pool)
+
+    # -- connection handling ----------------------------------------------
+
+    class _Borrowed:
+        """Context manager yielding a live connection, returned to the pool (or
+        left intact for a single injected connection) when the block exits --
+        even on error, so a failed query never leaks a connection."""
+
+        def __init__(self, store: "PostgresApprovalStore"):
+            self.store = store
+            self._conn = None
+            self._from_pool = False
+            self._cm = None
+
+        def __enter__(self):
+            pool = self.store._pool
+            if pool is not None:
+                if hasattr(pool, "getconn"):            # psycopg2 pool
+                    self._conn = pool.getconn()
+                    self._from_pool = True
+                elif hasattr(pool, "connection"):       # context-manager pool
+                    self._cm = pool.connection()
+                    self._conn = self._cm.__enter__()
+                else:
+                    raise TypeError(
+                        "pool must expose getconn()/putconn() or connection()")
+            else:
+                self._conn = self.store.connection      # may be None -> memory
+            return self._conn
+
+        def __exit__(self, exc_type, exc, tb):
+            pool = self.store._pool
+            if self._cm is not None:
+                self._cm.__exit__(exc_type, exc, tb)
+            elif self._from_pool and pool is not None and hasattr(pool, "putconn"):
+                pool.putconn(self._conn)
+            return False
+
+    def _borrow(self):
+        return self._Borrowed(self)
+
+    def _uses_db(self) -> bool:
+        return self.connection is not None or self._pool is not None
+
+    def _ensure_schema(self) -> None:
+        ddl = (
+            f"CREATE TABLE IF NOT EXISTS {self.table_name} ("
+            "id TEXT PRIMARY KEY, saga_id TEXT, step_id TEXT, tool TEXT, "
+            "rule TEXT, reason TEXT, saga_name TEXT, context JSONB, "
+            "requested_at DOUBLE PRECISION, expires_at DOUBLE PRECISION, "
+            "status TEXT, level INTEGER, approver TEXT, "
+            "decided_at DOUBLE PRECISION, note TEXT, break_glass BOOLEAN)"
+        )
+        try:
+            with self._borrow() as conn:
+                if conn is None:
+                    return
+                self._execute(conn, ddl, ())
+                self._commit(conn)
+        except Exception as exc:
+            logger.warning("could not ensure approvals schema: %r", exc)
+
+    # -- row <-> request mapping ------------------------------------------
+
+    @staticmethod
+    def _to_row(req: ApprovalRequest) -> tuple:
+        return (
+            req.id, req.saga_id, req.step_id, req.tool, req.rule, req.reason,
+            req.saga_name, json.dumps(req.context or {}), req.requested_at,
+            req.expires_at, req.status, req.level, req.approver, req.decided_at,
+            req.note, req.break_glass,
+        )
+
+    @staticmethod
+    def _from_row(row: Sequence) -> ApprovalRequest:
+        d = dict(zip(_PG_COLUMNS, row))
+        ctx = d.get("context")
+        if isinstance(ctx, str):
+            try:
+                ctx = json.loads(ctx)
+            except Exception:
+                ctx = {}
+        d["context"] = ctx or {}
+        return ApprovalRequest(**d)
+
+    @staticmethod
+    def _execute(conn: Any, sql: str, params: tuple):
+        cur = conn.cursor()
+        try:
+            cur.execute(sql, params)
+            try:
+                return cur.fetchall()
+            except Exception:
+                return None
+        finally:
+            cur.close()
+
+    @staticmethod
+    def _commit(conn: Any) -> None:
+        commit = getattr(conn, "commit", None)
+        if callable(commit):
+            commit()
+
+    # -- store interface ---------------------------------------------------
 
     def create(self, request: ApprovalRequest) -> ApprovalRequest:
         existing = self.get(request.id)
         if existing is not None:
             return existing
-        self._memory_backup[request.id] = request
-        return request
+        if not self._uses_db():
+            self._memory_backup[request.id] = request
+            return request
+        cols = ", ".join(_PG_COLUMNS)
+        placeholders = ", ".join(["%s"] * len(_PG_COLUMNS))
+        sql = (f"INSERT INTO {self.table_name} ({cols}) VALUES ({placeholders}) "
+               f"ON CONFLICT (id) DO NOTHING")
+        with self._borrow() as conn:
+            self._execute(conn, sql, self._to_row(request))
+            self._commit(conn)
+        return self.get(request.id) or request
 
     def get(self, request_id: str) -> Optional[ApprovalRequest]:
-        return self._memory_backup.get(request_id)
+        if not self._uses_db():
+            return self._memory_backup.get(request_id)
+        sql = f"SELECT {', '.join(_PG_COLUMNS)} FROM {self.table_name} WHERE id = %s"
+        with self._borrow() as conn:
+            rows = self._execute(conn, sql, (request_id,))
+        return self._from_row(rows[0]) if rows else None
 
     def decide(self, request_id: str, *, granted: bool, approver: str,
                note: str = "", break_glass: bool = False) -> Optional[ApprovalRequest]:
@@ -645,11 +793,26 @@ class PostgresApprovalStore:
         req.note = note
         req.break_glass = break_glass
         req.decided_at = time.time()
-        self._memory_backup[request_id] = req
-        return req
+        if not self._uses_db():
+            self._memory_backup[request_id] = req
+            return req
+        # First-decision-wins: only update a row still PENDING.
+        sql = (f"UPDATE {self.table_name} SET status=%s, approver=%s, note=%s, "
+               f"break_glass=%s, decided_at=%s WHERE id=%s AND status=%s")
+        with self._borrow() as conn:
+            self._execute(conn, sql, (req.status, approver, note, break_glass,
+                                      req.decided_at, request_id, PENDING))
+            self._commit(conn)
+        return self.get(request_id) or req
 
     def pending(self) -> list:
-        return [r for r in self._memory_backup.values() if not r.decided]
+        if not self._uses_db():
+            return [r for r in self._memory_backup.values() if not r.decided]
+        sql = (f"SELECT {', '.join(_PG_COLUMNS)} FROM {self.table_name} "
+               f"WHERE status = %s ORDER BY requested_at")
+        with self._borrow() as conn:
+            rows = self._execute(conn, sql, (PENDING,)) or []
+        return [self._from_row(r) for r in rows]
 
 
 _APPROVAL_STORE: Any = None

@@ -237,3 +237,97 @@ async def test_studio_wal_tail_streams_events(tmp_path):
         t.join(timeout=2)
     out = buf.getvalue()
     assert "SAGA_START" in out and "onboard-acme" in out
+
+
+# -- #19 PostgresApprovalStore connection pooling -----------------------------
+
+class _FakePool:
+    """Minimal psycopg2-style pool over an in-memory dict, so the SQL path and
+    connection borrow/return balance can be tested without a real database."""
+    def __init__(self):
+        from agent_saga.approvals import _PG_COLUMNS
+        self.rows = {}
+        self.get_calls = 0
+        self.put_calls = 0
+        self._status_idx = _PG_COLUMNS.index("status")
+        self._conn = self._Conn(self)
+
+    class _Conn:
+        def __init__(self, pool): self.pool = pool
+        def cursor(self): return _FakePool._Cursor(self.pool)
+        def commit(self): pass
+
+    class _Cursor:
+        def __init__(self, pool): self.pool = pool; self._res = None
+        def execute(self, sql, params):
+            s = " ".join(sql.split()); rows = self.pool.rows; si = self.pool._status_idx
+            if s.startswith("CREATE TABLE"): self._res = []
+            elif s.startswith("INSERT"):
+                rows.setdefault(params[0], tuple(params)); self._res = []
+            elif s.startswith("SELECT") and "WHERE id" in s:
+                r = rows.get(params[0]); self._res = [r] if r else []
+            elif s.startswith("SELECT"):
+                self._res = [r for r in rows.values() if r[si] == params[0]]
+            elif s.startswith("UPDATE"):
+                r = rows.get(params[5])
+                if r and r[si] == params[6]:
+                    r = list(r); r[si] = params[0]; r[12] = params[1]
+                    r[14] = params[2]; r[15] = params[3]; r[13] = params[4]
+                    rows[params[5]] = tuple(r)
+                self._res = []
+        def fetchall(self): return self._res
+        def close(self): pass
+
+    def getconn(self): self.get_calls += 1; return self._conn
+    def putconn(self, c): self.put_calls += 1
+
+
+def test_postgres_store_from_pool_roundtrip_and_no_leak():
+    from agent_saga.approvals import PostgresApprovalStore, ApprovalRequest
+    pool = _FakePool()
+    store = PostgresApprovalStore.from_pool(pool)
+
+    req = ApprovalRequest(id="r1", saga_id="s1", step_id="st1", tool="stripe.charge",
+                          rule="high", reason="big", saga_name="onboard")
+    store.create(req)
+    assert store.get("r1").tool == "stripe.charge"
+    assert len(store.pending()) == 1
+
+    dec = store.decide("r1", granted=True, approver="alice", note="ok")
+    assert dec.status == "GRANTED" and dec.approver == "alice"
+    assert store.pending() == []
+    # first-decision-wins
+    store.decide("r1", granted=False, approver="bob")
+    assert store.get("r1").status == "GRANTED"
+    # every borrowed connection was returned -> no pool exhaustion
+    assert pool.get_calls == pool.put_calls and pool.get_calls > 0
+
+
+def test_postgres_store_returns_connection_on_error():
+    from agent_saga.approvals import PostgresApprovalStore
+
+    class BoomConn:
+        def cursor(self): raise RuntimeError("db exploded")
+        def commit(self): pass
+
+    class BoomPool:
+        def __init__(self): self.get = 0; self.put = 0; self._c = BoomConn()
+        def getconn(self): self.get += 1; return self._c
+        def putconn(self, c): self.put += 1
+
+    p = BoomPool()
+    store = PostgresApprovalStore.from_pool(p)   # schema attempt swallows error
+    try:
+        store.get("x")
+    except Exception:
+        pass
+    assert p.get == p.put and p.get >= 1          # returned despite the failure
+
+
+def test_postgres_store_in_memory_fallback_without_db():
+    from agent_saga.approvals import PostgresApprovalStore, ApprovalRequest
+    store = PostgresApprovalStore()               # no connection, no pool
+    store.create(ApprovalRequest(id="m1", saga_id="s", step_id="x", tool="t",
+                                 rule="r", reason="z"))
+    assert store.get("m1").id == "m1"
+    assert store.decide("m1", granted=True, approver="a").status == "GRANTED"
