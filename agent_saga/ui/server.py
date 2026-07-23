@@ -105,6 +105,8 @@ def build_handler(reader: SagaWALReader, token: Optional[str] = None):
                 return self._json(200, reader.meta())
             if path == "/api/sagas":
                 return self._json(200, reader.list_sagas())
+            if path == "/events" or path == "/api/events":
+                return self._serve_events()
             if path.startswith("/api/sagas/"):
                 saga_id = unquote(path[len("/api/sagas/"):]).strip("/")
                 if not saga_id:
@@ -115,6 +117,54 @@ def build_handler(reader: SagaWALReader, token: Optional[str] = None):
                 return self._json(200, detail)
 
             self._json(404, {"error": "not found"})
+
+        def _serve_events(self, *, poll: float = 1.0, max_seconds: float = 3600.0) -> None:
+            """Server-Sent Events stream of saga activity. The browser's
+            EventSource holds this connection open and receives a `sagas` event
+            whenever the WAL changes -- so the dashboard updates live instead of
+            polling. Each connection is handled on its own thread by
+            ThreadingHTTPServer, so a parked stream never blocks other requests.
+
+            HTTP/1.0 + Connection: close means EventSource reconnects if the
+            stream ends; the max_seconds cap deliberately recycles a connection
+            rather than letting a half-dead client pin a thread forever."""
+            import hashlib
+            import time as _time
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+
+            def _emit(chunk: str) -> bool:
+                try:
+                    self.wfile.write(chunk.encode("utf-8"))
+                    self.wfile.flush()
+                    return True
+                except (BrokenPipeError, ConnectionError, OSError):
+                    return False   # client went away; end the stream quietly
+
+            # Tell the client how soon to retry a dropped stream.
+            if not _emit("retry: 2000\n\n"):
+                return
+            last_sig = None
+            deadline = _time.time() + max_seconds
+            while _time.time() < deadline:
+                try:
+                    sagas = reader.list_sagas()
+                    payload = json.dumps(sagas, default=str)
+                except Exception:
+                    payload = "null"
+                sig = hashlib.sha1(payload.encode("utf-8")).hexdigest()
+                if sig != last_sig:
+                    last_sig = sig
+                    if not _emit(f"event: sagas\ndata: {payload}\n\n"):
+                        return
+                else:
+                    if not _emit(": heartbeat\n\n"):   # comment keeps it alive
+                        return
+                _time.sleep(poll)
 
         def _serve_dashboard(self) -> None:
             try:

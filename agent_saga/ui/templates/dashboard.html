@@ -227,7 +227,7 @@ const STATUSES = [
   ["all", "All"], ["ROLLED_BACK", "Rolled Back"], ["FAILED", "Failed"],
   ["SUCCESS", "Succeeded"], ["IN_PROGRESS", "In Progress"],
 ];
-let state = { sagas: [], filter: "all", selectedSaga: null, detail: null, selectedStep: null, auto: false, timer: null };
+let state = { sagas: [], filter: "all", selectedSaga: null, detail: null, selectedStep: null, auto: false, timer: null, live: false };
 
 // ---- fetch helpers ----
 // If the dashboard was opened with ?token=..., forward it on every API call
@@ -423,7 +423,20 @@ function setAuto(on) {
   state.auto = on;
   $("#autotoggle").classList.toggle("on", on);
   if (state.timer) { clearInterval(state.timer); state.timer = null; }
-  if (on) state.timer = setInterval(refreshAll, 4000);
+  // SSE pushes updates the instant the WAL changes; the interval is only a
+  // fallback for when the live stream is unavailable, so it can be slow.
+  if (on) state.timer = setInterval(refreshAll, state.live ? 15000 : 4000);
+}
+
+// ---- live updates via Server-Sent Events ----
+function startLive() {
+  if (!window.EventSource) return;              // fall back to polling
+  const url = "/events" + (AUTH_TOKEN ? ("?token=" + encodeURIComponent(AUTH_TOKEN)) : "");
+  let es;
+  try { es = new EventSource(url); } catch (e) { return; }
+  es.addEventListener("sagas", () => { if (state.auto) refreshAll(); });
+  es.onopen = () => { state.live = true; if (state.auto) setAuto(true); };
+  es.onerror = () => { state.live = false; };   // EventSource auto-reconnects
 }
 
 // ---- wire up ----
@@ -433,6 +446,7 @@ $("#autotoggle").onclick = () => setAuto(!state.auto);
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
 
 refreshAll();
+startLive();
 </script>
 </body>
 </html>

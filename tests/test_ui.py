@@ -384,3 +384,50 @@ async def test_http_no_token_configured_stays_open():
         finally:
             httpd.shutdown()
             httpd.server_close()
+
+
+@aio
+async def test_sse_events_stream_pushes_saga_activity():
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "wal.jsonl"
+        await _run_saga(p, fail=False)
+
+        httpd = make_server(str(p), host="127.0.0.1", port=0)
+        httpd.daemon_threads = True   # SSE handler parks; don't block close on it
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            resp = urllib.request.urlopen(f"http://127.0.0.1:{port}/events", timeout=5)
+            lines = []
+            for _ in range(6):        # retry + first sagas event arrive promptly
+                raw = resp.readline()
+                if not raw:
+                    break
+                lines.append(raw.decode("utf-8", "ignore").rstrip())
+            resp.close()
+            blob = "\n".join(lines)
+            assert "retry:" in blob                 # reconnect hint
+            assert "event: sagas" in blob           # activity event
+            assert '"sagas"' in blob                # payload shape
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
+@aio
+async def test_sse_events_requires_token_when_configured():
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "wal.jsonl"
+        await _run_saga(p, fail=False)
+        httpd = make_server(str(p), host="127.0.0.1", port=0, token="s3cr3t")
+        httpd.daemon_threads = True
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            with pytest.raises(urllib.error.HTTPError) as exc:
+                urllib.request.urlopen(f"http://127.0.0.1:{port}/events")
+            assert exc.value.code == 401
+            exc.value.close()
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
