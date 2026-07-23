@@ -542,3 +542,53 @@ def test_langchain_callback_never_raises_into_llm_call():
     cb.on_llm_start(prompts=["x"], run_id="r")
     cb.on_llm_end(response=object(), run_id="r")   # must not raise
     assert cb.links and cb.links[0]["saga.hallucination_score"] == 0.0
+
+
+# -- #25 TenantContext.apply() auto-scopes stores -----------------------------
+
+class _PrefixStore:
+    def __init__(self, prefix): self.key_prefix = prefix
+
+
+def test_tenant_apply_scopes_and_restores():
+    from agent_saga.tenant import TenantContext, get_current_tenant
+    limit = _PrefixStore("agent-saga:limit:")
+    appr = _PrefixStore("agent-saga:appr:")
+
+    with TenantContext("acme").apply(stores=[limit, appr]):
+        assert get_current_tenant().tenant_id == "acme"
+        assert limit.key_prefix == "tenant:acme:agent-saga:limit:"
+        assert appr.key_prefix == "tenant:acme:agent-saga:appr:"
+    # restored on exit
+    assert limit.key_prefix == "agent-saga:limit:"
+    assert get_current_tenant() is None
+
+
+def test_tenant_apply_isolates_tenants():
+    from agent_saga.tenant import TenantContext
+    store = _PrefixStore("k:")
+    with TenantContext("acme").apply(stores=[store]):
+        a = store.key_prefix
+    with TenantContext("globex").apply(stores=[store]):
+        b = store.key_prefix
+    assert a != b and a.startswith("tenant:acme:") and b.startswith("tenant:globex:")
+
+
+def test_tenant_apply_nested_restore():
+    from agent_saga.tenant import TenantContext
+    store = _PrefixStore("k:")
+    with TenantContext("outer").apply(stores=[store]):
+        outer = store.key_prefix
+        with TenantContext("inner").apply(stores=[store]):
+            assert store.key_prefix.startswith("tenant:inner:")
+        assert store.key_prefix == outer      # inner restored, outer intact
+
+
+def test_tenant_apply_tolerates_prefixless_store_and_autodiscovery():
+    from agent_saga.tenant import TenantContext
+    # a store with no key_prefix must not crash the scope
+    with TenantContext("x").apply(stores=[object()]):
+        pass
+    # auto-discovery path (no explicit stores) runs without error
+    with TenantContext("y").apply():
+        pass
