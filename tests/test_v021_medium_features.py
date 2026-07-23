@@ -373,3 +373,41 @@ async def test_parallel_fail_all_waits_for_all_then_raises():
         await g.execute_all()
     # fail_all let the sibling finish before rolling back and raising.
     assert sibling["done"] is True
+
+
+# -- #21 OTLPExporter batching + flush interval -------------------------------
+
+def test_otlp_batch_size_triggers_flush_and_chunks():
+    from agent_saga.observability.otlp import OTLPExporter
+    posts = []
+    exp = OTLPExporter(batch_size=3)
+    exp._post = lambda spans: (posts.append(len(spans)), True)[1]
+    for i in range(7):
+        exp.create_span(f"s{i}", "saga-1")
+    # flushed at 3 and 6 spans; 1 remains buffered
+    assert posts == [3, 3] and len(exp.spans) == 1
+    exp.export()
+    assert posts == [3, 3, 1] and exp.spans == []
+
+
+def test_otlp_rebuffers_unsent_on_failure():
+    from agent_saga.observability.otlp import OTLPExporter
+    exp = OTLPExporter(batch_size=2)
+    exp._post = lambda spans: False        # collector unreachable
+    for i in range(4):
+        exp.create_span(f"s{i}", "saga-2")
+    # nothing dropped: all spans still buffered for the next flush
+    assert len(exp.spans) == 4
+
+
+def test_otlp_background_timer_flushes():
+    import time
+    from agent_saga.observability.otlp import OTLPExporter
+    flushed = []
+    exp = OTLPExporter(batch_size=1000, flush_interval_ms=80)
+    exp._post = lambda spans: (flushed.append(len(spans)), True)[1]
+    with exp:                              # context manager starts/stops timer
+        exp.create_span("a", "s")
+        exp.create_span("b", "s")
+        time.sleep(0.3)
+    assert sum(flushed) >= 2               # timer shipped the spans
