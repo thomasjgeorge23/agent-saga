@@ -507,3 +507,68 @@ def test_cli_unknown_id(capsys, tmp_path):
     assert main(["approvals", "approve", "missing", "--dir", str(tmp_path),
                  "--approver", "a@corp"]) == 2
     assert "no such approval" in capsys.readouterr().out
+
+
+# -- #29 Teams / Discord approval notifiers -----------------------------------
+
+def _sample_request():
+    from agent_saga.approvals import ApprovalRequest
+    return ApprovalRequest(id="req-abc123", saga_id="onboard-acme-1", step_id="st1",
+                           tool="stripe.charge", rule="high_amount", reason="charge $5000",
+                           context={"amount": 5000, "customer": "acme"})
+
+
+def test_teams_payload_is_adaptive_card():
+    from agent_saga.approvals import teams_payload
+    p = teams_payload(_sample_request(), ["@risk-team"])
+    att = p["attachments"][0]
+    assert att["contentType"] == "application/vnd.microsoft.card.adaptive"
+    assert att["content"]["type"] == "AdaptiveCard"
+    blob = str(p)
+    assert "stripe.charge" in blob and "approvals approve req-abc123" in blob
+    assert "@risk-team" in blob
+
+
+def test_discord_payload_is_embed():
+    from agent_saga.approvals import discord_payload
+    p = discord_payload(_sample_request(), ["@risk"])
+    embed = p["embeds"][0]
+    assert embed["title"] == "Agent approval required"
+    assert any(f["name"] == "amount" for f in embed["fields"])
+    assert "approvals deny req-abc123" in str(p)
+
+
+def test_teams_and_discord_notifiers_post(monkeypatch):
+    import urllib.request
+    from agent_saga.approvals import TeamsNotifier, DiscordNotifier
+    captured = {}
+
+    class FakeResp:
+        def read(self): return b""
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    def fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        captured["body"] = req.data
+        return FakeResp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    TeamsNotifier("https://teams.example/hook").notify(_sample_request(), ["@r"])
+    assert captured["url"].startswith("https://teams.example") and b"AdaptiveCard" in captured["body"]
+
+    DiscordNotifier("https://discord.example/hook").notify(_sample_request(), ["@r"])
+    assert b"embeds" in captured["body"]
+
+
+def test_notifier_failure_never_raises(monkeypatch):
+    # A broken webhook must be logged, not raised -- a lost message ends in deny.
+    import urllib.request
+    from agent_saga.approvals import TeamsNotifier
+
+    def boom(req, timeout=None):
+        raise OSError("network down")
+
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    TeamsNotifier("https://teams.example/hook").notify(_sample_request(), [])  # no raise

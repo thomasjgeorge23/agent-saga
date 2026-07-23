@@ -415,6 +415,88 @@ def slack_payload(request: ApprovalRequest, targets: Sequence[str]) -> dict:
     }
 
 
+def _decision_lines(request: ApprovalRequest) -> tuple[str, str]:
+    return (
+        f"agent-saga approvals approve {request.id} --approver <you>",
+        f"agent-saga approvals deny {request.id} --approver <you>",
+    )
+
+
+def teams_payload(request: ApprovalRequest, targets: Sequence[str]) -> dict:
+    """A Microsoft Teams Adaptive Card (the Teams analogue of Slack Block Kit),
+    wrapped in the message/attachments envelope Teams webhooks expect. Carries
+    the same decision context Slack does: what, why, and how to answer."""
+    approve, deny = _decision_lines(request)
+    facts = [{"title": k, "value": str(v)} for k, v in list(request.context.items())[:8]]
+    facts += [
+        {"title": "saga", "value": request.saga_id},
+        {"title": "step", "value": request.step_id},
+        {"title": "rule", "value": request.rule},
+    ]
+    body = [
+        {"type": "TextBlock", "size": "Large", "weight": "Bolder",
+         "text": "Agent approval required"},
+        {"type": "TextBlock", "wrap": True, "text": f"**{request.tool}** — {request.reason}"},
+        {"type": "FactSet", "facts": facts},
+    ]
+    if targets:
+        body.append({"type": "TextBlock", "wrap": True, "text": " ".join(targets)})
+    body.append({"type": "TextBlock", "wrap": True, "isSubtle": True,
+                 "text": f"Approve: `{approve}`\n\nDeny: `{deny}`"})
+    return {
+        "type": "message",
+        "attachments": [{
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "content": {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type": "AdaptiveCard",
+                "version": "1.4",
+                "body": body,
+            },
+        }],
+    }
+
+
+def discord_payload(request: ApprovalRequest, targets: Sequence[str]) -> dict:
+    """A Discord webhook message with a rich embed. Plain webhooks cannot carry
+    interactive button *components* (those need a bot application), so the
+    approve/deny commands travel in the embed, matching the Slack fallback."""
+    approve, deny = _decision_lines(request)
+    fields = [{"name": k, "value": str(v), "inline": True}
+              for k, v in list(request.context.items())[:8]]
+    fields.append({"name": "How to decide",
+                   "value": f"Approve:\n`{approve}`\nDeny:\n`{deny}`", "inline": False})
+    content = " ".join(targets) if targets else None
+    return {
+        "content": content or f"Approval needed: {request.tool}",
+        "embeds": [{
+            "title": "Agent approval required",
+            "description": f"**{request.tool}** — {request.reason}",
+            "color": 0xF5A623,   # amber: needs a human
+            "fields": fields,
+            "footer": {"text": (f"saga {request.saga_id[:12]} | "
+                                f"step {request.step_id[:12]} | rule {request.rule} | "
+                                f"id {request.id}")},
+        }],
+    }
+
+
+class TeamsNotifier(WebhookNotifier):
+    """POSTs a Teams Adaptive Card to an incoming-webhook / workflow URL."""
+
+    def __init__(self, url: str, *, timeout: float = 5.0,
+                 formatter: Optional[Callable[[ApprovalRequest, Sequence[str]], dict]] = None):
+        super().__init__(url, timeout=timeout, formatter=formatter or teams_payload)
+
+
+class DiscordNotifier(WebhookNotifier):
+    """POSTs a Discord embed to a channel webhook URL."""
+
+    def __init__(self, url: str, *, timeout: float = 5.0,
+                 formatter: Optional[Callable[[ApprovalRequest, Sequence[str]], dict]] = None):
+        super().__init__(url, timeout=timeout, formatter=formatter or discord_payload)
+
+
 # ---------------------------------------------------------------------------
 # Policy and gateway
 # ---------------------------------------------------------------------------
@@ -834,6 +916,7 @@ __all__ = [
     "ApprovalRequest", "ApprovalStore", "FileApprovalStore", "RedisApprovalStore", "PostgresApprovalStore",
     "ApprovalGateway", "ApprovalPolicy", "EscalationLevel",
     "Notifier", "ConsoleNotifier", "WebhookNotifier", "slack_payload",
+    "TeamsNotifier", "DiscordNotifier", "teams_payload", "discord_payload",
     "request_id", "PENDING", "GRANTED", "DENIED", "EXPIRED",
     "get_approval_store", "set_approval_store",
 ]

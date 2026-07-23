@@ -85,6 +85,8 @@ from .approvals import (
     RedisApprovalStore,
     PostgresApprovalStore,
     WebhookNotifier,
+    TeamsNotifier,
+    DiscordNotifier,
 )
 from .registry import compensator, registered, resolve
 from .semantics import ActionSemantics, Compensation, SagaStep, StepState
@@ -296,6 +298,8 @@ __all__ = [
     "RedisApprovalStore",
     "PostgresApprovalStore",
     "WebhookNotifier",
+    "TeamsNotifier",
+    "DiscordNotifier",
     "ConsoleNotifier",
     "ChainReport",
     "export_worm",
