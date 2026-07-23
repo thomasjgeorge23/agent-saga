@@ -592,3 +592,18 @@ def test_tenant_apply_tolerates_prefixless_store_and_autodiscovery():
     # auto-discovery path (no explicit stores) runs without error
     with TenantContext("y").apply():
         pass
+
+
+def test_otlp_bounded_queue_under_outage():
+    from agent_saga.observability.otlp import OTLPExporter
+    exp = OTLPExporter(batch_size=10, max_queue=50)
+    exp._post = lambda spans: False            # collector permanently down
+    for i in range(200):
+        exp.create_span(f"s{i}", "saga-1")
+    # memory is bounded: oldest dropped, newest kept, drops counted
+    assert len(exp.spans) == 50
+    assert exp.dropped == 150
+    assert exp.spans[-1]["name"] == "s199"
+    import pytest
+    with pytest.raises(ValueError):
+        OTLPExporter(batch_size=100, max_queue=10)   # max_queue must be >= batch_size

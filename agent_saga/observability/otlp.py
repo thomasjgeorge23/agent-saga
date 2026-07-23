@@ -44,18 +44,36 @@ class OTLPExporter:
         *,
         batch_size: int = 100,
         flush_interval_ms: float = 0.0,
+        max_queue: int = 10_000,
     ):
         if batch_size < 1:
             raise ValueError("batch_size must be >= 1")
+        if max_queue < batch_size:
+            raise ValueError("max_queue must be >= batch_size")
         self.endpoint = endpoint
         self.headers = headers or {"Content-Type": "application/json"}
         self.service_name = service_name
         self.batch_size = batch_size
         self.flush_interval_ms = flush_interval_ms
+        # Hard ceiling on buffered spans. If the collector is down, telemetry must
+        # not become a memory leak: past this we drop the OLDEST spans (and count
+        # them) rather than grow without bound in the exact high-throughput case
+        # batching exists for.
+        self.max_queue = max_queue
+        self.dropped = 0
         self.spans: list[dict[str, Any]] = []
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._timer: Optional[threading.Thread] = None
+
+    def _enqueue_locked(self, spans: list[dict[str, Any]], *, front: bool = False) -> None:
+        """Append (or re-buffer at the front) under the lock, enforcing max_queue
+        by dropping the oldest spans. Caller must hold self._lock."""
+        self.spans = (spans + self.spans) if front else (self.spans + spans)
+        overflow = len(self.spans) - self.max_queue
+        if overflow > 0:
+            del self.spans[:overflow]     # oldest first
+            self.dropped += overflow
 
     def create_span(
         self,
@@ -83,7 +101,7 @@ class OTLPExporter:
             "attributes": attr_list,
         }
         with self._lock:
-            self.spans.append(span)
+            self._enqueue_locked([span])
             full = len(self.spans) >= self.batch_size
         if full:
             self.export()          # size-triggered flush
@@ -129,9 +147,10 @@ class OTLPExporter:
         for i in range(0, len(pending), self.batch_size):
             chunk = pending[i:i + self.batch_size]
             if not self._post(chunk):
-                # Put the unsent remainder back, preserving order, and stop.
+                # Put the unsent remainder back at the front, preserving order and
+                # honouring max_queue, then stop.
                 with self._lock:
-                    self.spans = pending[i:] + self.spans
+                    self._enqueue_locked(pending[i:], front=True)
                 return False
         return True
 
