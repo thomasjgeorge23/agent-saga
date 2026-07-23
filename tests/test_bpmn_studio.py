@@ -25,7 +25,19 @@ def test_generate_saga_code_is_valid_python():
     code = generate_saga_code(STEPS, name="checkout")
     ast.parse(code)                                   # compiles
     assert "async def run_checkout" in code
-    assert 'tool="stripe.charge"' in code
+    # tool is emitted as a repr'd literal (single-quoted) for injection safety
+    assert "tool='stripe.charge'" in code
+
+
+def test_generate_saga_code_is_injection_safe():
+    # A tool name crafted to break out of the string must stay inert.
+    evil = [{"tool": 'x"; import os; os.system("evil"); "', "semantics": "REVERSIBLE"}]
+    code = generate_saga_code(evil, name='n"; BADNAME=1; "')
+    tree = ast.parse(code)                            # must still compile
+    imports = [a.name for n in ast.walk(tree)
+               if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names]
+    assert "os" not in imports                        # no injected import
+    assert not [n for n in ast.walk(tree) if isinstance(n, ast.Assign)]  # no BADNAME=1
 
 
 def test_only_compensable_steps_get_compensate():

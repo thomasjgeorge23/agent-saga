@@ -37,6 +37,14 @@ logger = logging.getLogger("agent_saga.propagation")
 _SAGA_HEADERS = (HEADER_CORRELATION_ID, HEADER_ENTANGLEMENT_ID, HEADER_PARENT_STEP)
 
 
+def _safe_header_value(value: Any) -> str:
+    """Strip CR/LF (and control chars) so a saga name/id that contains a newline
+    cannot inject extra headers when this value is written to an outgoing
+    request. Defense in depth -- most HTTP stacks reject these, but the header is
+    built from a user-supplied saga name, so we never trust it."""
+    return "".join(ch for ch in str(value) if ch not in "\r\n" and ch >= " ")
+
+
 class EntanglementPropagator:
     """Injects and extracts saga correlation headers across service boundaries."""
 
@@ -58,15 +66,16 @@ class EntanglementPropagator:
         headers = dict(existing or {})
         ctx = self._current_saga()
         if ctx is not None:
-            headers.update(get_correlation_headers(ctx))
+            for k, v in get_correlation_headers(ctx).items():
+                headers[k] = _safe_header_value(v)
             return headers
 
         sid = self._current_correlation_id()
         if sid:
-            headers[HEADER_CORRELATION_ID] = sid
-            headers.setdefault(HEADER_ENTANGLEMENT_ID, sid)
+            headers[HEADER_CORRELATION_ID] = _safe_header_value(sid)
+            headers.setdefault(HEADER_ENTANGLEMENT_ID, _safe_header_value(sid))
         else:
-            headers.setdefault(HEADER_ENTANGLEMENT_ID, self.matrix.matrix_id)
+            headers.setdefault(HEADER_ENTANGLEMENT_ID, _safe_header_value(self.matrix.matrix_id))
         return headers
 
     def extract(self, headers: Any) -> dict:

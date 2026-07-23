@@ -84,3 +84,17 @@ async def test_asgi_middleware_passes_through_non_http():
     async def raw(scope, r, s): called["v"] = True
     await p.starlette_middleware()(raw)({"type": "lifespan"}, None, None)
     assert called["v"]
+
+
+def test_header_values_are_crlf_sanitized():
+    from agent_saga.propagation import _safe_header_value
+    from agent_saga.observability import set_saga_id, reset_saga_id
+    # A saga id with CRLF must not carry the newline into an outgoing header.
+    tok = set_saga_id("saga-1\r\nX-Injected: evil")
+    try:
+        h = EntanglementPropagator().outgoing_headers()
+    finally:
+        reset_saga_id(tok)
+    val = h[HEADER_CORRELATION_ID]
+    assert "\r" not in val and "\n" not in val          # no header splitting
+    assert _safe_header_value("a\r\nb\tc") == "abc"      # control chars stripped

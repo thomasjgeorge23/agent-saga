@@ -134,9 +134,16 @@ def build_handler(reader: SagaWALReader, token: Optional[str] = None):
                 except Exception:
                     pass
 
+        # A design payload is a handful of steps; anything past this is either a
+        # mistake or an attempt to exhaust memory. Refuse rather than read it.
+        _MAX_BODY = 1_000_000  # 1 MB
+
         def _read_body(self) -> dict:
-            length = int(self.headers.get("Content-Length") or 0)
-            if length <= 0:
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                return {}
+            if length <= 0 or length > self._MAX_BODY:
                 return {}
             raw = self.rfile.read(length)
             try:
