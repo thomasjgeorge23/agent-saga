@@ -702,9 +702,16 @@ def build_parser() -> argparse.ArgumentParser:
     quar.add_argument("--release", action="store_true", help="un-quarantine it")
     quar.set_defaults(func=_cmd_quarantine)
 
-    rpy = sub.add_parser("replay", help="simulate a historical saga failure locally for debugging")
-    rpy.add_argument("saga_id", help="the saga_id to debug and replay")
-    rpy.add_argument("--wal-path", "--wal", default="./agent-saga.wal", help="path to the WAL file (default: ./agent-saga.wal)")
+    rpy = sub.add_parser(
+        "replay",
+        help="time-travel debugger: walk a historical saga's steps, "
+             "compensations, and failure point")
+    rpy.add_argument("saga_id", help="saga id or name (an unambiguous prefix works)")
+    rpy.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
+                     help="path to the WAL file (default: ./agent-saga.wal)")
+    rpy.add_argument("--execute", action="store_true",
+                     help="invoke registered compensators against the recorded "
+                          "kwargs to test compensation logic (may run real code)")
     rpy.set_defaults(func=_cmd_replay)
 
     rec = sub.add_parser(
@@ -723,36 +730,178 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _cmd_replay(args: argparse.Namespace) -> int:
-    from pathlib import Path
-    wal_path = Path(args.wal_path)
-    saga_target = args.saga_id
+def _resolve_saga_id(reader, target: str):
+    """Find a saga by exact id, exact name, or an unambiguous id/name prefix.
+    Returns (saga_id, None) on success, or (None, message) describing the miss or
+    the ambiguity so the operator knows which candidates matched."""
+    sagas = reader.list_sagas().get("sagas", [])
+    if not sagas:
+        return None, "no sagas found in this WAL"
 
+    ids = {s["saga_id"] for s in sagas}
+    if target in ids:
+        return target, None
+
+    by_name = [s["saga_id"] for s in sagas if s.get("name") == target]
+    if len(by_name) == 1:
+        return by_name[0], None
+    if len(by_name) > 1:
+        return None, f"name {target!r} matches {len(by_name)} sagas: {', '.join(by_name[:6])}"
+
+    prefixed = [s["saga_id"] for s in sagas
+                if s["saga_id"].startswith(target) or (s.get("name") or "").startswith(target)]
+    if len(prefixed) == 1:
+        return prefixed[0], None
+    if len(prefixed) > 1:
+        return None, f"prefix {target!r} is ambiguous: {', '.join(prefixed[:6])}"
+    return None, f"no saga matches {target!r} (by id, name, or prefix)"
+
+
+def _fmt_kwargs(kwargs: dict) -> str:
+    if not kwargs:
+        return "{}"
+    return json.dumps(kwargs, default=str)[:200]
+
+
+def _cmd_replay(args: argparse.Namespace) -> int:
+    """Time-travel debugger: reconstruct a historical saga from the WAL and walk
+    its forward actions, the compensation each would fire on rollback, where it
+    failed, and how the rollback actually went -- all without touching a live
+    API. With --execute, resolved compensators are invoked against the recorded
+    descriptors so a team can iterate on compensation logic against a real
+    failure."""
+    from .ui.reader import SagaWALReader
+    from .registry import resolve as resolve_comp
+
+    wal_path = Path(args.wal_path)
     if not wal_path.exists():
         print(f"Error: WAL file not found at {wal_path}", file=sys.stderr)
         return 1
 
-    records = _read_wal(wal_path)
-    saga_records = [r for r in records if r.get("saga_id") == saga_target]
-
-    if not saga_records:
-        print(f"No records found for saga_id '{saga_target}' in {wal_path}")
+    reader = SagaWALReader(wal_path)
+    saga_id, err = _resolve_saga_id(reader, args.saga_id)
+    if saga_id is None:
+        print(f"replay: {err}", file=sys.stderr)
         return 1
 
-    print(f"\n=======================================================")
-    print(f"  TIME-TRAVEL DEBUGGER: Replaying Saga '{saga_target}'")
-    print(f"=======================================================")
-    print(f"Found {len(saga_records)} records in {wal_path}\n")
+    detail = reader.get_saga(saga_id)
+    if detail is None:
+        print(f"replay: could not reconstruct saga {saga_id!r}", file=sys.stderr)
+        return 1
 
-    for idx, rec in enumerate(saga_records, 1):
-        event = rec.get("event", "UNKNOWN")
-        seq = rec.get("seq", idx)
-        tool = rec.get("tool", "-")
-        payload = rec.get("payload", {})
-        print(f" [{seq:03d}] {event:<22} tool={tool:<20} payload={json.dumps(payload, default=str)[:80]}")
+    name = detail.get("name")
+    label = f"{name} ({saga_id})" if name else saga_id
+    steps = detail.get("steps", [])
+    bar = "=" * 60
+    print(f"\n{bar}")
+    print(f"  TIME-TRAVEL DEBUGGER  --  {label}")
+    print(bar)
+    print(f"  status : {detail.get('status')}")
+    print(f"  steps  : {len(steps)}   started: {_replay_ts(detail.get('started_at'))}")
+    if getattr(args, "execute", False):
+        print("  mode   : EXECUTE -- resolved compensators will be invoked")
+    print()
 
-    print("\nSimulated Replay Completed Cleanly (Dry-Run Mode).")
+    # -- forward phase --------------------------------------------------
+    print("FORWARD:")
+    failed_at = None
+    for step in steps:
+        status = step.get("status", "?")
+        marker = "ok " if status == "COMMITTED" else ("!! " if status in ("ORPHANED", "FAILED") else "-> ")
+        print(f"  [{step.get('order', 0) + 1}] {marker}{step.get('tool', '?')}"
+              f"  [{step.get('semantics', '?')}]  ({status})")
+        print(f"        forward : {_fmt_kwargs(step.get('forward_kwargs') or {})}")
+        comp = step.get("compensation")
+        if comp:
+            rec = "recoverable" if comp.get("recoverable") else "NOT recoverable"
+            print(f"        undo    : {comp.get('handler', '?')}"
+                  f"({_fmt_kwargs(comp.get('kwargs') or {})})  [{rec}]")
+        else:
+            print(f"        undo    : (none recorded -- would ORPHAN on rollback)")
+        if step.get("error"):
+            failed_at = step
+            print(f"        ERROR   : {step['error']}")
+
+    # -- failure point --------------------------------------------------
+    cause = detail.get("abort_cause")
+    if cause:
+        where = f" at step '{failed_at.get('tool')}'" if failed_at else ""
+        print(f"\nFAILURE{where}: {cause.get('type')}: {cause.get('message')}")
+
+    # -- rollback phase -------------------------------------------------
+    if detail.get("rollback_started"):
+        print("\nROLLBACK (LIFO):")
+        compensated = [s for s in reversed(steps) if s.get("status") == "COMPENSATED"]
+        orphaned = [s for s in steps if s.get("status") == "ORPHANED"]
+        for s in compensated:
+            comp = s.get("compensation") or {}
+            print(f"  ok  {comp.get('handler', s.get('tool'))} compensated")
+        for s in orphaned:
+            print(f"  !!  {s.get('tool')} ORPHANED -- no working compensation")
+        clean = detail.get("rollback_clean")
+        print(f"  rollback clean: {'yes' if clean else 'NO -- needs a human'}")
+
+    # -- optional sandbox execution -------------------------------------
+    if getattr(args, "execute", False):
+        print("\nSANDBOX EXECUTION (compensators re-run against recorded kwargs):")
+        rc = _replay_execute(steps, resolve_comp)
+        print()
+        return rc
+
+    # Descriptive replay: report unresolved compensators as a warning.
+    missing = [s.get("compensation", {}).get("handler")
+               for s in steps
+               if s.get("compensation") and resolve_comp(s["compensation"].get("handler")) is None]
+    if missing:
+        print(f"\nNote: {len(missing)} compensation handler(s) not registered in this "
+              f"process: {', '.join(m for m in missing if m)}")
+        print("      Register them (or import their module) and re-run with --execute "
+              "to test the compensation logic.")
+    print()
     return 0
+
+
+def _replay_ts(ts) -> str:
+    if not ts:
+        return "-"
+    import datetime
+    return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _replay_execute(steps: list, resolve_comp) -> int:
+    """Invoke each committed step's registered compensator against its recorded
+    kwargs, LIFO, reporting outcomes. Returns non-zero if any failed or was
+    unresolved -- so this doubles as a compensation-logic regression check."""
+    import asyncio as _asyncio
+    import inspect as _inspect
+
+    failures = 0
+    committed = [s for s in reversed(steps)
+                 if s.get("status") in ("COMMITTED", "COMPENSATED") and s.get("compensation")]
+    if not committed:
+        print("  (no compensable steps to run)")
+        return 0
+
+    for s in committed:
+        comp = s["compensation"]
+        handler = comp.get("handler")
+        fn = resolve_comp(handler)
+        if fn is None:
+            failures += 1
+            print(f"  !!  {handler}: NOT REGISTERED in this process")
+            continue
+        kwargs = comp.get("kwargs") or {}
+        try:
+            result = fn(**kwargs)
+            if _inspect.isawaitable(result):
+                _asyncio.run(result)
+            print(f"  ok  {handler}({_fmt_kwargs(kwargs)}) -> compensated")
+        except Exception as exc:
+            failures += 1
+            print(f"  !!  {handler}: raised {type(exc).__name__}: {exc}")
+
+    print(f"\n  {len(committed) - failures}/{len(committed)} compensations succeeded")
+    return 1 if failures else 0
 
 
 def main(argv: list[str] | None = None) -> int:
