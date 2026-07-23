@@ -45,3 +45,15 @@ def test_assert_saga_deterministic_passes_and_fails(assert_saga_deterministic):
 def test_plugin_registers_saga_chaos_marker(pytestconfig):
     markers = pytestconfig.getini("markers")
     assert any("saga_chaos" in m for m in markers)
+
+
+def test_standalone_pytest_agent_saga_package():
+    import sys
+    from pathlib import Path
+    pkg_dir = str(Path(__file__).parent.parent / "pytest-agent-saga")
+    if pkg_dir not in sys.path:
+        sys.path.insert(0, pkg_dir)
+    import pytest_agent_saga
+    import pytest_agent_saga.plugin
+    assert pytest_agent_saga.__version__ == "0.2.2"
+    assert hasattr(pytest_agent_saga.plugin, "saga_wal")

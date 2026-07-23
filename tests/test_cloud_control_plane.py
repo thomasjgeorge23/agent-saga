@@ -72,3 +72,20 @@ async def test_control_plane_degrades_on_failure():
     c = SagaCloudClient(api_key="k", transport=down)
     res = await c.get_fleet_entanglement()      # must not raise
     assert res["status"] == "error"
+
+
+@aio
+async def test_live_cloud_server_e2e():
+    from agent_saga.cloud_server import SagaCloudServer, get_global_cloud_state
+    import urllib.request
+    import json
+
+    server = SagaCloudServer(host="127.0.0.1", port=8099)
+    server.start()
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8099/v1/fleet/budget")
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        assert data["status"] == "ok"
+    finally:
+        server.stop()

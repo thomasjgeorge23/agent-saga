@@ -163,6 +163,17 @@ def test_an_unchained_record_cannot_be_redacted():
         redact_record({"seq": 1, "event": "X", "saga_id": "s"})
 
 
+def test_redact_path_with_list_index():
+    from agent_saga.integrity import redact_path
+    records = [
+        {"seq": 1, "kwargs": {"items": [{"card": "1234-5678", "cvv": "999"}]}}
+    ]
+    out, count = redact_path(records, "kwargs.items.0.cvv")
+    assert count == 1
+    assert out[0]["kwargs"]["items"][0]["cvv"] == "[REDACTED]"
+    assert out[0]["kwargs"]["items"][0]["card"] == "1234-5678"
+
+
 def test_editing_a_redacted_record_is_still_caught():
     records = chained(4)
     records, _ = redact_where(records, lambda r: r.get("seq") == 2)

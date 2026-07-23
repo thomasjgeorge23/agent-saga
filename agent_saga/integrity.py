@@ -310,6 +310,12 @@ def _has_dotted_path(record: dict, path: str) -> bool:
     for p in parts:
         if isinstance(curr, dict) and p in curr:
             curr = curr[p]
+        elif isinstance(curr, (list, tuple)) and p.isdigit():
+            idx = int(p)
+            if 0 <= idx < len(curr):
+                curr = curr[idx]
+            else:
+                return False
         else:
             return False
     return True
@@ -320,23 +326,26 @@ REDACTED_VALUE = "[REDACTED]"
 
 def _redact_dotted_path(record: dict, path: str) -> Optional[dict]:
     """Return a copy of `record` with the value at `path` masked, or None if the
-    path is absent. Only the leaf is touched; the rest of the record -- the
-    surrounding audit context an operator still needs -- is preserved.
-
-    Copies are made along the traversed path so the caller's nested dicts are
-    never mutated in place."""
-    import copy
-
-    parts = path.split(".")
+    path is absent. Supports dict key paths and list index paths (e.g. 'kwargs.items.0.cvv').
+    Only the leaf is touched; surrounding audit context is preserved."""
     if not _has_dotted_path(record, path):
         return None
-    new_record = dict(record)
+    import copy
+    parts = path.split(".")
+    new_record = copy.deepcopy(record)
     cursor = new_record
     for p in parts[:-1]:
-        child = dict(cursor[p])   # copy each level we descend into
-        cursor[p] = child
-        cursor = child
-    cursor[parts[-1]] = REDACTED_VALUE
+        if isinstance(cursor, dict):
+            cursor = cursor[p]
+        elif isinstance(cursor, list) and p.isdigit():
+            cursor = cursor[int(p)]
+    last = parts[-1]
+    if isinstance(cursor, dict) and last in cursor:
+        cursor[last] = REDACTED_VALUE
+    elif isinstance(cursor, list) and last.isdigit():
+        idx = int(last)
+        if 0 <= idx < len(cursor):
+            cursor[idx] = REDACTED_VALUE
     return new_record
 
 
