@@ -331,3 +331,45 @@ def test_postgres_store_in_memory_fallback_without_db():
                                  rule="r", reason="z"))
     assert store.get("m1").id == "m1"
     assert store.decide("m1", granted=True, approver="a").status == "GRANTED"
+
+
+# -- #20 ParallelSagaGroup fail_fast vs fail_all distinction -------------------
+
+@aio
+async def test_parallel_fail_fast_cancels_siblings():
+    import asyncio
+    parent = SagaContext(saga_id="p-ff")
+    await parent.wal.start()
+    g = ParallelSagaGroup("ff", parent, mode="fail_fast")
+    sibling = {"done": False}
+
+    async def failing(ctx):
+        await asyncio.sleep(0.05); raise ValueError("boom")
+    async def long_sibling(ctx):
+        await asyncio.sleep(0.6); sibling["done"] = True
+
+    g.add_task(failing); g.add_task(long_sibling)
+    with pytest.raises(ValueError):
+        await g.execute_all()
+    # fail_fast cancelled the long sibling instead of waiting it out.
+    assert sibling["done"] is False
+
+
+@aio
+async def test_parallel_fail_all_waits_for_all_then_raises():
+    import asyncio
+    parent = SagaContext(saga_id="p-fa")
+    await parent.wal.start()
+    g = ParallelSagaGroup("fa", parent, mode="fail_all")
+    sibling = {"done": False}
+
+    async def failing(ctx):
+        await asyncio.sleep(0.05); raise ValueError("boom")
+    async def long_sibling(ctx):
+        await asyncio.sleep(0.3); sibling["done"] = True
+
+    g.add_task(failing); g.add_task(long_sibling)
+    with pytest.raises(ValueError):
+        await g.execute_all()
+    # fail_all let the sibling finish before rolling back and raising.
+    assert sibling["done"] is True
