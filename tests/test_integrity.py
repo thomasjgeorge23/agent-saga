@@ -399,7 +399,8 @@ def test_cli_export_refuses_a_broken_chain_by_default(capsys):
         out = Path(d) / "bundle"
 
         assert main(["export", "--wal-path", str(wal), "--out", str(out)]) == 1
-        assert "refusing to export" in capsys.readouterr().out
+        # Diagnostics go to stderr so stdout stays clean for piped exports.
+        assert "refusing to export" in capsys.readouterr().err
         assert not out.exists(), "a refused export must not leave an artifact"
 
         assert main(["export", "--wal-path", str(wal), "--out", str(out),

@@ -10,55 +10,17 @@ discipline.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import logging
+import os
+import secrets
+import sys
 import time
+from pathlib import Path
+
+from ._version import __version__
 from .integrity import verify, export_worm
-
-
-def _cmd_export(args: argparse.Namespace) -> int:
-    wal_path = Path(args.wal_path)
-    output_path = Path(args.output) if args.output else (Path(args.out) if getattr(args, "out", None) else None)
-    fmt = getattr(args, "format", "json").lower()
-    allow_broken = getattr(args, "allow_broken", False)
-
-    if not wal_path.exists():
-        print(f"cannot read {wal_path}: [Errno 2] No such file or directory: {wal_path!r}", file=sys.stderr)
-        return 2
-
-    records = _read_wal(wal_path)
-    report = verify(records)
-    if not report.intact and not allow_broken:
-        print(f"refusing to export: {report.summary()}", file=sys.stderr)
-        return 1
-
-    if getattr(args, "out", None):
-        export_worm(records, args.out, source=str(wal_path), report=report)
-        print(f"Exported WORM bundle with {len(records)} record(s) to {args.out}")
-        return 0
-
-    if fmt == "csv":
-        import csv
-        if records:
-            keys = sorted({k for r in records for k in r.keys()})
-            if output_path:
-                with open(output_path, "w", newline="", encoding="utf-8") as fh:
-                    writer = csv.DictWriter(fh, fieldnames=keys)
-                    writer.writeheader()
-                    writer.writerows(records)
-            else:
-                print(",".join(keys))
-                for r in records:
-                    print(",".join(str(r.get(k, "")) for k in keys))
-    else: # json
-        js_out = json.dumps(records, indent=2, default=str)
-        if output_path:
-            output_path.write_text(js_out, encoding="utf-8")
-        else:
-            print(js_out)
-
-    print(f"Exported {len(records)} WAL records successfully.")
-    return 0
 
 
 def _cmd_ui(args: argparse.Namespace) -> int:
@@ -120,8 +82,16 @@ def _read_wal(path: str) -> list:
     import sys
     from .encryption import EncryptedRecordError, decode_line
 
+    # Archived segments may be gzip-compressed (FileWAL compress_archives=True);
+    # read them transparently so `verify`/`export` work on an archive as-is.
+    if str(path).endswith(".gz"):
+        import gzip
+        opener = lambda: gzip.open(path, "rt", encoding="utf-8")
+    else:
+        opener = lambda: open(path, encoding="utf-8")
+
     records = []
-    with open(path, encoding="utf-8") as fh:
+    with opener() as fh:
         for line in fh:
             line = line.strip()
             if not line:
@@ -165,31 +135,80 @@ def _cmd_verify(args: argparse.Namespace) -> int:
 
 
 def _cmd_export(args: argparse.Namespace) -> int:
-    """Write a verified, self-describing bundle for write-once storage."""
-    from .integrity import export_worm, verify
+    """Export WAL records for auditors.
 
+    Two shapes, one command:
+
+    * ``--out <dir>`` writes a verified, self-describing WORM *bundle* (records
+      + manifest + chain head) for write-once/object-lock storage. This is the
+      auditor-grade artifact and stays the default when a directory is given.
+    * ``--format csv|json`` (optionally ``--output <file>``) writes a flat,
+      analysis-friendly dump to a single file or stdout, for teams that just
+      need the rows in a spreadsheet or a JSON pipeline.
+    """
     try:
         records = _read_wal(args.wal_path)
     except OSError as exc:
-        print(f"cannot read {args.wal_path}: {exc}")
+        print(f"cannot read {args.wal_path}: {exc}", file=sys.stderr)
         return 2
 
     report = verify(records)
     if not report.intact and not args.allow_broken:
-        print(f"refusing to export: {report.summary()}")
+        print(f"refusing to export: {report.summary()}", file=sys.stderr)
         print("Exporting a broken chain would launder it into an artifact that "
               "looks authoritative. Pass --allow-broken to export it anyway, "
-              "labelled as broken.")
+              "labelled as broken.", file=sys.stderr)
         return 1
 
-    manifest = export_worm(records, args.out, source=args.wal_path, report=report)
-    print(f"exported {manifest['records']} record(s) to {args.out}")
-    print(f"  chain head : {manifest['chain_head']}")
-    print(f"  bundle sha : {manifest['bundle_sha256']}")
-    print(f"  intact     : {manifest['intact']}")
-    print("\nStore under an object-lock/WORM policy. Re-verify any time with:")
-    print(f"  agent-saga verify --wal-path {args.out}/records.jsonl")
-    return 0 if manifest["intact"] else 1
+    # WORM bundle path -- auditor grade, unchanged behaviour.
+    if args.out:
+        manifest = export_worm(records, args.out, source=args.wal_path, report=report)
+        print(f"exported {manifest['records']} record(s) to {args.out}")
+        print(f"  chain head : {manifest['chain_head']}")
+        print(f"  bundle sha : {manifest['bundle_sha256']}")
+        print(f"  intact     : {manifest['intact']}")
+        print("\nStore under an object-lock/WORM policy. Re-verify any time with:")
+        print(f"  agent-saga verify --wal-path {args.out}/records.jsonl")
+        return 0 if manifest["intact"] else 1
+
+    # Flat structured export path -- CSV or JSON, to a file or stdout.
+    fmt = (args.format or "json").lower()
+    output_path = Path(args.output) if args.output else None
+
+    if fmt == "csv":
+        import csv, io
+
+        keys = sorted({k for r in records for k in r.keys()}) if records else []
+        buf = io.StringIO()
+        # lineterminator="\n" keeps the buffer newline-clean; we then write with
+        # newline="" so Windows does not turn each "\n" into a blank-line "\r\n".
+        writer = csv.DictWriter(buf, fieldnames=keys, extrasaction="ignore",
+                                lineterminator="\n")
+        writer.writeheader()
+        for r in records:
+            writer.writerow({k: _csv_cell(r.get(k, "")) for k in keys})
+        text = buf.getvalue()
+    else:  # json
+        text = json.dumps(records, indent=2, default=str)
+
+    if output_path:
+        with open(output_path, "w", newline="", encoding="utf-8") as fh:
+            fh.write(text)
+        print(f"exported {len(records)} record(s) as {fmt} to {output_path}", file=sys.stderr)
+    else:
+        sys.stdout.write(text)
+        if not text.endswith("\n"):
+            sys.stdout.write("\n")
+    return 0 if report.intact else 1
+
+
+def _csv_cell(value: object) -> str:
+    """Flatten a WAL value into a single CSV cell. Nested dicts/lists become
+    compact JSON so a row snapshot or kwargs blob survives the round-trip
+    instead of rendering as a bare ``{...}`` repr."""
+    if isinstance(value, (dict, list, tuple)):
+        return json.dumps(value, default=str, separators=(",", ":"))
+    return "" if value is None else str(value)
 
 
 def _cmd_mcp(args: argparse.Namespace) -> int:
@@ -246,18 +265,52 @@ def _format_local_time(ts: float) -> str:
     return datetime.datetime.fromtimestamp(ts).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
+def _format_utc_time(ts: float) -> str:
+    import datetime
+    return datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _format_timestamps(ts: float) -> str:
+    """UTC and the operator's local time on one line, so nobody has to convert in
+    their head to know when an approval was requested."""
+    return f"{_format_utc_time(ts)}  /  {_format_local_time(ts)} (local)"
+
+
+def _approvals_by_status(store, status: str):
+    """Return the requests matching `status` ('pending'|'granted'|'denied'|'all'),
+    or None if the store cannot serve non-pending history. 'pending' works on
+    every store; the rest need list_all()."""
+    from .approvals import GRANTED, DENIED, PENDING
+
+    if status == "pending":
+        return list(store.pending())
+    list_all = getattr(store, "list_all", None)
+    if list_all is None:
+        return None
+    records = list(list_all())
+    if status == "all":
+        return records
+    wanted = {"granted": GRANTED, "denied": DENIED}[status]
+    return [r for r in records if r.status == wanted]
+
+
 def _cmd_approvals(args: argparse.Namespace) -> int:
     store = _approval_store(args)
 
     if args.action == "list":
-        pending = store.pending()
-        if not pending:
-            print("no pending approvals")
+        status = getattr(args, "status", "pending")
+        requests = _approvals_by_status(store, status)
+        if requests is None:
+            print(f"this approval store does not support listing by status "
+                  f"'{status}' (only --status pending is available for it)")
+            return 2
+        if not requests:
+            print(f"no {status} approvals" if status != "all" else "no approvals")
             return 0
-        for request in pending:
-            import time
-            local_ts = _format_local_time(getattr(request, "requested_at", time.time()))
-            print(f"{request.summary()} (local time: {local_ts})")
+        for request in requests:
+            ts = getattr(request, "requested_at", time.time())
+            print(request.summary())
+            print(f"      requested: {_format_timestamps(ts)}")
             for key, value in request.context.items():
                 print(f"      {key}: {value}")
         return 0
@@ -420,16 +473,16 @@ def build_parser() -> argparse.ArgumentParser:
         description="Inspect and operate agent-saga state: human approvals, "
                     "kill-switches, audit logs, and the time-travel debugger.",
     )
-    p.add_argument("--version", action="version", version="agent-saga 0.2.1")
+    p.add_argument("--version", action="version", version=f"agent-saga {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
     recov = sub.add_parser("recover", help="run recovery daemon sweep over orphaned sagas")
-    recov.add_argument("--wal-path", default="./agent-saga.wal", help="path to WAL file")
+    recov.add_argument("--wal-path", "--wal", default="./agent-saga.wal", help="path to WAL file")
     recov.add_argument("--dry-run", action="store_true", help="run in observation-only mode without executing compensations")
     recov.set_defaults(func=_cmd_recover)
 
     ui = sub.add_parser("ui", help="launch the time-travel debugger over a WAL file")
-    ui.add_argument("--wal-path", default="./agent-saga.wal",
+    ui.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
                     help="path to the WAL file (default: ./agent-saga.wal)")
     ui.add_argument("--port", type=int, default=8080, help="port (default: 8080)")
     ui.add_argument("--host", default="127.0.0.1",
@@ -441,14 +494,14 @@ def build_parser() -> argparse.ArgumentParser:
     ui.set_defaults(func=_cmd_ui)
 
     studio = sub.add_parser("studio", help="unified studio launcher for web dashboard and tail")
-    studio.add_argument("--wal-path", default="./agent-saga.wal", help="path to WAL file")
+    studio.add_argument("--wal-path", "--wal", default="./agent-saga.wal", help="path to WAL file")
     studio.add_argument("--port", type=int, default=8080, help="port (default: 8080)")
     studio.add_argument("--host", default="127.0.0.1", help="bind host")
     studio.set_defaults(func=_cmd_studio)
 
     verify = sub.add_parser(
         "verify", help="check the WAL hash chain for tampering")
-    verify.add_argument("--wal-path", default="./agent-saga.wal",
+    verify.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
                         help="path to the WAL file (default: ./agent-saga.wal)")
     verify.add_argument("--strict", action="store_true",
                         help="also fail on records written before chaining was "
@@ -456,15 +509,18 @@ def build_parser() -> argparse.ArgumentParser:
     verify.set_defaults(func=_cmd_verify)
 
     export = sub.add_parser(
-        "export", help="export WAL records to structured CSV or JSON for audit teams")
-    export.add_argument("--wal-path", default="./agent-saga.wal",
+        "export",
+        help="export the WAL: a verified WORM bundle (--out) or flat CSV/JSON (--format)")
+    export.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
                         help="path to the WAL file (default: ./agent-saga.wal)")
+    export.add_argument("--out", default=None,
+                        help="output DIRECTORY for a verified WORM bundle (auditor grade)")
     export.add_argument("--format", default="json", choices=["json", "csv"],
-                        help="output format (csv or json)")
-    export.add_argument("--out", "--output", dest="out", default=None,
-                        help="output directory or file path")
+                        help="flat export format when --out is not used (default: json)")
+    export.add_argument("--output", "-o", default=None,
+                        help="output FILE for the flat CSV/JSON export (default: stdout)")
     export.add_argument("--allow-broken", action="store_true",
-                        help="export even if verification fails")
+                        help="export even if hash-chain verification fails (labelled broken)")
     export.set_defaults(func=_cmd_export)
 
     mcp = sub.add_parser(
@@ -480,7 +536,7 @@ def build_parser() -> argparse.ArgumentParser:
     mcp.add_argument("--boundary", default="session",
                      choices=["session", "explicit", "none"],
                      help="what a transaction is (default: session)")
-    mcp.add_argument("--wal-path", default="./agent-saga.wal",
+    mcp.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
                      help="path to the WAL file (default: ./agent-saga.wal)")
     mcp.add_argument("server", nargs=argparse.REMAINDER,
                      help="the upstream server command, after --")
@@ -491,6 +547,9 @@ def build_parser() -> argparse.ArgumentParser:
     appr.add_argument("action", choices=["list", "approve", "deny"])
     appr.add_argument("id", nargs="?", default="",
                       help="approval id (for approve/deny)")
+    appr.add_argument("--status", default="pending",
+                      choices=["pending", "granted", "denied", "all"],
+                      help="which approvals to list (default: pending)")
     appr.add_argument("--approver", default="",
                       help="who is deciding; required, and recorded")
     appr.add_argument("--note", default="", help="reason, recorded with the decision")
@@ -541,13 +600,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     rpy = sub.add_parser("replay", help="simulate a historical saga failure locally for debugging")
     rpy.add_argument("saga_id", help="the saga_id to debug and replay")
-    rpy.add_argument("--wal-path", default="./agent-saga.wal", help="path to the WAL file (default: ./agent-saga.wal)")
+    rpy.add_argument("--wal-path", "--wal", default="./agent-saga.wal", help="path to the WAL file (default: ./agent-saga.wal)")
     rpy.set_defaults(func=_cmd_replay)
 
     rec = sub.add_parser(
         "reconcile",
         help="ask the external systems whether the log is telling the truth")
-    rec.add_argument("--wal-path", default="./agent-saga.wal",
+    rec.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
                      help="path to the WAL file (default: ./agent-saga.wal)")
     rec.add_argument("--import", dest="imports", action="append", default=[],
                      metavar="MODULE",
