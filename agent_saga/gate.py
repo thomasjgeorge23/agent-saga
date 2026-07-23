@@ -358,6 +358,109 @@ def set_gate(gate: PreFlightGate) -> None:
     _DEFAULT_GATE = gate
 
 
+# ---------------------------------------------------------------------------
+# Embedding-based dynamic risk scoring
+# ---------------------------------------------------------------------------
+
+# Seed corpus of known-bad action shapes. A team extends this with its own
+# incident history; the scorer needs no training, just examples.
+DEFAULT_KNOWN_BAD_ACTIONS = (
+    "wire transfer large amount of money to an unknown external account",
+    "delete all production database records without a backup",
+    "send bulk email to the entire customer list",
+    "grant admin privileges to an unverified user",
+    "disable security controls or audit logging",
+    "issue a full refund to an account that did not pay",
+    "export the entire user table including credentials",
+    "execute arbitrary shell command on a production host",
+    "transfer ownership of resources to an external party",
+    "purchase or provision expensive infrastructure without approval",
+)
+
+
+def _hash_embed(text: str, dim: int = 512) -> list[float]:
+    """A deterministic, zero-dependency bag-of-features embedding: hashes word
+    and character-bigram tokens into a fixed-width L2-normalised vector. Not a
+    trained model, but enough for cosine similarity to separate 'wire transfer
+    to unknown account' from 'read the user profile' -- and it needs no install,
+    no network, and no GPU. Swap in a real model via ``embed_fn`` for better
+    semantics."""
+    import hashlib
+    import re
+
+    vec = [0.0] * dim
+    tokens = re.findall(r"[a-z0-9]+", text.lower())
+    features = list(tokens)
+    # character bigrams within each token add fuzzy overlap (transfer ~ transferring)
+    for tok in tokens:
+        features.extend(tok[i:i + 2] for i in range(len(tok) - 1))
+    for feat in features:
+        h = int(hashlib.md5(feat.encode("utf-8")).hexdigest(), 16) % dim
+        vec[h] += 1.0
+    norm = sum(x * x for x in vec) ** 0.5
+    if norm > 0:
+        vec = [x / norm for x in vec]
+    return vec
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    # inputs are already normalised; clamp for float noise
+    return max(0.0, min(1.0, dot))
+
+
+class EmbeddingRiskScorer:
+    """A ready-to-use ``risk_scorer`` for :class:`PreFlightGate` that scores a
+    proposed tool call by semantic similarity to a corpus of known-bad actions --
+    no model training required.
+
+        gate = PreFlightGate(risk_scorer=EmbeddingRiskScorer(), risk_threshold=0.6)
+
+    By default it uses a deterministic, dependency-free hashing embedder so it
+    works offline and in tests. For stronger semantics, pass an ``embed_fn`` that
+    returns a vector for a string (e.g. wrapping sentence-transformers or an
+    embeddings API), or use :meth:`from_sentence_transformers`.
+    """
+
+    def __init__(self, known_bad: Optional[Sequence[str]] = None, *,
+                 embed_fn: Optional[Callable[[str], Sequence[float]]] = None):
+        self.embed_fn = embed_fn or _hash_embed
+        self.known_bad: list[str] = list(known_bad if known_bad is not None
+                                         else DEFAULT_KNOWN_BAD_ACTIONS)
+        self._corpus: list[list[float]] = [list(self.embed_fn(t)) for t in self.known_bad]
+
+    @classmethod
+    def from_sentence_transformers(cls, model_name: str = "all-MiniLM-L6-v2",
+                                   known_bad: Optional[Sequence[str]] = None) -> "EmbeddingRiskScorer":
+        """Build a scorer backed by a sentence-transformers model (requires the
+        ``sentence-transformers`` package)."""
+        from sentence_transformers import SentenceTransformer  # type: ignore
+
+        model = SentenceTransformer(model_name)
+
+        def embed(text: str) -> Sequence[float]:
+            return model.encode(text, normalize_embeddings=True).tolist()
+
+        return cls(known_bad, embed_fn=embed)
+
+    def add_known_bad(self, description: str) -> None:
+        """Add an incident to the corpus (e.g. from a real past bad action)."""
+        self.known_bad.append(description)
+        self._corpus.append(list(self.embed_fn(description)))
+
+    def describe(self, ctx: "GateContext") -> str:
+        import json
+        return f"{ctx.tool} {json.dumps(ctx.kwargs, default=str, sort_keys=True)}"
+
+    def __call__(self, ctx: "GateContext") -> float:
+        """Return a risk score in [0, 1]: the max similarity of the proposed call
+        to any known-bad action."""
+        if not self._corpus:
+            return 0.0
+        vec = list(self.embed_fn(self.describe(ctx)))
+        return max(_cosine(vec, cv) for cv in self._corpus)
+
+
 __all__ = [
     "PreFlightGate",
     "PreFlightViolation",
@@ -373,5 +476,7 @@ __all__ = [
     "dynamic_risk_rule",
     "get_gate",
     "set_gate",
+    "EmbeddingRiskScorer",
+    "DEFAULT_KNOWN_BAD_ACTIONS",
 ]
 

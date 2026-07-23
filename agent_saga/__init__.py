@@ -14,6 +14,7 @@ from .decorator import current_saga, saga, saga_scope, tool
 from .retry import RetryPolicy
 from .gate import (
     Decision,
+    EmbeddingRiskScorer,
     GateContext,
     PreFlightGate,
     PreFlightViolation,
@@ -264,6 +265,7 @@ __all__ = [
     "registered",
     "resolve",
     "GateContext",
+    "EmbeddingRiskScorer",
     "PreFlightGate",
     "PreFlightViolation",
     "RollbackReport",
