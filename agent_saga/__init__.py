@@ -137,6 +137,7 @@ from .mission_critical import (
 )
 from .auto import patch_all
 from .entanglement import EntangledNode, EntanglementMatrix
+from .propagation import EntanglementPropagator
 from .sentinel import PredictiveSentinel
 from .gc import GCReport, SnapshotGC
 from .idempotency import IdempotencyManager
@@ -390,6 +391,7 @@ __all__ = [
     "StateSnapshot",
     "EntangledNode",
     "EntanglementMatrix",
+    "EntanglementPropagator",
     "PredictiveSentinel",
     "SemanticOutputVerifier",
     "VerifiedOutput",
