@@ -103,6 +103,47 @@ def build_handler(reader: SagaWALReader, token: Optional[str] = None):
 
         do_HEAD = do_GET
 
+        def do_POST(self) -> None:  # noqa: N802
+            try:
+                if not self._authorized():
+                    self._json(401, {"error": "unauthorized"})
+                    return
+                path = urlparse(self.path).path
+                body = self._read_body()
+                if path == "/api/design/code":
+                    from ..bpmn import generate_saga_code
+                    code = generate_saga_code(body.get("steps", []),
+                                              name=body.get("name") or "designed_saga")
+                    return self._send(200, code.encode("utf-8"), "text/plain; charset=utf-8")
+                if path == "/api/design/bpmn":
+                    from ..bpmn import design_to_bpmn_xml
+                    xml = design_to_bpmn_xml(body.get("steps", []))
+                    return self._send(200, xml.encode("utf-8"), "application/xml; charset=utf-8")
+                if path == "/api/design/code-from-bpmn":
+                    from ..bpmn import saga_code_from_bpmn
+                    code = saga_code_from_bpmn(body.get("xml", ""),
+                                               name=body.get("name") or "imported_saga")
+                    return self._send(200, code.encode("utf-8"), "text/plain; charset=utf-8")
+                self._json(404, {"error": "not found"})
+            except BrokenPipeError:
+                pass
+            except Exception:
+                logger.exception("POST handling failed")
+                try:
+                    self._json(400, {"error": "bad request"})
+                except Exception:
+                    pass
+
+        def _read_body(self) -> dict:
+            length = int(self.headers.get("Content-Length") or 0)
+            if length <= 0:
+                return {}
+            raw = self.rfile.read(length)
+            try:
+                return json.loads(raw.decode("utf-8"))
+            except Exception:
+                return {}
+
         def _route(self) -> None:
             path = urlparse(self.path).path
 
@@ -119,6 +160,12 @@ def build_handler(reader: SagaWALReader, token: Optional[str] = None):
                 return self._json(200, get_entanglement_matrix().summary())
             if path == "/api/limits":
                 return self._json(200, self._limits_snapshot())
+            if path == "/api/bpmn":
+                from ..bpmn import BPMNExporter
+                from .reader import iter_records
+                records = list(iter_records(reader.wal_path)) if reader else []
+                xml = BPMNExporter.to_bpmn_xml(records)
+                return self._send(200, xml.encode("utf-8"), "application/xml; charset=utf-8")
             if path.startswith("/api/sagas/"):
                 saga_id = unquote(path[len("/api/sagas/"):]).strip("/")
                 if not saga_id:

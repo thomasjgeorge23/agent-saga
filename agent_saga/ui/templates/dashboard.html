@@ -196,6 +196,32 @@
     padding: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
   .login-btn:hover { background: var(--accent-2); }
 
+  /* BPMN Studio overlay */
+  .studio-overlay { position: fixed; inset: 0; background: rgba(2,6,18,.72);
+    display: flex; align-items: center; justify-content: center; z-index: 60; backdrop-filter: blur(3px); }
+  .studio-panel { width: min(1000px, 94vw); height: min(680px, 90vh); background: var(--panel);
+    border: 1px solid var(--border-2); border-radius: 14px; display: flex; flex-direction: column;
+    box-shadow: 0 24px 70px rgba(0,0,0,.5); overflow: hidden; }
+  .studio-body { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  .studio-left { border-right: 1px solid var(--border); padding: 14px; display: flex; flex-direction: column; min-height: 0; }
+  .studio-right { padding: 14px; display: flex; flex-direction: column; min-height: 0; }
+  .studio-form, .studio-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .studio-form input, .studio-form select, .studio-actions input {
+    background: var(--panel-2); border: 1px solid var(--border-2); color: var(--text);
+    border-radius: 7px; padding: 7px 9px; font-size: 12px; font-family: var(--mono); flex: 1; min-width: 0; }
+  .studio-flow { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .flow-step { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 8px 10px; font-size: 12px; position: relative; }
+  .flow-step .fs-tool { font-family: var(--mono); color: var(--text); }
+  .flow-step .fs-sem { font-size: 10px; color: var(--accent-2); text-transform: uppercase; letter-spacing: .5px; }
+  .flow-step .fs-comp { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .flow-step .fs-del { position: absolute; top: 6px; right: 8px; cursor: pointer; color: var(--faint); border: 0; background: 0; }
+  .flow-step .fs-del:hover { color: #fbbf24; }
+  .flow-arrow { text-align: center; color: var(--faint); font-size: 11px; line-height: 1; }
+  .studio-out, #studio-out { flex: 1; background: var(--bg-2); border: 1px solid var(--border-2);
+    color: var(--text); border-radius: 8px; padding: 10px; font-family: var(--mono); font-size: 11.5px;
+    resize: none; white-space: pre; overflow: auto; }
+
   /* Entanglement graph overlay */
   .graph-overlay { position: fixed; inset: 0; background: rgba(2,6,18,.72);
     display: flex; align-items: center; justify-content: center; z-index: 60; backdrop-filter: blur(3px); }
@@ -248,6 +274,7 @@
       <div class="toggle" id="autotoggle" title="Auto-refresh every 4s">
         <span class="switch"></span><span>Live</span>
       </div>
+      <button class="btn" id="studiobtn" title="Visually design a saga and export Python">⚙ Studio</button>
       <button class="btn" id="graphbtn" title="Show the multi-agent entanglement graph">⚛ Graph</button>
       <button class="btn" id="bpmnbtn" title="Open BPMN Workflow Visual Designer">📐 BPMN</button>
       <button class="btn" id="refresh">↻ Refresh</button>
@@ -283,6 +310,39 @@
       <div class="login-err" id="login-err" hidden>That token was rejected. Try again.</div>
       <button class="login-btn" type="submit">Unlock</button>
     </form>
+  </div>
+
+  <div class="studio-overlay" id="studio-overlay" hidden>
+    <div class="studio-panel">
+      <div class="graph-head">
+        <div>⚙ BPMN Studio <small>design a saga, export Python</small></div>
+        <button class="x" id="studio-close">✕</button>
+      </div>
+      <div class="studio-body">
+        <div class="studio-left">
+          <div class="studio-form">
+            <input id="st-tool" placeholder="tool (e.g. stripe.charge)" />
+            <select id="st-sem">
+              <option value="REVERSIBLE">REVERSIBLE</option>
+              <option value="COMPENSABLE" selected>COMPENSABLE</option>
+              <option value="IRREVERSIBLE">IRREVERSIBLE</option>
+            </select>
+            <input id="st-comp" placeholder="compensation handler (COMPENSABLE only)" />
+            <button class="btn" id="st-add">+ Add step</button>
+          </div>
+          <div class="studio-flow" id="studio-flow"></div>
+        </div>
+        <div class="studio-right">
+          <div class="studio-actions">
+            <input id="st-name" placeholder="saga name" value="designed_saga" />
+            <button class="btn" id="st-gen-py">Generate Python</button>
+            <button class="btn" id="st-gen-bpmn">Generate BPMN</button>
+          </div>
+          <textarea id="studio-out" spellcheck="false" readonly
+                    placeholder="Add steps, then Generate Python…"></textarea>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="graph-overlay" id="graph-overlay" hidden>
@@ -683,6 +743,7 @@ $("#login-form").addEventListener("submit", async (e) => {
 });
 
 // ---- BPMN 2.0 Visual Designer ----
+let lastBpmnXml = "";
 async function openBpmn() {
   $("#bpmn-overlay").hidden = false;
   let bpmnXml = "";
@@ -690,7 +751,17 @@ async function openBpmn() {
     const res = await fetch("/api/bpmn", { headers: AUTH_TOKEN ? { "Authorization": "Bearer " + AUTH_TOKEN } : {} });
     if (res.ok) bpmnXml = await res.text();
   } catch (e) {}
+  lastBpmnXml = bpmnXml;
   renderBpmnNodes(bpmnXml);
+}
+async function exportBpmnCode() {
+  const opts = { method: "POST", headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({ xml: lastBpmnXml, name: "imported_saga" }) };
+  if (AUTH_TOKEN) opts.headers["Authorization"] = "Bearer " + AUTH_TOKEN;
+  try {
+    const r = await fetch("/api/design/code-from-bpmn", opts);
+    $("#bpmn-code-out").value = await r.text();
+  } catch (e) { $("#bpmn-code-out").value = "// generation failed: " + e; }
 }
 function closeBpmn() { $("#bpmn-overlay").hidden = true; }
 function renderBpmnNodes(bpmnXml) {
@@ -739,18 +810,64 @@ function generatePythonSagaCode(nodes) {
   $("#bpmn-code-out").value = pyLines.join("\n");
 }
 
+// ---- BPMN Studio (visual saga designer -> Python) ----
+let studioSteps = [];
+function openStudio() { $("#studio-overlay").hidden = false; renderStudio(); }
+function closeStudio() { $("#studio-overlay").hidden = true; }
+function addStudioStep() {
+  const tool = $("#st-tool").value.trim();
+  if (!tool) return;
+  const sem = $("#st-sem").value;
+  const handler = $("#st-comp").value.trim();
+  studioSteps.push({
+    tool, semantics: sem,
+    compensate: (sem === "COMPENSABLE" && handler) ? { handler, kwargs: {} } : null,
+  });
+  $("#st-tool").value = ""; $("#st-comp").value = "";
+  renderStudio();
+}
+function renderStudio() {
+  const flow = $("#studio-flow");
+  if (!studioSteps.length) { flow.innerHTML = `<div class="loading">No steps yet. Add one above.</div>`; return; }
+  flow.innerHTML = studioSteps.map((s, i) => `
+    <div class="flow-step">
+      <button class="fs-del" data-i="${i}" title="remove">✕</button>
+      <div class="fs-sem">${s.semantics}</div>
+      <div class="fs-tool">${esc(s.tool)}</div>
+      ${s.compensate ? `<div class="fs-comp">↩ undo: ${esc(s.compensate.handler)}</div>` : ""}
+    </div>${i < studioSteps.length - 1 ? '<div class="flow-arrow">↓</div>' : ""}`).join("");
+  flow.querySelectorAll(".fs-del").forEach(b =>
+    b.onclick = () => { studioSteps.splice(+b.dataset.i, 1); renderStudio(); });
+}
+async function studioGenerate(path) {
+  const name = $("#st-name").value.trim() || "designed_saga";
+  const opts = { method: "POST", headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({ steps: studioSteps, name }) };
+  if (AUTH_TOKEN) opts.headers["Authorization"] = "Bearer " + AUTH_TOKEN;
+  try {
+    const r = await fetch(path, opts);
+    $("#studio-out").value = await r.text();
+  } catch (e) { $("#studio-out").value = "// generation failed: " + e; }
+}
+
 // ---- wire up ----
 $("#refresh").onclick = refreshAll;
+$("#studiobtn").onclick = openStudio;
+$("#studio-close").onclick = closeStudio;
+$("#st-add").onclick = addStudioStep;
+$("#st-gen-py").onclick = () => studioGenerate("/api/design/code");
+$("#st-gen-bpmn").onclick = () => studioGenerate("/api/design/bpmn");
 $("#graphbtn").onclick = openGraph;
 $("#graph-close").onclick = closeGraph;
 $("#bpmnbtn").onclick = openBpmn;
 $("#bpmn-close").onclick = closeBpmn;
-$("#bpmn-gen-code").onclick = () => alert("Python @saga_scope code exported to side panel!");
+$("#bpmn-gen-code").onclick = exportBpmnCode;
 $("#d-close").onclick = closeDrawer;
 $("#autotoggle").onclick = () => setAuto(!state.auto);
-document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeGraph(); closeBpmn(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeGraph(); closeBpmn(); closeStudio(); } });
 $("#graph-overlay").addEventListener("click", e => { if (e.target.id === "graph-overlay") closeGraph(); });
 $("#bpmn-overlay").addEventListener("click", e => { if (e.target.id === "bpmn-overlay") closeBpmn(); });
+$("#studio-overlay").addEventListener("click", e => { if (e.target.id === "studio-overlay") closeStudio(); });
 
 refreshAll();
 startLive();

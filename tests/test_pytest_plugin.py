@@ -53,7 +53,10 @@ def test_standalone_pytest_agent_saga_package():
     pkg_dir = str(Path(__file__).parent.parent / "pytest-agent-saga")
     if pkg_dir not in sys.path:
         sys.path.insert(0, pkg_dir)
+    import agent_saga
     import pytest_agent_saga
     import pytest_agent_saga.plugin
-    assert pytest_agent_saga.__version__ == "0.2.2"
+    # The companion package ships in lockstep with agent-saga, so a release bump
+    # can't leave them disagreeing (single source of truth, same as the CLI).
+    assert pytest_agent_saga.__version__ == agent_saga.__version__
     assert hasattr(pytest_agent_saga.plugin, "saga_wal")
