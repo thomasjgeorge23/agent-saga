@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-saga"
-version = "0.2.1"
+dynamic = ["version"]
 description = "Transactional boundaries, typed compensation semantics, and a pre-flight safety gate for autonomous AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,27 +34,58 @@ Issues = "https://github.com/thomasjgeorge23/agent-saga/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "langchain-core>=0.3"]
+
+# -- backing stores ----------------------------------------------------------
+# redis: RedisWAL, RedisLimitStore, RedisApprovalStore, RedisSwitchStore.
+# redis-py >=5 bundles the asyncio client (redis.asyncio) the stores use.
+redis = ["redis>=5.0.0"]
+# postgres: PostgresWAL + PostgresApprovalStore (asyncpg) and SQLAlchemyAdapter
+# (SQLAlchemy 2.0-style select/update/delete/inspect).
+postgres = ["asyncpg>=0.28.0", "sqlalchemy>=2.0"]
+
+# -- observability -----------------------------------------------------------
+# otel: setup_telemetry() drives the OpenTelemetry SDK. OTLPExporter itself is
+# native (stdlib json+urllib) and needs nothing here.
+otel = ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0"]
+opentelemetry = ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0"]  # alias
+
+# -- integrations ------------------------------------------------------------
+# slack: SlackBlockKitApp and the webhook notifiers are pure stdlib, so this
+# extra pulls no third-party package. It exists so `pip install agent-saga[slack]`
+# is a valid, self-documenting install target and stays stable if a future
+# transport ever adds a dependency.
+slack = []
+stripe = ["stripe>=5.0"]
+salesforce = ["httpx>=0.24"]
+encryption = ["cryptography>=41.0"]
+
+# -- agent framework adapters ------------------------------------------------
 langgraph = ["langchain-core>=0.3", "langgraph>=0.2"]
 crewai = ["crewai"]
 openai-agents = ["openai-agents"]
 llamaindex = ["llama-index-core>=0.11"]
 autogen = ["autogen-core>=0.4"]
-postgres = ["asyncpg>=0.28.0"]
-stripe = ["stripe>=5.0"]
-salesforce = ["httpx>=0.24"]
-encryption = ["cryptography>=41.0"]
-redis = ["redis>=5.0.0"]
-opentelemetry = ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0"]
-otel = ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0"]
+
+# -- everything --------------------------------------------------------------
 all = [
-    "langchain-core>=0.3", "langgraph>=0.2", "crewai", "openai-agents",
-    "llama-index-core>=0.11", "asyncpg>=0.28.0", "stripe>=5.0", "httpx>=0.24",
-    "cryptography>=41.0", "redis>=5.0.0",
+    # stores
+    "redis>=5.0.0", "asyncpg>=0.28.0", "sqlalchemy>=2.0",
+    # observability
     "opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0",
+    # integrations
+    "stripe>=5.0", "httpx>=0.24", "cryptography>=41.0",
+    # framework adapters
+    "langchain-core>=0.3", "langgraph>=0.2", "crewai", "openai-agents",
+    "llama-index-core>=0.11", "autogen-core>=0.4",
 ]
 
 [project.scripts]
 agent-saga = "agent_saga.cli:main"
+
+[tool.hatch.version]
+# Single source of truth: agent_saga/_version.py. The runtime attribute, the CLI
+# banner, and this wheel's metadata all read the same string.
+path = "agent_saga/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agent_saga"]

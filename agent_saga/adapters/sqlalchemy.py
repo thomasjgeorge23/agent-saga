@@ -1,12 +1,30 @@
 from typing import Any, Dict, List, Optional, Callable
 from .base_db import BaseDBAdapter
 
+_IMPORT_HINT = (
+    "SQLAlchemyAdapter needs the 'sqlalchemy' package, which is an optional "
+    "dependency.\n"
+    "    pip install agent-saga[postgres]\n"
+    "The core engine stays dependency-free; only this adapter needs it."
+)
+
+
+def _require_sqlalchemy() -> None:
+    """Fail with an actionable hint -- pointing at the extra -- instead of a bare
+    ModuleNotFoundError the first time the adapter touches SQLAlchemy."""
+    try:
+        import sqlalchemy  # noqa: F401
+    except ImportError as exc:  # pragma: no cover - exercised without the extra
+        raise ImportError(_IMPORT_HINT) from exc
+
+
 class SQLAlchemyAdapter(BaseDBAdapter):
     """SQLAlchemy ORM adapter that automatically registers compensating SQL statements
     for inserts, updates, and deletes, utilizing SQLAlchemy AsyncSession."""
 
     def __init__(self, session_or_factory: Any):
         """Initialize with an AsyncSession or a callable factory returning an AsyncSession."""
+        _require_sqlalchemy()
         if callable(session_or_factory) and not hasattr(session_or_factory, "execute"):
             self.session_factory = session_or_factory
             self._session = None
