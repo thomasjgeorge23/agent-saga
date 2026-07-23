@@ -376,6 +376,28 @@ class InProcessLimitStore:
         with self._mutex:
             return self._prune(key, time.time(), window)
 
+    def spend_snapshot(self, window: Optional[float] = None) -> list[dict]:
+        """Per-scope spend, for the live dashboard gauge. For each tracked scope
+        key: total amount used, number of debits, and the newest entry time. Pass
+        `window` to sum only the last N seconds; omit it to sum everything
+        currently retained. Observability only -- never a decision input."""
+        now = time.time()
+        cutoff = now - window if window is not None else None
+        out = []
+        with self._mutex:
+            for key, entries in self._log.items():
+                live = [e for e in entries if cutoff is None or e[0] > cutoff]
+                if not live:
+                    continue
+                out.append({
+                    "key": key,
+                    "used": sum(e[1] for e in live),
+                    "count": len(live),
+                    "newest_ts": max(e[0] for e in live),
+                })
+        out.sort(key=lambda d: d["used"], reverse=True)
+        return out
+
     def reset(self) -> None:
         """Drop all state. For tests -- never call this in production, it
         forgives every limit at once."""

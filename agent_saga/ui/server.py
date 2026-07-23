@@ -117,6 +117,8 @@ def build_handler(reader: SagaWALReader, token: Optional[str] = None):
             if path == "/api/entanglement":
                 from ..entanglement import get_entanglement_matrix
                 return self._json(200, get_entanglement_matrix().summary())
+            if path == "/api/limits":
+                return self._json(200, self._limits_snapshot())
             if path.startswith("/api/sagas/"):
                 saga_id = unquote(path[len("/api/sagas/"):]).strip("/")
                 if not saga_id:
@@ -175,6 +177,20 @@ def build_handler(reader: SagaWALReader, token: Optional[str] = None):
                     if not _emit(": heartbeat\n\n"):   # comment keeps it alive
                         return
                 _time.sleep(poll)
+
+        def _limits_snapshot(self) -> dict:
+            """Current budget/rate consumption per scope, from the active limit
+            store. Meaningful when the dashboard shares a process with the agents
+            (e.g. `agent-saga studio`); a standalone reader sees its own empty
+            store, and a store without spend_snapshot degrades to an empty list."""
+            try:
+                from ..limits import get_limit_store
+                store = get_limit_store()
+                snap = getattr(store, "spend_snapshot", None)
+                scopes = snap() if callable(snap) else []
+                return {"scopes": scopes, "total": sum(s["used"] for s in scopes)}
+            except Exception:
+                return {"scopes": [], "total": 0}
 
         def _serve_dashboard(self) -> None:
             try:

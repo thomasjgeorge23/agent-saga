@@ -210,6 +210,16 @@
   .graph-svg { flex: 1; width: 100%; background:
     radial-gradient(circle at 50% 40%, rgba(99,102,241,.08), transparent 60%); }
   .graph-empty { padding: 40px; text-align: center; color: var(--faint); font-size: 13px; }
+
+  /* Live spend gauge */
+  .spendstat { display: flex; align-items: center; gap: 8px; font-family: var(--mono);
+    font-size: 12px; color: var(--muted); background: var(--panel-2);
+    border: 1px solid var(--border); padding: 6px 11px; border-radius: 8px; }
+  .spend-label { text-transform: uppercase; letter-spacing: .5px; font-size: 10px; color: var(--faint); }
+  .spend-total { color: var(--accent-2); font-weight: 600; }
+  .spend-bars { display: flex; gap: 3px; align-items: flex-end; height: 18px; }
+  .spend-bar { width: 6px; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 2px; }
+  .spend-bar.hot { background: #fbbf24; }
   .g-edge { stroke: var(--border-2); stroke-width: 1.5; }
   .g-node circle { fill: var(--panel-2); stroke: var(--accent); stroke-width: 2; cursor: grab; }
   .g-node.aborted circle { stroke: #fbbf24; }
@@ -228,6 +238,11 @@
     <div class="walstat" id="walstat" title="">
       <span class="dot warn" id="waldot"></span>
       <span class="path" id="walpath">connecting…</span>
+    </div>
+    <div class="spendstat" id="spendstat" title="Live budget consumption per scope" hidden>
+      <span class="spend-label">spend</span>
+      <span class="spend-total" id="spend-total">0</span>
+      <div class="spend-bars" id="spend-bars"></div>
     </div>
     <div class="ctrl">
       <div class="toggle" id="autotoggle" title="Auto-refresh every 4s">
@@ -496,10 +511,29 @@ function openStep(stepId) {
 function closeDrawer() { $("#drawer").classList.remove("open"); state.selectedStep = null;
   document.querySelectorAll(".node.sel").forEach(n => n.classList.remove("sel")); }
 
+// ---- live spend gauge ----
+async function loadLimits() {
+  let data;
+  try { data = await api("/api/limits"); }
+  catch (e) { if (e instanceof Unauthorized) throw e; return; }
+  const scopes = (data && data.scopes) || [];
+  const el = $("#spendstat");
+  if (!scopes.length) { el.hidden = true; return; }
+  el.hidden = false;
+  $("#spend-total").textContent = (data.total || 0).toLocaleString();
+  const max = Math.max(...scopes.map(s => s.used), 1);
+  // one bar per scope (top 12), height proportional to its share, hot near cap
+  $("#spend-bars").innerHTML = scopes.slice(0, 12).map(s => {
+    const h = Math.max(2, Math.round((s.used / max) * 18));
+    const hot = s.used / max > 0.8 ? " hot" : "";
+    return `<div class="spend-bar${hot}" style="height:${h}px" title="${esc(s.key)}: ${s.used}"></div>`;
+  }).join("");
+}
+
 // ---- refresh / live ----
 async function refreshAll() {
   try {
-    await Promise.all([loadMeta(), loadSagas()]);
+    await Promise.all([loadMeta(), loadSagas(), loadLimits()]);
   } catch (e) {
     if (e instanceof Unauthorized) return;   // login overlay already shown
     throw e;

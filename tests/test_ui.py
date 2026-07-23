@@ -477,3 +477,45 @@ def test_entanglement_summary_excludes_dangling_edges():
     m.register_agent("A", "fw", SagaContext(saga_id="A"), depends_on=["ghost"])  # ghost not registered
     s = m.summary()
     assert s["nodes"] and s["edges"] == []   # dangling edge to 'ghost' dropped
+
+
+@aio
+async def test_api_limits_returns_spend_snapshot():
+    from agent_saga.limits import InProcessLimitStore, LimitRequest, set_limit_store
+    store = InProcessLimitStore()
+    set_limit_store(store)
+    store.reserve([LimitRequest(limit_name="b", key="tool:stripe.charge",
+                                amount=8500, cap=10000, window=86400)])
+    store.reserve([LimitRequest(limit_name="b", key="tool:sendgrid.send",
+                                amount=300, cap=10000, window=86400)])
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "wal.jsonl"
+            await _run_saga(p, fail=False)
+            httpd = make_server(str(p), host="127.0.0.1", port=0)
+            httpd.daemon_threads = False
+            httpd.block_on_close = True
+            port = httpd.server_address[1]
+            threading.Thread(target=httpd.serve_forever, daemon=True).start()
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/limits") as r:
+                    data = json.loads(r.read().decode())
+                assert data["total"] == 8800
+                assert data["scopes"][0]["key"] == "tool:stripe.charge"   # sorted desc
+                assert data["scopes"][0]["used"] == 8500
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+    finally:
+        store.reset()
+
+
+def test_spend_snapshot_window_filter():
+    import time
+    from agent_saga.limits import InProcessLimitStore, LimitRequest
+    store = InProcessLimitStore()
+    store.reserve([LimitRequest(limit_name="b", key="k", amount=100, cap=1e9, window=86400)])
+    snap = store.spend_snapshot()
+    assert snap and snap[0]["used"] == 100 and snap[0]["count"] == 1
+    # a zero-length window sums nothing recent (0.0 is a real window, not "unset")
+    assert store.spend_snapshot(window=0.0) == []
