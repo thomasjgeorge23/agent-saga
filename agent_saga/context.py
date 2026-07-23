@@ -13,7 +13,10 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from .gate import GateContext, PreFlightGate, PreFlightViolation
-from .observability import reset_saga_id, reset_step_id, set_saga_id, set_step_id
+from .observability import (
+    reset_saga_id, reset_saga_name, reset_step_id,
+    set_saga_id, set_saga_name, set_step_id,
+)
 from .semantics import (
     ActionSemantics,
     Compensation,
@@ -110,6 +113,7 @@ class SagaContext:
         self._rolled_back = False
         self._heartbeat: Optional[asyncio.Task] = None
         self._obs_token = None
+        self._name_token = None
         self._abort_cause: Optional[tuple[str, str]] = None
         self._span_cm = None
         self._span = None
@@ -275,6 +279,7 @@ class SagaContext:
         # under this context -- forward calls, the failure, all compensations --
         # carries the same saga_id an operator can grep on.
         self._obs_token = set_saga_id(self.saga_id)
+        self._name_token = set_saga_name(self.name)
         # Root span for the whole saga. Entered manually rather than with a
         # `with` block because a saga's lifetime spans begin()..finish(), which
         # are separate calls the caller drives.
@@ -282,8 +287,13 @@ class SagaContext:
 
         self._span_cm = get_tracer().span(SPAN_SAGA, {ATTR_SAGA_ID: self.saga_id})
         self._span = self._span_cm.__enter__()
-        self.wal.append("SAGA_START", {"saga_id": self.saga_id, "pid": os.getpid(),
-                                       "lease_ttl": self.lease_ttl})
+        start_record = {"saga_id": self.saga_id, "pid": os.getpid(),
+                        "lease_ttl": self.lease_ttl}
+        if self.name:
+            # A readable label an operator can scan in the WAL, the dashboard, and
+            # the approval queue, alongside the UUID.
+            start_record["name"] = self.name
+        self.wal.append("SAGA_START", start_record)
         await self.wal.barrier()
         self._heartbeat = asyncio.create_task(self._renew_lease())
         logger.info("saga started (pid=%s, lease_ttl=%ss)", os.getpid(), self.lease_ttl)
@@ -334,6 +344,9 @@ class SagaContext:
         if self._obs_token is not None:
             reset_saga_id(self._obs_token)
             self._obs_token = None
+        if getattr(self, "_name_token", None) is not None:
+            reset_saga_name(self._name_token)
+            self._name_token = None
 
     def record_abort(self, exc: BaseException) -> None:
         """Record what triggered the rollback.

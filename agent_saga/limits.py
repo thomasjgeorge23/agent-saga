@@ -476,6 +476,12 @@ class RedisLimitStore:
             self._client = Redis.from_url(self.url, decode_responses=True)
         return self._client
 
+    async def health_check(self) -> None:
+        """Round-trip PING so a misconfigured or unreachable Redis surfaces at
+        SagaConfig.validate() time, not on the first budget reservation."""
+        conn = await self._conn()
+        await conn.ping()
+
     def _member(self) -> str:
         with self._mutex:
             self._counter += 1

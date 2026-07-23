@@ -315,13 +315,58 @@ def _has_dotted_path(record: dict, path: str) -> bool:
     return True
 
 
+REDACTED_VALUE = "[REDACTED]"
+
+
+def _redact_dotted_path(record: dict, path: str) -> Optional[dict]:
+    """Return a copy of `record` with the value at `path` masked, or None if the
+    path is absent. Only the leaf is touched; the rest of the record -- the
+    surrounding audit context an operator still needs -- is preserved.
+
+    Copies are made along the traversed path so the caller's nested dicts are
+    never mutated in place."""
+    import copy
+
+    parts = path.split(".")
+    if not _has_dotted_path(record, path):
+        return None
+    new_record = dict(record)
+    cursor = new_record
+    for p in parts[:-1]:
+        child = dict(cursor[p])   # copy each level we descend into
+        cursor[p] = child
+        cursor = child
+    cursor[parts[-1]] = REDACTED_VALUE
+    return new_record
+
+
 def redact_where(records: list[dict], predicate, *,
                  reason: str = "erasure-request") -> tuple[list[dict], int]:
-    """Redact every record the predicate selects (supports callable or dotted path string e.g. 'kwargs.card.cvv'). Returns (records, count)."""
+    """Redact records, returning (records, count).
+
+    Two modes, chosen by the type of `predicate`:
+
+    * **Callable** -- whole-record GDPR erasure. Every record the predicate
+      selects is replaced by a redacted stub that keeps its place in the hash
+      chain provable (see ``redact_record``). For already-chained WAL records.
+
+    * **Dotted-path string** (e.g. ``"kwargs.card.cvv"``) -- surgical masking of
+      one nested field, keeping the rest of the record intact. This is the
+      pre-WAL scrub: strip a nested credential out of a payload *before* it is
+      written, so it never reaches disk. Works on unchained records (they have
+      no digest to preserve yet)."""
     out, count = [], 0
+
     if isinstance(predicate, str):
         path_str = predicate
-        predicate = lambda r: _has_dotted_path(r, path_str)
+        for record in records:
+            masked = _redact_dotted_path(record, path_str)
+            if masked is not None:
+                out.append(masked)
+                count += 1
+            else:
+                out.append(record)
+        return out, count
 
     for record in records:
         if predicate(record) and not record.get(REDACTED_FIELD):

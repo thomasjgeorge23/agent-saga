@@ -189,7 +189,7 @@ from .locks import AutoLockHeartbeat
 from .streaming import IncrementalCompensationTracker, streaming_step
 from .observability.otlp import OTLPExporter
 from .feedback import SelfHealingPromptFeedback
-from .scheduler import DurableTimerManager, CronSagaScheduler
+from .scheduler import DurableTimerManager, CronSagaScheduler, TimerCancelled
 from .signals import SignalBus, QueryBus, get_signal_bus, get_query_bus
 from .orchestrator import ChildSaga, ParallelSagaGroup
 from .bpmn import BPMNExporter, BPMNImporter, BPMNNode
@@ -200,7 +200,7 @@ from .cloud import SagaCloudClient
 from .schemas import SchemaContractError, validate_schema
 from .testing import ChaosRunner, ChaosResult, verify_saga_replay
 
-__version__ = "0.2.1"
+from ._version import __version__
 __author__ = "SagaOps"
 
 __all__ = [
@@ -224,6 +224,7 @@ __all__ = [
     "OTLPExporter",
     "SelfHealingPromptFeedback",
     "DurableTimerManager",
+    "TimerCancelled",
     "CronSagaScheduler",
     "SignalBus",
     "QueryBus",

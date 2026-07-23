@@ -75,6 +75,9 @@ class ApprovalRequest:
     tool: str
     rule: str
     reason: str
+    saga_name: str = ""
+    """The saga's human-readable label (from saga_scope(name=...)), shown next to
+    the UUID so an operator scanning the queue recognises the workflow."""
     context: dict = field(default_factory=dict)
     """What the approver needs to decide -- the amount, the recipient, the
     semantics. Whatever is here appears in the notification, so it must never
@@ -107,7 +110,8 @@ class ApprovalRequest:
 
     def summary(self) -> str:
         age = int(time.time() - self.requested_at)
-        return (f"[{self.status}] {self.tool} -- {self.reason} "
+        label = f"{self.saga_name} " if self.saga_name else ""
+        return (f"[{self.status}] {label}{self.tool} -- {self.reason} "
                 f"(rule {self.rule}, {age}s old, id {self.id[:12]})")
 
 
@@ -201,19 +205,23 @@ class FileApprovalStore:
     def update(self, request: ApprovalRequest) -> None:
         self._write(request)
 
-    def pending(self) -> list:
+    def list_all(self) -> list:
+        """Every request on disk, decided or not, oldest first. Backs the CLI's
+        `approvals list --status granted|denied|all` history view."""
         if not self.directory.exists():
             return []
         out = []
         for path in sorted(self.directory.glob("*.json")):
             try:
                 with open(path, encoding="utf-8") as fh:
-                    request = ApprovalRequest.from_dict(json.load(fh))
+                    out.append(ApprovalRequest.from_dict(json.load(fh)))
             except Exception:
                 continue
-            if not request.decided:
-                out.append(request)
+        out.sort(key=lambda r: r.requested_at)
         return out
+
+    def pending(self) -> list:
+        return [r for r in self.list_all() if not r.decided]
 
 
 class RedisApprovalStore:
@@ -477,7 +485,7 @@ class ApprovalGateway:
             return False
 
     async def decide(self, ctx: Any, rule: Any) -> bool:
-        from .observability import current_correlation
+        from .observability import current_correlation, current_saga_name
 
         saga_id, step_id = current_correlation()
         saga_id = saga_id or "unknown"
@@ -488,6 +496,7 @@ class ApprovalGateway:
         request = ApprovalRequest(
             id=rid, saga_id=saga_id, step_id=step_id, tool=ctx.tool,
             rule=rule_name, reason=getattr(rule, "reason", "") or "approval required",
+            saga_name=current_saga_name() or "",
             context=self.context_builder(ctx, rule),
             expires_at=time.time() + self.policy.timeout)
 

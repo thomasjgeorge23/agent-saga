@@ -21,11 +21,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import threading
 import time
 from pathlib import Path
 from typing import Any, Optional, Protocol, runtime_checkable
+
+logger = logging.getLogger("agent_saga.locks")
 
 
 @runtime_checkable
@@ -370,6 +373,12 @@ class RedisSemanticLocks:
             self._client = Redis.from_url(self.url, decode_responses=True)
         return self._client
 
+    async def health_check(self) -> None:
+        """Round-trip PING so a misconfigured or unreachable Redis surfaces at
+        SagaConfig.validate() time, not on the first lock acquisition mid-saga."""
+        conn = await self._conn()
+        await conn.ping()
+
     def try_acquire(self, resource_id: str, saga_id: str) -> bool:
         """Not available on a distributed backend: the check is a network round
         trip and cannot be done synchronously.
@@ -498,42 +507,99 @@ def set_semantic_locks(manager: SemanticLockManager) -> None:
 
 
 class AutoLockHeartbeat:
-    """Async context manager that automatically renews semantic lock lease
-    during prolonged operations (e.g. 40s+ LLM token streaming or reasoning)."""
+    """Keep a semantic lock alive across a prolonged operation (40s+ of LLM token
+    streaming, a long reasoning step) by renewing its lease on an interval.
+
+    Two equivalent ways to use it::
+
+        async with AutoLockHeartbeat(resource_id, saga_id):
+            await long_running_work()
+
+        hb = AutoLockHeartbeat(resource_id, saga_id)
+        await hb.start()
+        try:
+            await long_running_work()
+        finally:
+            await hb.stop()
+
+    Renewal failures are *not* swallowed. Losing a lock mid-operation is the exact
+    hazard this guards against, so a failed or rejected renewal is logged, and a
+    ``renew`` that reports the lock is no longer held stops the loop rather than
+    hammering a claim we do not own.
+
+    Distributed backends (e.g. RedisSemanticLocks) renew themselves from the
+    moment they acquire, so wrapping one here is redundant; that is detected and
+    logged once instead of silently doing nothing.
+    """
 
     def __init__(self, resource_id: str, saga_id: str, manager: Optional[Any] = None, interval: float = 5.0):
+        if interval <= 0:
+            raise ValueError("AutoLockHeartbeat interval must be > 0 seconds")
         self.resource_id = resource_id
         self.saga_id = saga_id
         self.manager = manager or get_semantic_locks()
         self.interval = interval
         self._task: Optional[asyncio.Task] = None
 
-    async def __aenter__(self):
-        self._task = asyncio.create_task(self._renew_loop())
+    async def start(self) -> "AutoLockHeartbeat":
+        """Begin renewing in the background. Idempotent: a second call is a no-op
+        while a heartbeat is already running."""
+        if self._task is not None and not self._task.done():
+            return self
+        renew = getattr(self.manager, "renew", None)
+        if renew is None:
+            if getattr(self.manager, "distributed", False):
+                logger.debug(
+                    "AutoLockHeartbeat is a no-op for %s: the distributed backend "
+                    "renews its own lease.", type(self.manager).__name__)
+            else:
+                logger.warning(
+                    "AutoLockHeartbeat: manager %s exposes no renew(); the lock "
+                    "lease will NOT be extended.", type(self.manager).__name__)
+            return self
+        self._task = asyncio.create_task(self._renew_loop(renew))
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self._task:
-            self._task.cancel()
+    async def stop(self) -> None:
+        """Stop renewing and join the background task. Safe to call more than once."""
+        task, self._task = self._task, None
+        if task is not None:
+            task.cancel()
             try:
-                await self._task
-            except (asyncio.CancelledError, Exception):
+                await task
+            except asyncio.CancelledError:
                 pass
 
-    async def _renew_loop(self):
+    async def __aenter__(self) -> "AutoLockHeartbeat":
+        return await self.start()
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self.stop()
+
+    async def _renew_loop(self, renew: Any) -> None:
+        ttl = self.interval * 3   # lease outlives ~3 missed beats before lapsing
+        is_coro = asyncio.iscoroutinefunction(renew)
         try:
             while True:
                 await asyncio.sleep(self.interval)
-                renew = getattr(self.manager, "renew", None)
-                if renew:
-                    if asyncio.iscoroutinefunction(renew):
-                        await renew(self.resource_id, self.saga_id, self.interval * 3)
-                    else:
-                        renew(self.resource_id, self.saga_id, self.interval * 3)
+                try:
+                    result = renew(self.resource_id, self.saga_id, ttl)
+                    if is_coro:
+                        result = await result
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    logger.warning(
+                        "AutoLockHeartbeat: renewal of %r failed: %r",
+                        self.resource_id, exc)
+                    continue
+                if result is False:
+                    logger.warning(
+                        "AutoLockHeartbeat: lock %r no longer held by saga %r; "
+                        "stopping renewal.", self.resource_id, self.saga_id)
+                    return
         except asyncio.CancelledError:
             raise
-        except Exception:
-            pass
 
 
 __all__ = ["RecoveryLock", "FileLock", "InProcessLock",

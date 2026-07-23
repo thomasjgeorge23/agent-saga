@@ -28,6 +28,8 @@ from typing import Any, Iterator, Optional
 
 _saga_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "agent_saga_saga_id", default=None)
+_saga_name: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "agent_saga_saga_name", default=None)
 _step_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "agent_saga_step_id", default=None)
 
@@ -47,6 +49,20 @@ def set_saga_id(saga_id: Optional[str]) -> contextvars.Token:
 
 def reset_saga_id(token: contextvars.Token) -> None:
     _saga_id.reset(token)
+
+
+def set_saga_name(name: Optional[str]) -> contextvars.Token:
+    """Bind the current saga's human-readable label, so downstream machinery
+    (approval requests, dashboards) can show it alongside the UUID."""
+    return _saga_name.set(name)
+
+
+def reset_saga_name(token: contextvars.Token) -> None:
+    _saga_name.reset(token)
+
+
+def current_saga_name() -> Optional[str]:
+    return _saga_name.get()
 
 
 def set_step_id(step_id: Optional[str]) -> contextvars.Token:

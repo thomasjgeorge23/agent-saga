@@ -53,7 +53,8 @@ def get_saga_ui_app(
             return handle()
         return lightweight_asgi
 
-    app = FastAPI(title="agent-saga UI Dashboard", version="0.2.1")
+    from .._version import __version__
+    app = FastAPI(title="agent-saga UI Dashboard", version=__version__)
     reader = SagaWALReader(wal_path) if wal_path else None
 
     async def verify_auth(x_api_key: Optional[str] = Header(None, alias="X-API-Key"), authorization: Optional[str] = Header(None)):

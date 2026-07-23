@@ -164,6 +164,7 @@ class _StepAcc:
 @dataclass
 class _SagaAcc:
     saga_id: str
+    name: Optional[str] = None
     first_ts: Optional[float] = None
     last_ts: Optional[float] = None
     pid: Optional[int] = None
@@ -207,6 +208,8 @@ class _SagaAcc:
 
         if ev == "SAGA_START":
             self.pid = rec.get("pid")
+            if rec.get("name"):
+                self.name = rec.get("name")
         elif ev == "SAGA_COMPLETE":
             self.completed = True
         elif ev == "SAGA_ABORTED":
@@ -270,6 +273,7 @@ class _SagaAcc:
         committed = [s for s in self.steps.values() if s.status != STEP_GATED]
         return {
             "saga_id": self.saga_id,
+            "name": self.name,
             "started_at": self.first_ts,
             "ended_at": self.last_ts,
             "status": self.status,

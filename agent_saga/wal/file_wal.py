@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -50,6 +51,9 @@ class FileWAL(BufferedWAL):
         chain: bool = True,
         max_size_mb: float = 0,
         rotate_daily: bool = False,
+        archive_dir: Optional[str | Path] = None,
+        compress_archives: bool = False,
+        max_segments: Optional[int] = None,
     ):
         super().__init__(max_buffer=max_buffer, backpressure=backpressure,
                          encryptor=encryptor, barrier_timeout=barrier_timeout,
@@ -59,23 +63,122 @@ class FileWAL(BufferedWAL):
         self._flush_pool = None
         self.max_size_mb = max_size_mb
         self.rotate_daily = rotate_daily
+        self.archive_dir = Path(archive_dir) if archive_dir else None
+        self.compress_archives = compress_archives
+        self.max_segments = max_segments
+        # The calendar day the active WAL segment belongs to. Pinned in memory so
+        # per-write mtime updates never confuse daily rotation; only reset when a
+        # new segment is opened.
+        self._segment_day: Optional[str] = None
+
+    @staticmethod
+    def _today() -> str:
+        return time.strftime("%Y%m%d")
+
+    def _file_day(self) -> Optional[str]:
+        """The calendar day of the on-disk file's last write, used only to anchor
+        a segment inherited from a previous process so a restart the next day
+        still rotates yesterday's log."""
+        try:
+            if self.path and self.path.exists():
+                return time.strftime("%Y%m%d", time.localtime(self.path.stat().st_mtime))
+        except OSError:
+            return None
+        return None
 
     def _maybe_rotate(self) -> None:
-        if not self.path or not self.path.exists():
+        if not self.path:
             return
+
+        today = self._today()
+        if self._segment_day is None:
+            # First write of this process: adopt the existing file's day if there
+            # is one, else start a fresh segment anchored to today.
+            self._segment_day = self._file_day() or today
+
+        if not self.path.exists():
+            return
+
         should_rotate = False
         if self.max_size_mb > 0:
             size_mb = self.path.stat().st_size / (1024 * 1024)
             if size_mb >= self.max_size_mb:
                 should_rotate = True
+        if self.rotate_daily and today != self._segment_day:
+            should_rotate = True
+
         if should_rotate:
-            import time
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            rotated_path = self.path.with_name(f"{self.path.stem}_{timestamp}{self.path.suffix}")
+            rotated_path = self._next_segment_path()
             if self._fh:
                 self._fh.close()
                 self._fh = None
             os.rename(self.path, rotated_path)
+            # The freshly opened segment belongs to today.
+            self._segment_day = today
+            self._archive_segment(rotated_path)
+            self._prune_segments()
+
+    def _next_segment_path(self) -> Path:
+        """A collision-free name for the segment being rotated out. Microsecond
+        resolution plus a monotonic counter, so many rotations inside the same
+        second never clobber one another (the bug a bare second-resolution
+        timestamp caused: rapid rotations renaming onto the same file)."""
+        import datetime
+        self._rotation_seq = getattr(self, "_rotation_seq", 0) + 1
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        name = f"{self.path.stem}_{stamp}_{self._rotation_seq:04d}{self.path.suffix}"
+        candidate = self.path.with_name(name)
+        while candidate.exists():  # belt-and-braces across process restarts
+            self._rotation_seq += 1
+            name = f"{self.path.stem}_{stamp}_{self._rotation_seq:04d}{self.path.suffix}"
+            candidate = self.path.with_name(name)
+        return candidate
+
+    def _archive_segment(self, rotated_path: Path) -> None:
+        """Move (and optionally gzip) a just-rotated segment into the archive.
+
+        The hash chain continues across segments -- the new active file picks up
+        from the same in-memory head -- so an archived segment stays independently
+        verifiable with `agent-saga verify`. gzip is transparent to that: the WAL
+        reader decompresses `.gz` segments on read."""
+        try:
+            dest_dir = self.archive_dir or rotated_path.parent
+            dest_dir.mkdir(parents=True, exist_ok=True)
+
+            if self.compress_archives:
+                import gzip, shutil
+                gz_path = dest_dir / (rotated_path.name + ".gz")
+                with open(rotated_path, "rb") as src, gzip.open(gz_path, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                os.remove(rotated_path)
+            elif self.archive_dir is not None:
+                os.replace(rotated_path, dest_dir / rotated_path.name)
+            # else: leave the renamed segment beside the active WAL (default).
+        except OSError as exc:
+            logger.warning("could not archive rotated WAL segment %s: %r",
+                           rotated_path, exc)
+
+    def _segment_glob(self) -> list[Path]:
+        """Every archived/rotated segment belonging to this WAL, oldest first."""
+        if not self.path:
+            return []
+        dest_dir = self.archive_dir or self.path.parent
+        stem, suffix = self.path.stem, self.path.suffix
+        matches = list(dest_dir.glob(f"{stem}_*{suffix}")) + \
+                  list(dest_dir.glob(f"{stem}_*{suffix}.gz"))
+        return sorted(matches, key=lambda p: p.stat().st_mtime)
+
+    def _prune_segments(self) -> None:
+        """Enforce retention: keep only the newest `max_segments` archived files."""
+        if not self.max_segments or self.max_segments < 1:
+            return
+        segments = self._segment_glob()
+        excess = len(segments) - self.max_segments
+        for old in segments[:max(0, excess)]:
+            try:
+                os.remove(old)
+            except OSError as exc:
+                logger.warning("could not prune old WAL segment %s: %r", old, exc)
 
     # -- sink --------------------------------------------------------------
 

@@ -62,9 +62,47 @@ def test_tenant_context_scoping():
 
 @aio
 async def test_saga_cloud_client():
-    client = SagaCloudClient(api_key="saga_cloud_key_test")
+    captured = {}
+
+    def fake_transport(url, payload, headers):
+        captured["url"] = url
+        captured["payload"] = payload
+        captured["headers"] = headers
+        return {"status": "accepted"}
+
+    client = SagaCloudClient(api_key="saga_cloud_key_test", transport=fake_transport)
     res = await client.push_wal_records([{"event": "SAGA_START"}])
+
     assert res["status"] == "accepted"
+    # Wiring: correct endpoint path, bearer auth, and the records in the body.
+    assert res["records_ingested"] == 1
+    assert captured["url"].endswith("/wal/ingest")
+    assert captured["headers"]["Authorization"] == "Bearer saga_cloud_key_test"
+    assert captured["payload"]["records"] == [{"event": "SAGA_START"}]
+
+
+@aio
+async def test_saga_cloud_client_dry_run_sends_nothing():
+    def must_not_be_called(url, payload, headers):
+        raise AssertionError("network hit during dry_run")
+
+    client = SagaCloudClient(api_key="k", transport=must_not_be_called, dry_run=True)
+    res = await client.push_wal_records([{"event": "SAGA_START"}])
+    assert res["status"] == "dry_run"
+    assert res["sent"] is False
+    assert res["would_send"]["records"] == [{"event": "SAGA_START"}]
+
+
+@aio
+async def test_saga_cloud_client_degrades_on_failure():
+    def boom(url, payload, headers):
+        raise ConnectionError("network down")
+
+    # Default: telemetry failure must not raise -- it returns a structured error.
+    client = SagaCloudClient(api_key="k", transport=boom)
+    res = await client.push_wal_records([{"event": "x"}])
+    assert res["status"] == "error"
+    assert "network down" in res["error"]
 
 
 def test_typed_schema_contracts():
