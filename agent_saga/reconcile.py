@@ -121,6 +121,21 @@ class Finding:
     def is_drift(self) -> bool:
         return self.outcome == DRIFT
 
+    def alert_payload(self) -> dict:
+        """A structured, notifier-ready description of this finding, for routing
+        a DRIFT to Slack / PagerDuty / a webhook."""
+        return {
+            "type": "reconciliation_drift",
+            "outcome": self.outcome,
+            "saga_id": self.saga_id,
+            "step_id": self.step_id,
+            "tool": self.tool,
+            "handler": self.handler,
+            "expected": self.expected,
+            "detail": self.detail,
+            "summary": str(self),
+        }
+
     def __str__(self) -> str:
         return (f"[{self.outcome}] {self.tool} (saga {self.saga_id[:12]}, "
                 f"step {self.step_id[:12]}): expected {self.expected}"
@@ -235,10 +250,14 @@ class Reconciliation:
     """Compare the log against the systems it claims to have changed."""
 
     def __init__(self, wal: Any = None, *, timeout: float = 30.0,
-                 concurrency: int = 8):
+                 concurrency: int = 8, on_drift: Optional[Callable[[dict], Any]] = None):
         self.wal = wal
         self.timeout = timeout
         self.concurrency = concurrency
+        # Fired the moment a DRIFT finding is discovered, turning reconciliation
+        # from a polling report into live alerting. Sync or async; exceptions in
+        # the callback never break the sweep.
+        self.on_drift = on_drift
 
     async def run(self, records: Iterable[dict]) -> ReconcileReport:
         report = ReconcileReport()
@@ -256,12 +275,26 @@ class Reconciliation:
                 report.confirmed.append(finding)
             elif finding.outcome == DRIFT:
                 report.drift.append(finding)
+                await self._alert_drift(finding)
             else:
                 report.unverifiable.append(finding)
             self._record(finding)
 
         (logger.info if report.clean else logger.error)(report.summary())
         return report
+
+    async def _alert_drift(self, finding: Finding) -> None:
+        """Push a discovered DRIFT to the configured alert sink immediately. A
+        failing or slow notifier must never take down the reconciliation sweep."""
+        if self.on_drift is None:
+            return
+        try:
+            result = self.on_drift(finding.alert_payload())
+            if inspect.isawaitable(result):
+                await result
+        except Exception:
+            logger.exception("Reconciliation on_drift callback failed for saga %s",
+                             finding.saga_id)
 
     async def _check(self, effect: _Effect) -> Finding:
         observer = _RECONCILERS.get(effect.handler)

@@ -401,3 +401,68 @@ def test_cli_verbose_lists_unverifiable(capsys, tmp_path):
     _write_wal(wal, [committed(), compensated()])
     assert main(["reconcile", "--wal-path", str(wal), "--verbose"]) == 3
     assert "stripe.charge" in capsys.readouterr().out
+
+
+# -- #27 automatic drift alerting ---------------------------------------------
+
+def _drift_finding():
+    from agent_saga.reconcile import Finding, DRIFT
+    return Finding("saga-1", "st1", "stripe.charge", "stripe.refund",
+                   "REVERSED", DRIFT, detail="charge still live")
+
+
+_DRIFT_RECORDS = [{
+    "event": "STEP_COMMITTED", "saga_id": "saga-1", "step_id": "st1",
+    "tool": "stripe.charge", "ts": 1.0, "semantics": "COMPENSABLE",
+    "compensation": {"handler": "stripe.refund", "recoverable": True, "kwargs": {}},
+}]
+
+
+async def _identity(v):
+    return v
+
+
+@aio
+async def test_reconciliation_fires_on_drift():
+    from agent_saga.reconcile import Reconciliation
+    alerts = []
+    rec = Reconciliation(on_drift=lambda p: alerts.append(p))
+    rec._check = lambda effect: _identity(_drift_finding())      # force a DRIFT
+    report = await rec.run(_DRIFT_RECORDS)
+    assert len(report.drift) == 1 and len(alerts) == 1
+    p = alerts[0]
+    assert p["type"] == "reconciliation_drift"
+    assert p["saga_id"] == "saga-1" and p["tool"] == "stripe.charge"
+    assert p["expected"] == "REVERSED" and "summary" in p
+
+
+@aio
+async def test_reconciliation_on_drift_supports_async_callback():
+    from agent_saga.reconcile import Reconciliation
+    got = []
+    async def cb(payload): got.append(payload)
+    rec = Reconciliation(on_drift=cb)
+    rec._check = lambda effect: _identity(_drift_finding())
+    await rec.run(_DRIFT_RECORDS)
+    assert len(got) == 1
+
+
+@aio
+async def test_reconciliation_on_drift_exception_does_not_break_sweep():
+    from agent_saga.reconcile import Reconciliation
+    def boom(payload): raise RuntimeError("pagerduty down")
+    rec = Reconciliation(on_drift=boom)
+    rec._check = lambda effect: _identity(_drift_finding())
+    report = await rec.run(_DRIFT_RECORDS)    # must not raise
+    assert len(report.drift) == 1             # drift still recorded
+
+
+@aio
+async def test_reconciliation_no_alert_when_confirmed():
+    from agent_saga.reconcile import Reconciliation, Finding, CONFIRMED
+    alerts = []
+    rec = Reconciliation(on_drift=lambda p: alerts.append(p))
+    rec._check = lambda effect: _identity(
+        Finding("s", "st", "t", "h", "REVERSED", CONFIRMED))
+    await rec.run(_DRIFT_RECORDS)
+    assert alerts == []                        # only DRIFT alerts
