@@ -82,6 +82,11 @@ all = [
 [project.scripts]
 agent-saga = "agent_saga.cli:main"
 
+# Ships the saga testing fixtures (saga_wal, chaos_runner,
+# assert_saga_deterministic) to any project that installs agent-saga.
+[project.entry-points.pytest11]
+agent_saga = "agent_saga.pytest_plugin"
+
 [tool.hatch.version]
 # Single source of truth: agent_saga/_version.py. The runtime attribute, the CLI
 # banner, and this wheel's metadata all read the same string.
