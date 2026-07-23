@@ -325,15 +325,20 @@ class SagaMCPProxy:
         return await self.call_upstream(tool, arguments)
 
     def _observe(self, tool: str, arguments: dict) -> None:
-        seen = self.observations.setdefault(tool, {"calls": 0, "arg_keys": set()})
+        import time as _time
+        now = _time.time()
+        seen = self.observations.setdefault(
+            tool, {"calls": 0, "arg_keys": set(), "first_seen": now, "last_seen": now})
         seen["calls"] += 1
         seen["arg_keys"].update(arguments.keys())
+        seen["last_seen"] = now
 
     def policy_skeleton(self) -> dict:
         from .policy import skeleton_from_observations
 
         return skeleton_from_observations({
-            k: {"calls": v["calls"], "arg_keys": sorted(v["arg_keys"])}
+            k: {"calls": v["calls"], "arg_keys": sorted(v["arg_keys"]),
+                "first_seen": v.get("first_seen"), "last_seen": v.get("last_seen")}
             for k, v in self.observations.items()})
 
 

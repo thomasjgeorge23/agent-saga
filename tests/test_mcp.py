@@ -502,3 +502,67 @@ async def test_proxied_calls_produce_a_verifiable_chain():
 
     assert verify(records).intact
     assert any(r.get("event") == "COMPENSATED" for r in records)
+
+
+# -- #34 observe-mode policy auto-generator -----------------------------------
+
+def _obs(now):
+    return {
+        "db.get_user":     {"calls": 50, "arg_keys": ["user_id"], "first_seen": now-10, "last_seen": now},
+        "stripe.charge":   {"calls": 8,  "arg_keys": ["amount", "customer"], "first_seen": now-20, "last_seen": now},
+        "email.send":      {"calls": 3,  "arg_keys": ["to", "body"], "first_seen": now-5, "last_seen": now},
+        "crm.create_lead": {"calls": 12, "arg_keys": ["name", "email"], "first_seen": now-30, "last_seen": now},
+    }
+
+
+def test_skeleton_infers_semantics_suggestions():
+    import time
+    from agent_saga.mcp.policy import skeleton_from_observations
+    sk = skeleton_from_observations(_obs(time.time()))["tools"]
+    assert sk["db.get_user"]["_suggested_semantics"] == "REVERSIBLE"
+    assert sk["stripe.charge"]["_suggested_semantics"] == "COMPENSABLE"
+    assert sk["email.send"]["_suggested_semantics"] == "IRREVERSIBLE"
+    assert sk["crm.create_lead"]["_suggested_semantics"] == "COMPENSABLE"
+
+
+def test_skeleton_active_semantics_stays_irreversible():
+    import time
+    from agent_saga.mcp.policy import skeleton_from_observations
+    sk = skeleton_from_observations(_obs(time.time()))["tools"]
+    # the generator never auto-upgrades; every active semantics is the safe default
+    assert all(e["semantics"] == "IRREVERSIBLE" for e in sk.values())
+
+
+def test_skeleton_emits_compensation_stub_for_write_tools():
+    import time
+    from agent_saga.mcp.policy import skeleton_from_observations
+    sk = skeleton_from_observations(_obs(time.time()))["tools"]
+    stub = sk["crm.create_lead"]["_compensate_stub"]
+    assert stub["tool"] == "create_lead_undo"
+    assert stub["from_arguments"] == {"email": "email", "name": "name"}
+    # read-only tools get no stub
+    assert "_compensate_stub" not in sk["db.get_user"]
+
+
+def test_skeleton_recommends_rate_limit_from_frequency():
+    import time
+    from agent_saga.mcp.policy import skeleton_from_observations
+    sk = skeleton_from_observations(_obs(time.time()))["tools"]
+    # 50 calls over 10s -> ~5/s -> *60*2 headroom = 600/60s
+    assert sk["db.get_user"]["_rate_limit"]["max_calls"] == 600
+    assert sk["db.get_user"]["_rate_limit"]["window_seconds"] == 60.0
+
+
+def test_enriched_skeleton_still_loads():
+    import time
+    from agent_saga.mcp.policy import skeleton_from_observations, load_policy
+    sk = skeleton_from_observations(_obs(time.time()))
+    policy = load_policy(sk)               # advisory _keys ignored, no error
+    assert policy.mode == "enforce" and len(policy.tools) == 4
+
+
+def test_render_policy_yaml():
+    import time
+    from agent_saga.mcp.policy import skeleton_from_observations, render_policy_yaml
+    text = render_policy_yaml(skeleton_from_observations(_obs(time.time())))
+    assert "mode:" in text and "tools:" in text and "_suggested_semantics" in text

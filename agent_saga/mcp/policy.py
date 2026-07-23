@@ -229,29 +229,143 @@ def load_policy_file(path: str) -> ProxyPolicy:
     return load_policy(data)
 
 
-def skeleton_from_observations(observations: dict) -> dict:
-    """Turn what OBSERVE saw into a policy file a human can finish.
+# Name heuristics for a *suggestion* only. The active `semantics` stays
+# IRREVERSIBLE regardless; these drive advisory `_suggested_*` fields a reviewer
+# acts on. Ordered by precedence: destructive/irreversible wins over write, write
+# over read, so "delete_and_read" is not mistaken for a read.
+_READ_VERBS = ("get", "list", "read", "search", "fetch", "query", "describe",
+               "show", "lookup", "count", "exists", "find", "view")
+_WRITE_VERBS = ("create", "add", "insert", "update", "set", "put", "upload",
+                "register", "book", "reserve", "charge", "provision", "enable")
+_DESTRUCTIVE_VERBS = ("delete", "remove", "destroy", "drop", "purge", "send",
+                      "email", "publish", "execute", "run", "pay", "transfer",
+                      "refund", "cancel", "terminate", "deploy", "disable")
 
-    Everything is emitted as IRREVERSIBLE with a TODO, deliberately. A generator
-    that guessed COMPENSABLE and invented an inverse would be asserting that a
-    real financial operation can be undone, on the evidence of a tool name --
-    which is the one guess this project exists to refuse. The reviewer downgrades
-    what is safe; the file never upgrades itself.
+
+def _suggest_semantics(name: str) -> str:
+    lowered = name.lower()
+    if any(v in lowered for v in _DESTRUCTIVE_VERBS):
+        return "IRREVERSIBLE"
+    if any(v in lowered for v in _WRITE_VERBS):
+        return "COMPENSABLE"
+    if any(v in lowered for v in _READ_VERBS):
+        return "REVERSIBLE"
+    return "IRREVERSIBLE"
+
+
+def _rate_limit_recommendation(seen: dict) -> Optional[dict]:
+    """A conservative rate-limit suggestion from observed call frequency: project
+    the observed rate over a 60s window and double it for headroom, so a normal
+    burst is not throttled but a runaway loop is capped."""
+    import math
+
+    calls = seen.get("calls", 0)
+    first, last = seen.get("first_seen"), seen.get("last_seen")
+    if not calls:
+        return None
+    window = 60.0
+    if first and last and last > first:
+        per_second = calls / (last - first)
+        recommended = max(1, math.ceil(per_second * window * 2))
+        basis = f"observed {calls} call(s) over {last - first:.1f}s"
+    else:
+        # No usable timing (single call or instantaneous): cap at 2x the count.
+        recommended = max(1, calls * 2)
+        basis = f"observed {calls} call(s), no timing window"
+    return {"max_calls": recommended, "window_seconds": window, "basis": basis}
+
+
+def skeleton_from_observations(observations: dict) -> dict:
+    """Turn what OBSERVE saw into a near-complete policy a human can finish fast.
+
+    The active ``semantics`` is still emitted as IRREVERSIBLE, deliberately. A
+    generator that *set* COMPENSABLE and invented an inverse would assert that a
+    real financial operation can be undone on the evidence of a tool name --
+    the one guess this project exists to refuse. The reviewer downgrades what is
+    safe; the file never upgrades itself.
+
+    What the generator now adds are *advisory* fields (``_``-prefixed, ignored by
+    the loader) so review is a quick confirm rather than a from-scratch write:
+
+      * ``_suggested_semantics`` -- a name-based guess to accept or correct.
+      * ``_compensate_stub`` -- for write-like tools, the shape of the inverse to
+        fill in (never active until the reviewer moves it to ``compensate`` and
+        sets COMPENSABLE).
+      * ``_rate_limit`` -- a cap projected from the observed call frequency.
     """
     tools = {}
     for name, seen in sorted(observations.items()):
-        tools[name] = {
+        suggestion = _suggest_semantics(name)
+        entry = {
             "semantics": "IRREVERSIBLE",
             "description": (
-                f"TODO: classify. Observed {seen.get('calls', 0)} call(s); "
-                f"argument keys seen: {sorted(seen.get('arg_keys', []))}. "
-                f"If this only reads, mark REVERSIBLE. If it writes and can be "
-                f"undone, mark COMPENSABLE and declare `compensate`."),
+                f"TODO: classify (suggested: {suggestion}). Observed "
+                f"{seen.get('calls', 0)} call(s); argument keys seen: "
+                f"{sorted(seen.get('arg_keys', []))}."),
+            "_suggested_semantics": suggestion,
         }
+        rate = _rate_limit_recommendation(seen)
+        if rate:
+            entry["_rate_limit"] = rate
+        if suggestion == "COMPENSABLE":
+            entry["_compensate_stub"] = {
+                "tool": f"{name.split('.')[-1]}_undo",
+                "from_arguments": {k: k for k in sorted(seen.get("arg_keys", []))},
+                "note": "TODO: implement the inverse call, then set semantics: "
+                        "COMPENSABLE and move this to `compensate`.",
+            }
+        tools[name] = entry
     return {"mode": "enforce", "tools": tools}
+
+
+def render_policy_yaml(skeleton: dict) -> str:
+    """Render a policy skeleton as YAML text for a reviewer. Uses PyYAML when
+    available; otherwise emits a minimal, correct YAML by hand (the structure is
+    shallow) so this stays dependency-free."""
+    try:
+        import yaml  # type: ignore
+        return yaml.safe_dump(skeleton, sort_keys=False, default_flow_style=False)
+    except Exception:
+        return _yaml_dump(skeleton)
+
+
+def _yaml_dump(obj: Any, indent: int = 0) -> str:
+    pad = "  " * indent
+    lines: list[str] = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(v, (dict, list)) and v:
+                lines.append(f"{pad}{k}:")
+                lines.append(_yaml_dump(v, indent + 1))
+            else:
+                lines.append(f"{pad}{k}: {_yaml_scalar(v)}")
+    elif isinstance(obj, list):
+        for item in obj:
+            if isinstance(item, (dict, list)):
+                lines.append(f"{pad}-")
+                lines.append(_yaml_dump(item, indent + 1))
+            else:
+                lines.append(f"{pad}- {_yaml_scalar(item)}")
+    else:
+        return f"{pad}{_yaml_scalar(obj)}"
+    return "\n".join(l for l in lines if l)
+
+
+def _yaml_scalar(v: Any) -> str:
+    if v is None:
+        return "null"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
+    s = str(v)
+    if s == "" or any(c in s for c in ":#{}[],&*!|>'\"%@`") or s.strip() != s:
+        return json.dumps(s)   # quote anything YAML-ambiguous
+    return s
 
 
 __all__ = [
     "ProxyPolicy", "ToolPolicy", "CompensationSpec", "PolicyError",
     "load_policy", "load_policy_file", "extract", "skeleton_from_observations",
+    "render_policy_yaml",
 ]
