@@ -107,6 +107,9 @@ def build_handler(reader: SagaWALReader, token: Optional[str] = None):
                 return self._json(200, reader.list_sagas())
             if path == "/events" or path == "/api/events":
                 return self._serve_events()
+            if path == "/api/entanglement":
+                from ..entanglement import get_entanglement_matrix
+                return self._json(200, get_entanglement_matrix().summary())
             if path.startswith("/api/sagas/"):
                 saga_id = unquote(path[len("/api/sagas/"):]).strip("/")
                 if not saga_id:

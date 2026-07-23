@@ -113,6 +113,33 @@ class EntanglementMatrix:
         parent_step = headers.get(HEADER_PARENT_STEP) or headers.get(HEADER_PARENT_STEP.lower()) or ""
         return {"matrix_id": matrix_id, "parent_step": parent_step}
 
+    def summary(self) -> dict[str, Any]:
+        """A graph-shaped snapshot of the matrix for visualisation and telemetry:
+        one node per entangled agent, one directed edge per dependency
+        (dependant -> dependency, i.e. the order rollback would cascade)."""
+        nodes = [
+            {
+                "id": aid,
+                "framework": node.framework,
+                "saga_id": getattr(node.context, "saga_id", None),
+                "name": getattr(node.context, "name", None),
+                "created_at": node.created_at,
+            }
+            for aid, node in self._nodes.items()
+        ]
+        edges = [
+            {"source": aid, "target": dep}
+            for aid, deps in self._dependencies.items()
+            for dep in deps
+            if dep in self._nodes         # never emit a dangling edge
+        ]
+        return {
+            "matrix_id": self.matrix_id,
+            "active_nodes": len(self._nodes),
+            "nodes": nodes,
+            "edges": edges,
+        }
+
     async def abort_all(self, trigger_agent_id: str, reason: str = "") -> dict[str, RollbackReport]:
         """Cascade atomic rollback across all entangled agents in reverse dependency order."""
         logger.warning("Entanglement matrix %s abort triggered by %s: %s",
@@ -132,9 +159,30 @@ class EntanglementMatrix:
         return reports
 
 
+_MATRIX: Optional[EntanglementMatrix] = None
+
+
+def get_entanglement_matrix() -> EntanglementMatrix:
+    """The process-wide default matrix agents register into, created on first use.
+    Backs the dashboard's /api/entanglement graph."""
+    global _MATRIX
+    if _MATRIX is None:
+        _MATRIX = EntanglementMatrix()
+    return _MATRIX
+
+
+def set_entanglement_matrix(matrix: Optional[EntanglementMatrix]) -> None:
+    global _MATRIX
+    _MATRIX = matrix
+
+
 __all__ = [
     "EntanglementMatrix",
     "EntangledNode",
+    "get_entanglement_matrix",
+    "set_entanglement_matrix",
+    "get_correlation_headers",
     "HEADER_ENTANGLEMENT_ID",
     "HEADER_PARENT_STEP",
+    "HEADER_CORRELATION_ID",
 ]

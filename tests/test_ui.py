@@ -431,3 +431,42 @@ async def test_sse_events_requires_token_when_configured():
         finally:
             httpd.shutdown()
             httpd.server_close()
+
+
+@aio
+async def test_api_entanglement_returns_graph():
+    from agent_saga.entanglement import (
+        get_entanglement_matrix, set_entanglement_matrix, EntanglementMatrix)
+    from agent_saga.context import SagaContext
+    set_entanglement_matrix(EntanglementMatrix())
+    m = get_entanglement_matrix()
+    m.register_agent("A", "langgraph", SagaContext(saga_id="A-1", name="orders"))
+    m.register_agent("B", "crewai", SagaContext(saga_id="B-2", name="billing"), depends_on=["A"])
+
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "wal.jsonl"
+        await _run_saga(p, fail=False)
+        httpd = make_server(str(p), host="127.0.0.1", port=0)
+        httpd.daemon_threads = False
+        httpd.block_on_close = True
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/entanglement") as r:
+                graph = json.loads(r.read().decode())
+            assert graph["active_nodes"] == 2
+            assert {n["id"] for n in graph["nodes"]} == {"A", "B"}
+            assert {"source": "B", "target": "A"} in graph["edges"]
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            set_entanglement_matrix(None)
+
+
+def test_entanglement_summary_excludes_dangling_edges():
+    from agent_saga.entanglement import EntanglementMatrix
+    from agent_saga.context import SagaContext
+    m = EntanglementMatrix()
+    m.register_agent("A", "fw", SagaContext(saga_id="A"), depends_on=["ghost"])  # ghost not registered
+    s = m.summary()
+    assert s["nodes"] and s["edges"] == []   # dangling edge to 'ghost' dropped

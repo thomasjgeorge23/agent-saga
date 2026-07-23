@@ -178,6 +178,26 @@
   .flag.good { background: rgba(34,197,94,.13); color: #4ade80; }
   .flag.bad { background: rgba(245,158,11,.14); color: #fbbf24; }
   .loading { color: var(--faint); padding: 30px; text-align: center; }
+
+  /* Entanglement graph overlay */
+  .graph-overlay { position: fixed; inset: 0; background: rgba(2,6,18,.72);
+    display: flex; align-items: center; justify-content: center; z-index: 60; backdrop-filter: blur(3px); }
+  .graph-panel { width: min(880px, 92vw); height: min(640px, 88vh); background: var(--panel);
+    border: 1px solid var(--border-2); border-radius: 14px; display: flex; flex-direction: column;
+    box-shadow: 0 24px 70px rgba(0,0,0,.5); overflow: hidden; }
+  .graph-head { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  .graph-head small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 8px; }
+  .graph-head .x { background: transparent; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; }
+  .graph-head .x:hover { color: var(--text); }
+  .graph-svg { flex: 1; width: 100%; background:
+    radial-gradient(circle at 50% 40%, rgba(99,102,241,.08), transparent 60%); }
+  .graph-empty { padding: 40px; text-align: center; color: var(--faint); font-size: 13px; }
+  .g-edge { stroke: var(--border-2); stroke-width: 1.5; }
+  .g-node circle { fill: var(--panel-2); stroke: var(--accent); stroke-width: 2; cursor: grab; }
+  .g-node.aborted circle { stroke: #fbbf24; }
+  .g-node text { fill: var(--text); font-family: var(--sans); font-size: 11px; }
+  .g-node small { fill: var(--muted); }
 </style>
 </head>
 <body>
@@ -196,6 +216,7 @@
       <div class="toggle" id="autotoggle" title="Auto-refresh every 4s">
         <span class="switch"></span><span>Live</span>
       </div>
+      <button class="btn" id="graphbtn" title="Show the multi-agent entanglement graph">⚛ Graph</button>
       <button class="btn" id="refresh">↻ Refresh</button>
     </div>
   </header>
@@ -216,6 +237,17 @@
         <button class="x" id="d-close">✕</button>
       </div>
       <div class="dbody" id="d-body"></div>
+    </div>
+  </div>
+
+  <div class="graph-overlay" id="graph-overlay" hidden>
+    <div class="graph-panel">
+      <div class="graph-head">
+        <div>⚛ Entanglement Graph <small id="graph-sub">multi-agent step dependencies &amp; compensation chains</small></div>
+        <button class="x" id="graph-close">✕</button>
+      </div>
+      <svg class="graph-svg" id="graph-svg" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="graph-empty" id="graph-empty" hidden>No entangled agents registered yet. Cross-process agent calls appear here as a live dependency graph.</div>
     </div>
   </div>
 </div>
@@ -439,11 +471,89 @@ function startLive() {
   es.onerror = () => { state.live = false; };   // EventSource auto-reconnects
 }
 
+// ---- entanglement graph (dependency-free force-directed layout) ----
+let graphAnim = null;
+async function openGraph() {
+  $("#graph-overlay").hidden = false;
+  let data;
+  try { data = await api("/api/entanglement"); }
+  catch (e) { data = { nodes: [], edges: [] }; }
+  renderGraph(data);
+}
+function closeGraph() {
+  $("#graph-overlay").hidden = true;
+  if (graphAnim) { cancelAnimationFrame(graphAnim); graphAnim = null; }
+}
+function renderGraph(data) {
+  const svg = $("#graph-svg"), W = 800, H = 520;
+  const nodes = (data.nodes || []).map((n, i) => ({
+    id: n.id, label: n.name || n.id, framework: n.framework || "",
+    x: W/2 + Math.cos(i) * 120, y: H/2 + Math.sin(i) * 120, vx: 0, vy: 0,
+  }));
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const edges = (data.edges || []).filter(e => byId[e.source] && byId[e.target])
+    .map(e => ({ s: byId[e.source], t: byId[e.target] }));
+  $("#graph-empty").hidden = nodes.length > 0;
+  $("#graph-sub").textContent = nodes.length + " agent(s), " + edges.length + " dependency edge(s)";
+  svg.innerHTML = "";
+  if (!nodes.length) { if (graphAnim) cancelAnimationFrame(graphAnim); return; }
+
+  const NS = "http://www.w3.org/2000/svg";
+  const edgeEls = edges.map(() => svg.appendChild(document.createElementNS(NS, "line")));
+  edgeEls.forEach(l => l.setAttribute("class", "g-edge"));
+  const nodeEls = nodes.map(n => {
+    const g = document.createElementNS(NS, "g"); g.setAttribute("class", "g-node");
+    const c = document.createElementNS(NS, "circle"); c.setAttribute("r", "22"); g.appendChild(c);
+    const t = document.createElementNS(NS, "text"); t.setAttribute("text-anchor", "middle");
+    t.setAttribute("dy", "40"); t.textContent = n.label.length > 16 ? n.label.slice(0,15)+"…" : n.label;
+    g.appendChild(t);
+    const fw = document.createElementNS(NS, "text"); fw.setAttribute("text-anchor", "middle");
+    fw.setAttribute("dy", "4"); fw.setAttribute("font-size", "9"); fw.setAttribute("fill", "var(--muted)");
+    fw.textContent = n.framework.slice(0, 6); g.appendChild(fw);
+    svg.appendChild(g); return g;
+  });
+
+  // Verlet-ish force sim: pairwise repulsion, spring links, centering, damping.
+  let ticks = 0;
+  function step() {
+    for (let a of nodes) {
+      let fx = (W/2 - a.x) * 0.008, fy = (H/2 - a.y) * 0.008;   // centering
+      for (let b of nodes) if (a !== b) {
+        let dx = a.x - b.x, dy = a.y - b.y, d2 = dx*dx + dy*dy + 0.01;
+        let f = 2600 / d2; fx += dx * f / Math.sqrt(d2); fy += dy * f / Math.sqrt(d2);
+      }
+      a._fx = fx; a._fy = fy;
+    }
+    for (let e of edges) {                                       // spring links
+      let dx = e.t.x - e.s.x, dy = e.t.y - e.s.y, d = Math.sqrt(dx*dx+dy*dy)+0.01;
+      let f = (d - 130) * 0.02, ux = dx/d, uy = dy/d;
+      e.s._fx += ux*f; e.s._fy += uy*f; e.t._fx -= ux*f; e.t._fy -= uy*f;
+    }
+    for (let n of nodes) {
+      n.vx = (n.vx + n._fx) * 0.82; n.vy = (n.vy + n._fy) * 0.82;
+      n.x = Math.max(30, Math.min(W-30, n.x + n.vx));
+      n.y = Math.max(30, Math.min(H-40, n.y + n.vy));
+    }
+    edges.forEach((e, i) => {
+      const l = edgeEls[i];
+      l.setAttribute("x1", e.s.x); l.setAttribute("y1", e.s.y);
+      l.setAttribute("x2", e.t.x); l.setAttribute("y2", e.t.y);
+    });
+    nodeEls.forEach((g, i) => g.setAttribute("transform", `translate(${nodes[i].x},${nodes[i].y})`));
+    if (++ticks < 400) graphAnim = requestAnimationFrame(step);
+  }
+  if (graphAnim) cancelAnimationFrame(graphAnim);
+  step();
+}
+
 // ---- wire up ----
 $("#refresh").onclick = refreshAll;
+$("#graphbtn").onclick = openGraph;
+$("#graph-close").onclick = closeGraph;
 $("#d-close").onclick = closeDrawer;
 $("#autotoggle").onclick = () => setAuto(!state.auto);
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeGraph(); } });
+$("#graph-overlay").addEventListener("click", e => { if (e.target.id === "graph-overlay") closeGraph(); });
 
 refreshAll();
 startLive();
