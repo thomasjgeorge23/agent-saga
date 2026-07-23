@@ -70,15 +70,23 @@ class SnapshotGC:
         grace_seconds: float = 3600.0,
         ttl_days: Optional[float] = None,
         max_snapshots_per_key: Optional[int] = None,
+        max_age_days: Optional[float] = None,
+        max_versions: Optional[int] = None,
         dry_run: bool = False,
     ):
         self.wal_path = Path(wal_path)
         self.store = store or get_snapshot_store()
         self.recovery_journal = Path(recovery_journal) if recovery_journal else None
         self.grace_seconds = grace_seconds
-        self.ttl_days = ttl_days
-        self.max_snapshots_per_key = max_snapshots_per_key
+        # `max_age_days`/`max_versions` are the documented names; `ttl_days`/
+        # `max_snapshots_per_key` are kept as aliases for back-compat.
+        self.max_age_days = max_age_days if max_age_days is not None else ttl_days
+        self.max_versions = max_versions if max_versions is not None else max_snapshots_per_key
+        self.ttl_days = self.max_age_days
+        self.max_snapshots_per_key = self.max_versions
         self.dry_run = dry_run
+        self._stop_evt = None
+        self._thread = None
 
     # -- read saga lifecycles from the WAL (and optional recovery journal) ---
 
@@ -168,9 +176,20 @@ class SnapshotGC:
             for snap in L.snapshot_ids:
                 owner[snap] = L
 
+        ttl_seconds = self.max_age_days * 86400.0 if self.max_age_days else None
         report = GCReport()
         for snap in self.store.list_ids():
             report.scanned += 1
+
+            # Hard TTL ceiling: past max_age_days a snapshot goes regardless of
+            # saga state, so disk usage stays bounded even if a saga never
+            # resolves. This is the safety cap on top of the lifecycle logic.
+            if ttl_seconds is not None:
+                age = self.store.age_seconds(snap)
+                if age is not None and age > ttl_seconds:
+                    self._delete(snap, report, reason="ttl-expired")
+                    continue
+
             L = owner.get(snap)
 
             if L is None:
@@ -194,9 +213,68 @@ class SnapshotGC:
 
             self._delete(snap, report, reason="resolved+aged-out")
 
+        # Version cap: keep only the newest `max_versions` snapshots per owning
+        # saga; delete the oldest surplus so a hot saga cannot accumulate history
+        # without bound.
+        if self.max_versions:
+            self._enforce_version_cap(owner, report)
+
         if report.deleted or report.scanned:
             logger.info("%s%s", "[dry-run] " if self.dry_run else "", report.summary())
         return report
+
+    def _enforce_version_cap(self, owner: dict, report: GCReport) -> None:
+        from collections import defaultdict
+
+        already = set(report.deleted)
+        by_saga: dict[int, list[str]] = defaultdict(list)
+        for snap, L in owner.items():
+            if snap not in already:
+                by_saga[id(L)].append(snap)
+
+        for snaps in by_saga.values():
+            surplus = len(snaps) - self.max_versions
+            if surplus <= 0:
+                continue
+            # Oldest first (largest age); delete just the surplus.
+            oldest = sorted(snaps, key=lambda s: self.store.age_seconds(s) or 0.0,
+                            reverse=True)
+            for snap in oldest[:surplus]:
+                self._delete(snap, report, reason="version-cap")
+
+    # -- background scheduling --------------------------------------------
+
+    def start_background(self, interval_seconds: float = 3600.0) -> "SnapshotGC":
+        """Run collect() now and then every `interval_seconds` on a daemon thread,
+        so old snapshots are pruned on a schedule without operator intervention.
+        Idempotent; call stop_background() to end it."""
+        import threading
+
+        if self._thread is not None and self._thread.is_alive():
+            return self
+        self._stop_evt = threading.Event()
+
+        def _loop() -> None:
+            self._safe_collect()                        # immediate first sweep
+            while not self._stop_evt.wait(interval_seconds):
+                self._safe_collect()
+
+        self._thread = threading.Thread(target=_loop, name="snapshot-gc", daemon=True)
+        self._thread.start()
+        return self
+
+    def stop_background(self) -> None:
+        if self._stop_evt is not None:
+            self._stop_evt.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+            self._thread = None
+
+    def _safe_collect(self) -> None:
+        try:
+            self.collect()
+        except Exception:
+            logger.exception("SnapshotGC background sweep failed; continuing")
 
     def _delete(self, snap: str, report: GCReport, *, reason: str) -> None:
         if not self.dry_run:

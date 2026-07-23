@@ -172,3 +172,64 @@ def test_gc_tolerates_a_truncated_wal():
     store.put("snapA", b"x")
     report = SnapshotGC(wal, store, grace_seconds=3600).collect(now=NOW)
     assert report.deleted == ["snapA"]
+
+
+# --------------------------------------------------------------------------
+# #26 TTL cap, version cap, and background scheduling
+# --------------------------------------------------------------------------
+
+class _AgeStore:
+    """Snapshot store with controllable ages, so the TTL/version caps can be
+    tested deterministically (FileSnapshotStore ages come from real mtimes)."""
+    def __init__(self, ages): self.ages = dict(ages); self.deleted = []
+    def list_ids(self): return [k for k in self.ages if k not in self.deleted]
+    def age_seconds(self, sid): return self.ages.get(sid)
+    def delete(self, sid): self.deleted.append(sid)
+    def put(self, *a): pass
+    def get(self, *a): return b""
+
+
+def _multi_snap_saga(sid, snaps, ts, *, complete=True):
+    recs = [{"event": "SAGA_START", "saga_id": sid, "ts": ts, "pid": 1}]
+    for i, snap in enumerate(snaps):
+        recs.append({"event": "STEP_COMMITTED", "saga_id": sid, "ts": ts,
+                     "step_id": f"s{i}", "tool": "durable.file", "semantics": "COMPENSABLE",
+                     "compensation": {"handler": "durable.restore_file", "recoverable": True,
+                                      "kwargs": {"snapshot_id": snap}}})
+    if complete:
+        recs.append({"event": "SAGA_COMPLETE", "saga_id": sid, "ts": ts, "clean": True})
+    return recs
+
+
+def test_gc_ttl_cap_reaps_past_max_age_regardless_of_state():
+    d = tempfile.mkdtemp(); wal = Path(d) / "wal.jsonl"
+    # dangling (unresolved) saga -> normally kept, but TTL overrides
+    _write_wal(wal, _multi_snap_saga("s1", ["snapOld", "snapNew"], NOW, complete=False))
+    store = _AgeStore({"snapOld": 40 * 86400, "snapNew": 1 * 86400})
+    report = SnapshotGC(wal, store, max_age_days=30).collect(now=NOW)
+    assert "snapOld" in store.deleted and "snapNew" not in store.deleted
+
+
+def test_gc_version_cap_keeps_newest_per_saga():
+    d = tempfile.mkdtemp(); wal = Path(d) / "wal.jsonl"
+    _write_wal(wal, _multi_snap_saga("s1", ["a", "b", "c"], NOW))
+    store = _AgeStore({"a": 300.0, "b": 200.0, "c": 100.0})   # c newest
+    SnapshotGC(wal, store, grace_seconds=10**9, max_versions=1).collect(now=NOW)
+    assert sorted(store.deleted) == ["a", "b"]                 # oldest two go, c kept
+
+
+def test_gc_max_age_days_alias_of_ttl_days():
+    gc = SnapshotGC("x.wal", store=_AgeStore({}), ttl_days=15, max_snapshots_per_key=5)
+    assert gc.max_age_days == 15 and gc.max_versions == 5
+
+
+def test_gc_start_background_runs_a_sweep():
+    import time
+    d = tempfile.mkdtemp(); wal = Path(d) / "wal.jsonl"
+    _write_wal(wal, _multi_snap_saga("s1", ["snapOld"], NOW, complete=False))
+    store = _AgeStore({"snapOld": 40 * 86400})
+    gc = SnapshotGC(wal, store, max_age_days=30)
+    gc.start_background(interval_seconds=100)
+    time.sleep(0.3)
+    gc.stop_background()
+    assert "snapOld" in store.deleted
