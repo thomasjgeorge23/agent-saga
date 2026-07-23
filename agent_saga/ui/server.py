@@ -72,9 +72,16 @@ def build_handler(reader: SagaWALReader, token: Optional[str] = None):
                 provided = vals[0] if vals else None
             return provided is not None and hmac.compare_digest(provided, token)
 
+        # The app shell carries no WAL data -- it is just HTML/JS whose whole job
+        # is to prompt for a token and then call the protected /api/* endpoints.
+        # Serving it without auth is what makes the login page reachable at all;
+        # every route that returns actual saga data still requires the token.
+        _PUBLIC_PATHS = frozenset({"/", "/index.html"})
+
         def do_GET(self) -> None:  # noqa: N802 (stdlib naming)
             try:
-                if not self._authorized():
+                path = urlparse(self.path).path
+                if path not in self._PUBLIC_PATHS and not self._authorized():
                     self.send_response(401)
                     self.send_header("WWW-Authenticate", 'Bearer realm="agent-saga-ui"')
                     body = b'{"error": "unauthorized"}'

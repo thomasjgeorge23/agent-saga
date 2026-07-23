@@ -179,6 +179,23 @@
   .flag.bad { background: rgba(245,158,11,.14); color: #fbbf24; }
   .loading { color: var(--faint); padding: 30px; text-align: center; }
 
+  /* Token login overlay */
+  .login-overlay { position: fixed; inset: 0; background: var(--bg); display: flex;
+    align-items: center; justify-content: center; z-index: 80; }
+  .login-card { width: min(360px, 90vw); background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 14px; padding: 30px 26px; display: flex; flex-direction: column; gap: 12px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.5); text-align: center; }
+  .login-mark { font-size: 30px; }
+  .login-title { font-weight: 600; font-size: 16px; }
+  .login-sub { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+  .login-input { background: var(--panel-2); border: 1px solid var(--border-2); color: var(--text);
+    border-radius: 8px; padding: 10px 12px; font-family: var(--mono); font-size: 13px; outline: none; }
+  .login-input:focus { border-color: var(--accent); }
+  .login-err { color: #fbbf24; font-size: 12px; }
+  .login-btn { background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    padding: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .login-btn:hover { background: var(--accent-2); }
+
   /* Entanglement graph overlay */
   .graph-overlay { position: fixed; inset: 0; background: rgba(2,6,18,.72);
     display: flex; align-items: center; justify-content: center; z-index: 60; backdrop-filter: blur(3px); }
@@ -240,6 +257,18 @@
     </div>
   </div>
 
+  <div class="login-overlay" id="login-overlay" hidden>
+    <form class="login-card" id="login-form">
+      <div class="login-mark">🔒</div>
+      <div class="login-title">This dashboard is protected</div>
+      <div class="login-sub">Enter the bearer token to view saga activity.</div>
+      <input class="login-input" id="login-token" type="password" autocomplete="off"
+             placeholder="bearer token" spellcheck="false" />
+      <div class="login-err" id="login-err" hidden>That token was rejected. Try again.</div>
+      <button class="login-btn" type="submit">Unlock</button>
+    </form>
+  </div>
+
   <div class="graph-overlay" id="graph-overlay" hidden>
     <div class="graph-panel">
       <div class="graph-head">
@@ -261,17 +290,42 @@ const STATUSES = [
 ];
 let state = { sagas: [], filter: "all", selectedSaga: null, detail: null, selectedStep: null, auto: false, timer: null, live: false };
 
-// ---- fetch helpers ----
-// If the dashboard was opened with ?token=..., forward it on every API call
-// (as a Bearer header) so token-protected servers work from the browser.
-const AUTH_TOKEN = new URLSearchParams(window.location.search).get("token");
+// ---- auth ----
+// Token precedence: sessionStorage (a prior login this tab) then a ?token= in
+// the URL. A URL token is moved into sessionStorage and scrubbed from the
+// address bar so it does not linger in history or get shoulder-surfed. On a 401
+// the login overlay appears; the token never leaves the browser except as a
+// Bearer header on same-origin API calls.
+const TOKEN_KEY = "agent-saga-ui-token";
+let AUTH_TOKEN = sessionStorage.getItem(TOKEN_KEY) || null;
+(function absorbUrlToken() {
+  const u = new URLSearchParams(window.location.search).get("token");
+  if (u) {
+    AUTH_TOKEN = u;
+    try { sessionStorage.setItem(TOKEN_KEY, u); } catch (e) {}
+    const clean = window.location.pathname + window.location.hash;
+    history.replaceState(null, "", clean);   // strip ?token= from the URL
+  }
+})();
+
+class Unauthorized extends Error {}
+
 async function api(path) {
   const opts = { cache: "no-store" };
   if (AUTH_TOKEN) opts.headers = { "Authorization": "Bearer " + AUTH_TOKEN };
   const r = await fetch(path, opts);
+  if (r.status === 401) { showLogin(); throw new Unauthorized("unauthorized"); }
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+function showLogin(rejected) {
+  $("#login-err").hidden = !rejected;
+  $("#login-overlay").hidden = false;
+  const inp = $("#login-token"); if (inp) { inp.value = ""; inp.focus(); }
+}
+function hideLogin() { $("#login-overlay").hidden = true; }
+function signOut() { sessionStorage.removeItem(TOKEN_KEY); AUTH_TOKEN = null; showLogin(); }
 function shortId(id) { return id ? id.slice(0, 12) : "—"; }
 function fmtTs(ts) { if (!ts) return "—"; const d = new Date(ts * 1000); return d.toLocaleString(); }
 function fmtLat(ms) { if (ms == null) return "—"; return ms < 1 ? (ms*1000).toFixed(0)+"µs" : ms.toFixed(2)+"ms"; }
@@ -444,7 +498,12 @@ function closeDrawer() { $("#drawer").classList.remove("open"); state.selectedSt
 
 // ---- refresh / live ----
 async function refreshAll() {
-  await Promise.all([loadMeta(), loadSagas()]);
+  try {
+    await Promise.all([loadMeta(), loadSagas()]);
+  } catch (e) {
+    if (e instanceof Unauthorized) return;   // login overlay already shown
+    throw e;
+  }
   if (state.selectedSaga) {
     try { state.detail = await api("/api/sagas/" + encodeURIComponent(state.selectedSaga)); renderTimeline();
       if (state.selectedStep) openStep(state.selectedStep);
@@ -545,6 +604,24 @@ function renderGraph(data) {
   if (graphAnim) cancelAnimationFrame(graphAnim);
   step();
 }
+
+// ---- login form ----
+$("#login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const tok = $("#login-token").value.trim();
+  if (!tok) return;
+  AUTH_TOKEN = tok;
+  try {
+    await api("/api/meta");        // validate the token before trusting it
+    try { sessionStorage.setItem(TOKEN_KEY, tok); } catch (e) {}
+    hideLogin();
+    refreshAll();
+    startLive();
+  } catch (err) {
+    AUTH_TOKEN = null;
+    showLogin(true);               // rejected -> show the error, ask again
+  }
+});
 
 // ---- wire up ----
 $("#refresh").onclick = refreshAll;

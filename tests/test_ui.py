@@ -341,8 +341,15 @@ async def test_http_token_auth_gates_every_route():
                 return r.status, r.read().decode()
 
         try:
-            # No token -> 401 on both the dashboard and the API.
-            for path in ("/", "/api/sagas"):
+            # The app shell (/) is public so the login page is reachable; it
+            # carries no WAL data. Every data route still requires the token.
+            status, _ = get("/")
+            assert status == 200
+            status, _ = get("/index.html")
+            assert status == 200
+
+            # No token -> 401 on the data endpoints.
+            for path in ("/api/sagas", "/api/meta", "/api/entanglement", "/events"):
                 with pytest.raises(urllib.error.HTTPError) as exc:
                     get(path)
                 assert exc.value.code == 401
