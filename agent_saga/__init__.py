@@ -192,7 +192,7 @@ from .encryption import KeyRingEncryptor
 from .locks import AutoLockHeartbeat
 from .streaming import IncrementalCompensationTracker, streaming_step
 from .observability.otlp import OTLPExporter
-from .feedback import SelfHealingPromptFeedback
+from .feedback import SelfHealingPromptFeedback, SelfHealingLoop, HealingOutcome
 from .scheduler import DurableTimerManager, CronSagaScheduler, TimerCancelled
 from .signals import SignalBus, QueryBus, get_signal_bus, get_query_bus
 from .orchestrator import ChildSaga, ParallelSagaGroup
@@ -227,6 +227,8 @@ __all__ = [
     "streaming_step",
     "OTLPExporter",
     "SelfHealingPromptFeedback",
+    "SelfHealingLoop",
+    "HealingOutcome",
     "DurableTimerManager",
     "TimerCancelled",
     "CronSagaScheduler",
