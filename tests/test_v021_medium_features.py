@@ -411,3 +411,47 @@ def test_otlp_background_timer_flushes():
         exp.create_span("b", "s")
         time.sleep(0.3)
     assert sum(flushed) >= 2               # timer shipped the spans
+
+
+# -- #22 setup_telemetry auto-detects existing OTEL provider ------------------
+
+def test_setup_telemetry_provider_selection():
+    import types
+    from agent_saga.observability.otel import _select_provider, _provider_is_configured
+
+    class ProxyTracerProvider: pass       # API placeholder
+    class SdkTracerProvider: pass         # SDK-style provider
+    class DatadogProvider: pass           # third-party, already configured
+
+    class FakeOT:
+        def __init__(self, cur): self._cur = cur; self.set_to = None
+        def get_tracer_provider(self): return self._cur
+        def set_tracer_provider(self, p): self.set_to = p; self._cur = p
+
+    fake_sdk = types.SimpleNamespace(TracerProvider=SdkTracerProvider)
+
+    # explicit wins
+    _, how = _select_provider(FakeOT(ProxyTracerProvider()), "X", fake_sdk)
+    assert how == "explicit"
+    # an already-configured provider is attached to, not replaced
+    ot = FakeOT(DatadogProvider())
+    p, how = _select_provider(ot, None, fake_sdk)
+    assert how == "existing" and isinstance(p, DatadogProvider) and ot.set_to is None
+    # unconfigured + SDK available -> create and install globally
+    ot = FakeOT(ProxyTracerProvider())
+    p, how = _select_provider(ot, None, fake_sdk)
+    assert how == "created" and isinstance(p, SdkTracerProvider) and ot.set_to is p
+    # unconfigured + no SDK -> default, never raises
+    _, how = _select_provider(FakeOT(ProxyTracerProvider()), None, None)
+    assert how == "default"
+
+    assert _provider_is_configured(DatadogProvider()) is True
+    assert _provider_is_configured(ProxyTracerProvider()) is False
+
+
+def test_setup_telemetry_never_raises():
+    # An observability dependency must never take down the engine: setup returns a
+    # usable tracer whether or not OpenTelemetry is installed.
+    from agent_saga.observability.otel import setup_telemetry
+    tracer = setup_telemetry()
+    assert tracer is not None and hasattr(tracer, "span")

@@ -121,8 +121,51 @@ class SagaTracer:
 _TRACER: Any = NoOpTracer()
 
 
+# The API's placeholder providers, returned by get_tracer_provider() before any
+# real SDK provider is installed. Seeing one of these means nothing has been
+# configured yet, so agent-saga should stand up its own.
+_UNCONFIGURED_PROVIDERS = {
+    "ProxyTracerProvider", "NoOpTracerProvider", "DefaultTracerProvider",
+}
+
+
+def _provider_is_configured(provider: Any) -> bool:
+    """True if `provider` is a real, already-installed TracerProvider (e.g. set by
+    LangSmith or Datadog APM) rather than the API's default placeholder."""
+    return provider is not None and type(provider).__name__ not in _UNCONFIGURED_PROVIDERS
+
+
+def _select_provider(ot_trace: Any, tracer_provider: Any, sdk_trace: Any) -> tuple[Any, str]:
+    """Pick the TracerProvider to trace through:
+
+      explicit  -- the caller passed one; always wins.
+      existing  -- a real global provider is already configured; attach to it so
+                   agent-saga spans join the same trace tree as the LLM calls.
+      created   -- nothing configured and the SDK is available; create one and
+                   install it globally so tracing actually exports.
+      default   -- SDK missing; fall back to the API placeholder (effectively a
+                   no-op), never raising.
+    """
+    if tracer_provider is not None:
+        return tracer_provider, "explicit"
+    current = ot_trace.get_tracer_provider()
+    if _provider_is_configured(current):
+        return current, "existing"
+    if sdk_trace is not None:
+        new_provider = sdk_trace.TracerProvider()
+        ot_trace.set_tracer_provider(new_provider)
+        return new_provider, "created"
+    return current, "default"
+
+
 def setup_telemetry(tracer_provider: Any = None) -> Any:
     """Turn on tracing. Opt-in, and safe to call when OTel is not installed.
+
+    Auto-detects an existing global TracerProvider (from LangSmith, Datadog APM,
+    or any other instrumentation) and attaches to it, so agent-saga spans appear
+    in the same trace tree as the surrounding LLM calls instead of a separate
+    one. If none is configured, it creates and installs an SDK provider so
+    tracing still exports standalone. Pass `tracer_provider` to override.
 
     Returns the active tracer -- a `SagaTracer` on success, a `NoOpTracer` if
     `opentelemetry` is missing. It does not raise: an observability dependency
@@ -138,9 +181,18 @@ def setup_telemetry(tracer_provider: Any = None) -> Any:
         _TRACER = NoOpTracer()
         return _TRACER
 
-    provider = tracer_provider or ot_trace.get_tracer_provider()
+    try:
+        from opentelemetry.sdk.trace import TracerProvider as _SdkTP
+
+        class _sdk:  # tiny namespace so _select_provider stays module-agnostic
+            TracerProvider = _SdkTP
+        sdk_trace: Any = _sdk
+    except ImportError:
+        sdk_trace = None
+
+    provider, how = _select_provider(ot_trace, tracer_provider, sdk_trace)
     _TRACER = SagaTracer(provider.get_tracer("agent_saga"), ot_trace)
-    logger.info("OpenTelemetry tracing enabled for agent_saga")
+    logger.info("OpenTelemetry tracing enabled for agent_saga (provider: %s)", how)
     return _TRACER
 
 
