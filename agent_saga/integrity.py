@@ -377,6 +377,15 @@ def redact_where(records: list[dict], predicate, *,
     return out, count
 
 
+def redact_path(records: list[dict], path: str, *,
+                reason: str = "erasure-request") -> tuple[list[dict], int]:
+    """Target nested fields via dotted-path syntax without writing a lambda predicate.
+
+    Example: ``redact_path(records, "kwargs.card.cvv")``
+    """
+    return redact_where(records, path, reason=reason)
+
+
 def as_runs(seqs: Iterable[int]) -> list[list[int]]:
     """Compress sequence numbers into [start, end] runs.
 
@@ -516,5 +525,5 @@ __all__ = [
     "REDACTED_FIELD", "as_runs", "attested_seqs", "export_worm",
     "GAP_EVENT", "canonical", "content_digest", "record_hash", "business_fields",
     "stamp", "stamp_batch", "verify", "ChainReport", "ChainBreak",
-    "redact_record", "redact_where", "gap_attestation", "digest_of",
+    "redact_record", "redact_where", "redact_path", "gap_attestation", "digest_of",
 ]

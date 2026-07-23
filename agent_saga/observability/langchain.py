@@ -56,6 +56,11 @@ class LangChainSagaCallback(_base_handler()):  # type: ignore[misc]
         self.hallucination_scorer = hallucination_scorer
         self._prompts: dict[str, str] = {}   # run_id -> joined prompt text
         self.links: list[dict] = []          # every link_llm_trace payload emitted
+        try:
+            from .otel import setup_telemetry
+            setup_telemetry()
+        except Exception:
+            pass
 
     # -- LangChain callback surface (flexible kwargs across versions) -------
 

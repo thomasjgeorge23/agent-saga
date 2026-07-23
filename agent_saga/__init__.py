@@ -51,6 +51,7 @@ from .integrity import (
     export_worm,
     redact_record,
     redact_where,
+    redact_path,
 )
 from .integrity import verify as verify_chain
 from .breaker import (
@@ -310,6 +311,7 @@ __all__ = [
     "export_worm",
     "redact_record",
     "redact_where",
+    "redact_path",
     "BudgetLimit",
     "RateLimit",
     "LimitExceeded",

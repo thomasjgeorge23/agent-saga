@@ -61,7 +61,12 @@ class SagaCloudClient:
 
     async def push_wal_records(self, records: list[dict[str, Any]]) -> dict[str, Any]:
         """Push WAL execution records to the hosted audit log & compliance
-        dashboard. Returns the server's response, or an error dict on failure."""
+        dashboard. Returns the server's response, or an error dict on failure.
+        Validates locally that no unredacted secrets slip into the payload."""
+        from .connectors._secrets import assert_no_secrets
+        for idx, record in enumerate(records):
+            assert_no_secrets(record, where=f"push_wal_records[{idx}]")
+
         result = await self._post("/wal/ingest", {"records": records})
         if result.get("status") == "accepted" and "records_ingested" not in result:
             # Be forgiving of a server that only echoes ``accepted``.

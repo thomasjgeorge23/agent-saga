@@ -1,9 +1,7 @@
 import asyncio
 import functools
 
-# Load the shipped pytest plugin from the working tree (installed users get it
-# automatically via the pytest11 entry point in pyproject.toml).
-pytest_plugins = ("agent_saga.pytest_plugin",)
+# The plugin is registered via entry points in pyproject.toml
 
 
 def aio(fn):

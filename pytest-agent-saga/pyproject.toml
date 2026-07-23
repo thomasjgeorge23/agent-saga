@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pytest-agent-saga"
+version = "0.2.2"
+description = "Pytest plugin for agent-saga: deterministic replay verification, chaos injection, and WAL fixtures."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = ["pytest", "agent-saga", "saga", "ai-agents", "testing", "chaos-engineering"]
+authors = [
+    { name = "AgentSaga Team", email = "dev@agent-saga.io" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "pytest>=7.0.0",
+    "agent-saga>=0.2.2",
+]
+
+[project.entry-points.pytest11]
+pytest_agent_saga = "pytest_agent_saga.plugin"
+
+[project.urls]
+Homepage = "https://github.com/thomasjgeorge23/agent-saga"
+Repository = "https://github.com/thomasjgeorge23/agent-saga"

@@ -249,6 +249,7 @@
         <span class="switch"></span><span>Live</span>
       </div>
       <button class="btn" id="graphbtn" title="Show the multi-agent entanglement graph">⚛ Graph</button>
+      <button class="btn" id="bpmnbtn" title="Open BPMN Workflow Visual Designer">📐 BPMN</button>
       <button class="btn" id="refresh">↻ Refresh</button>
     </div>
   </header>
@@ -292,6 +293,30 @@
       </div>
       <svg class="graph-svg" id="graph-svg" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="graph-empty" id="graph-empty" hidden>No entangled agents registered yet. Cross-process agent calls appear here as a live dependency graph.</div>
+    </div>
+  </div>
+
+  <div class="graph-overlay" id="bpmn-overlay" hidden>
+    <div class="graph-panel" style="width: min(960px, 94vw); height: min(700px, 90vh);">
+      <div class="graph-head">
+        <div>📐 BPMN 2.0 Visual Workflow Designer <small>Design compensation flows &amp; export Python saga code</small></div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn" id="bpmn-gen-code" style="padding: 4px 10px; font-size: 11.5px; background: var(--accent);">🐍 Export Python Code</button>
+          <button class="x" id="bpmn-close">✕</button>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 340px; flex: 1; min-height: 0;">
+        <div id="bpmn-container" style="background: var(--panel-2); position: relative; overflow: auto; padding: 20px; font-family: var(--mono); font-size: 12px;">
+          <div id="bpmn-canvas" style="min-height: 100%; display: flex; flex-direction: column; gap: 12px;">
+            <div style="color: var(--muted); margin-bottom: 8px;">Visual BPMN Workflow Graph Nodes:</div>
+            <div id="bpmn-nodes-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+          </div>
+        </div>
+        <div style="border-left: 1px solid var(--border); padding: 14px; background: var(--bg-2); display: flex; flex-direction: column; gap: 10px;">
+          <div style="font-weight: 600; font-size: 12px; color: var(--accent-2);">Generated @saga_scope Code</div>
+          <textarea id="bpmn-code-out" readonly style="flex: 1; background: var(--panel); color: #86efac; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: var(--mono); font-size: 11.5px; resize: none;"></textarea>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -657,14 +682,75 @@ $("#login-form").addEventListener("submit", async (e) => {
   }
 });
 
+// ---- BPMN 2.0 Visual Designer ----
+async function openBpmn() {
+  $("#bpmn-overlay").hidden = false;
+  let bpmnXml = "";
+  try {
+    const res = await fetch("/api/bpmn", { headers: AUTH_TOKEN ? { "Authorization": "Bearer " + AUTH_TOKEN } : {} });
+    if (res.ok) bpmnXml = await res.text();
+  } catch (e) {}
+  renderBpmnNodes(bpmnXml);
+}
+function closeBpmn() { $("#bpmn-overlay").hidden = true; }
+function renderBpmnNodes(bpmnXml) {
+  const listEl = $("#bpmn-nodes-list");
+  listEl.innerHTML = "";
+  let nodes = [];
+  if (bpmnXml) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(bpmnXml, "text/xml");
+    const tasks = Array.from(doc.querySelectorAll("task, serviceTask, userTask, sendTask"));
+    nodes = tasks.map(t => ({ id: t.getAttribute("id"), name: t.getAttribute("name") || t.getAttribute("id") }));
+  }
+  if (!nodes.length) {
+    nodes = [
+      { id: "Task_ReserveFlight", name: "reserve_flight" },
+      { id: "Task_BookHotel", name: "book_hotel" },
+      { id: "Task_ProcessPayment", name: "charge_card" }
+    ];
+  }
+  nodes.forEach(n => {
+    const item = document.createElement("div");
+    item.style.cssText = "background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;";
+    item.innerHTML = `<div><span style="color:var(--accent-2); font-weight:600;">⚙ ${esc(n.name)}</span> <small style="color:var(--faint);">(${esc(n.id)})</small></div><span class="badge sem-COMPENSABLE">COMPENSABLE</span>`;
+    listEl.appendChild(item);
+  });
+  generatePythonSagaCode(nodes);
+}
+function generatePythonSagaCode(nodes) {
+  const pyLines = [
+    "from agent_saga import saga_scope, ActionSemantics",
+    "",
+    "@saga_scope(name=\"visual_bpmn_saga\")",
+    "async def execute_bpmn_workflow(ctx):"
+  ];
+  nodes.forEach(n => {
+    const fnName = n.name.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+    pyLines.push(`    # Step: ${n.name}`);
+    pyLines.push(`    res_${fnName} = await ctx.execute(`);
+    pyLines.push(`        tool="${fnName}",`);
+    pyLines.push(`        fn=lambda: api_${fnName}(),`);
+    pyLines.push(`        compensation=lambda: undo_${fnName}(),`);
+    pyLines.push(`        semantics=ActionSemantics.COMPENSABLE,`);
+    pyLines.push(`    )`);
+  });
+  pyLines.push("    return \"BPMN Workflow Executed Successfully\"");
+  $("#bpmn-code-out").value = pyLines.join("\n");
+}
+
 // ---- wire up ----
 $("#refresh").onclick = refreshAll;
 $("#graphbtn").onclick = openGraph;
 $("#graph-close").onclick = closeGraph;
+$("#bpmnbtn").onclick = openBpmn;
+$("#bpmn-close").onclick = closeBpmn;
+$("#bpmn-gen-code").onclick = () => alert("Python @saga_scope code exported to side panel!");
 $("#d-close").onclick = closeDrawer;
 $("#autotoggle").onclick = () => setAuto(!state.auto);
-document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeGraph(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeGraph(); closeBpmn(); } });
 $("#graph-overlay").addEventListener("click", e => { if (e.target.id === "graph-overlay") closeGraph(); });
+$("#bpmn-overlay").addEventListener("click", e => { if (e.target.id === "bpmn-overlay") closeBpmn(); });
 
 refreshAll();
 startLive();

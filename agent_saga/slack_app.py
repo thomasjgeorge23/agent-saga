@@ -74,5 +74,46 @@ class SlackBlockKitApp:
 
         return {"status": "resolved", "req_id": req_id, "granted": granted, "approver": approver}
 
+    @classmethod
+    def build_oauth_install_url(
+        cls, client_id: str, redirect_uri: str, scopes: Optional[list[str]] = None
+    ) -> str:
+        """Construct a Slack OAuth 2.0 Install URL for workspace authorization."""
+        from urllib.parse import urlencode
+        scope_str = ",".join(scopes or ["chat:write", "commands", "incoming-webhook"])
+        params = {
+            "client_id": client_id,
+            "scope": scope_str,
+            "redirect_uri": redirect_uri,
+        }
+        return f"https://slack.com/oauth/v2/authorize?{urlencode(params)}"
+
+    @classmethod
+    def handle_slash_command(
+        cls, command_text: str, user_name: str = "slack_user"
+    ) -> dict[str, Any]:
+        """Handle /saga-approve <approve|deny> <req_id> [note] slash commands."""
+        parts = command_text.strip().split(maxsplit=2)
+        if not parts:
+            return {"response_type": "ephemeral", "text": "Usage: /saga-approve [approve|deny] <req_id> [note]"}
+
+        action = parts[0].lower()
+        if action in ("approve", "deny") and len(parts) >= 2:
+            req_id = parts[1]
+            note = parts[2] if len(parts) > 2 else ""
+            granted = (action == "approve")
+        else:
+            req_id = parts[0]
+            granted = True
+            note = parts[1] if len(parts) > 1 else ""
+
+        store = get_approval_store()
+        res = store.decide(req_id, granted=granted, approver=user_name, note=note)
+        if not res:
+            return {"response_type": "ephemeral", "text": f"❌ Approval request `{req_id}` not found or already decided."}
+
+        status_str = "APPROVED ✅" if granted else "DENIED ❌"
+        return {"response_type": "in_channel", "text": f"{status_str} request `{req_id}` by @{user_name}."}
+
 
 __all__ = ["SlackBlockKitApp"]

@@ -384,6 +384,25 @@ class Reconciliation:
         except Exception as exc:
             logger.error("could not record reconciliation finding: %r", exc)
 
+    def start_schedule(self, interval_minutes: float = 60.0,
+                       wal_path: Optional[str | Any] = None) -> asyncio.Task:
+        """Run reconciliation automatically on a background schedule.
+        Like SnapshotGC.start_background()."""
+        async def _loop():
+            from .ui.reader import iter_records
+            interval_sec = interval_minutes * 60.0
+            while True:
+                await asyncio.sleep(interval_sec)
+                target_path = wal_path or getattr(self.wal, "path", None)
+                if target_path:
+                    try:
+                        records = list(iter_records(target_path))
+                        await self.run(records)
+                    except Exception as exc:
+                        logger.error("Scheduled reconciliation sweep failed: %r", exc)
+
+        return asyncio.create_task(_loop())
+
 
 def _suffix(obs: Observation) -> str:
     bits = []

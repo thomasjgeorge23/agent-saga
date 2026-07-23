@@ -294,6 +294,43 @@ def _approvals_by_status(store, status: str):
     return [r for r in records if r.status == wanted]
 
 
+def _parse_since(since_str: Optional[str]) -> Optional[float]:
+    if not since_str:
+        return None
+    s = since_str.strip().lower()
+    mult = 1.0
+    if s.endswith("h"):
+        mult = 3600.0
+        s = s[:-1]
+    elif s.endswith("m"):
+        mult = 60.0
+        s = s[:-1]
+    elif s.endswith("d"):
+        mult = 86400.0
+        s = s[:-1]
+    elif s.endswith("s"):
+        s = s[:-1]
+    try:
+        seconds = float(s) * mult
+        return time.time() - seconds
+    except ValueError:
+        return None
+
+
+def _cmd_cloud_server(args: argparse.Namespace) -> int:
+    from .cloud_server import SagaCloudServer
+    srv = SagaCloudServer(host=args.host, port=args.port)
+    srv.start()
+    print(f"agent-saga Cloud Server running at http://{args.host}:{args.port}/v1 (Press Ctrl+C to stop)")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nStopping cloud server...")
+        srv.stop()
+    return 0
+
+
 def _cmd_approvals(args: argparse.Namespace) -> int:
     store = _approval_store(args)
 
@@ -304,6 +341,9 @@ def _cmd_approvals(args: argparse.Namespace) -> int:
             print(f"this approval store does not support listing by status "
                   f"'{status}' (only --status pending is available for it)")
             return 2
+        since_cutoff = _parse_since(getattr(args, "since", None))
+        if since_cutoff is not None:
+            requests = [r for r in requests if getattr(r, "requested_at", 0) >= since_cutoff]
         if not requests:
             print(f"no {status} approvals" if status != "all" else "no approvals")
             return 0
@@ -654,6 +694,8 @@ def build_parser() -> argparse.ArgumentParser:
     appr.add_argument("--status", default="pending",
                       choices=["pending", "granted", "denied", "all"],
                       help="which approvals to list (default: pending)")
+    appr.add_argument("--since", default=None,
+                      help="filter approvals requested since duration (e.g. 24h, 1h, 30m)")
     appr.add_argument("--approver", default="",
                       help="who is deciding; required, and recorded")
     appr.add_argument("--note", default="", help="reason, recorded with the decision")
@@ -665,6 +707,11 @@ def build_parser() -> argparse.ArgumentParser:
     appr.add_argument("--redis", default=None,
                       help="use a Redis store instead, e.g. redis://localhost:6379/0")
     appr.set_defaults(func=_cmd_approvals)
+
+    cserver = sub.add_parser("cloud-server", help="run self-hosted cloud control plane server (sagaops.dev API)")
+    cserver.add_argument("--host", default="127.0.0.1", help="bind host (default: 127.0.0.1)")
+    cserver.add_argument("--port", type=int, default=8090, help="port (default: 8090)")
+    cserver.set_defaults(func=_cmd_cloud_server)
 
     def _switch_args(sp):
         sp.add_argument("--file", default="./.agent-saga-switch.json",
