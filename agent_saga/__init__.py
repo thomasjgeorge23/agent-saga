@@ -140,6 +140,11 @@ from .mission_critical import (
 from .auto import patch_all
 from .entanglement import EntangledNode, EntanglementMatrix
 from .propagation import EntanglementPropagator
+from .hardware import (
+    ActionChallenge,
+    HardwareApprovalProvider,
+    action_digest,
+)
 from .predictive import (
     PredictiveExecutor,
     Speculation,
@@ -423,6 +428,9 @@ __all__ = [
     "EntangledNode",
     "EntanglementMatrix",
     "EntanglementPropagator",
+    "HardwareApprovalProvider",
+    "ActionChallenge",
+    "action_digest",
     "PredictiveExecutor",
     "Speculation",
     "SpeculationRefused",
