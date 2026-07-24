@@ -20,6 +20,7 @@ from .base import (
     WALStalled,
 )
 from .file_wal import AsyncWAL, FileWAL
+from .async_sink import AsyncSinkWAL, AsyncStorageSink, InMemoryAsyncSink
 from .mmap_wal import MmapWAL
 
 
@@ -35,6 +36,7 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
+    "AsyncSinkWAL", "AsyncStorageSink", "InMemoryAsyncSink",
     "BaseWAL",
     "BufferedWAL",
     "AsyncWAL",

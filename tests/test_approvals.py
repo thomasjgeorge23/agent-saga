@@ -46,9 +46,12 @@ def correlation():
     yield
     set_saga_id(None)
     set_step_id(None)
-    # Retire any out-of-band decider before its store is torn down.
-    for stop in _DECIDERS:
+    # Retire every out-of-band decider before its store is torn down: signal,
+    # then join, so no worker is mid-decide() when the store goes away.
+    for stop, _ in _DECIDERS:
         stop.set()
+    for _, thread in _DECIDERS:
+        thread.join(timeout=5)
     _DECIDERS.clear()
 
 
@@ -63,11 +66,12 @@ def fast(**kwargs):
     return ApprovalPolicy(**kwargs)
 
 
-# Every out-of-band decider registers its stop flag here so the autouse fixture
-# below can retire it at teardown. A worker that outlives its test keeps polling
-# a store whose temp directory has been deleted, and the exception it raises in
-# that thread surfaces as an unraisable-exception failure attributed to whatever
-# test happens to be running -- which is exactly the flake this caused.
+# Every out-of-band decider registers (stop_flag, thread) here so the autouse
+# fixture below can *stop and join* it at teardown. Signalling the flag is not
+# enough: a worker mid-store.decide() when the temp store is torn down still
+# raises, and that exception -- in a thread pytest's unraisableexception plugin
+# watches -- surfaces as a failure attributed to whatever test runs next. Joining
+# guarantees no worker outlives the store it polls.
 _DECIDERS: list = []
 
 
@@ -80,7 +84,6 @@ def decide_after(store, delay, **kwargs):
     its test ends, or if the store goes away underneath it.
     """
     stop = threading.Event()
-    _DECIDERS.append(stop)
 
     def worker():
         deadline = time.time() + 30
@@ -95,6 +98,7 @@ def decide_after(store, delay, **kwargs):
             stop.wait(0.01)
 
     t = threading.Thread(target=worker, daemon=True)
+    _DECIDERS.append((stop, t))
     time.sleep(0) if delay == 0 else None
     t.start()
     return t
