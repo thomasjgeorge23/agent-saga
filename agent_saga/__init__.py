@@ -54,6 +54,7 @@ from .integrity import (
     redact_path,
 )
 from .integrity import verify as verify_chain
+from .chaos import ChaosConfig, ChaosEngine, ChaosInjectionError
 from .breaker import (
     BreakerPolicy,
     CircuitBreaker,

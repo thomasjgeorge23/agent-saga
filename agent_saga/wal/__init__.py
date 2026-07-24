@@ -20,6 +20,7 @@ from .base import (
     WALStalled,
 )
 from .file_wal import AsyncWAL, FileWAL
+from .mmap_wal import MmapWAL
 
 
 def __getattr__(name: str) -> Any:
@@ -38,6 +39,7 @@ __all__ = [
     "BufferedWAL",
     "AsyncWAL",
     "FileWAL",
+    "MmapWAL",
     "RedisWAL",
     "PostgresWAL",
     "BackpressurePolicy",
