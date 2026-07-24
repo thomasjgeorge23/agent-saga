@@ -33,7 +33,9 @@ Repository = "https://github.com/thomasjgeorge23/agent-saga"
 Issues = "https://github.com/thomasjgeorge23/agent-saga/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4", "langchain-core>=0.3"]
+# Everything the full test suite needs. CI installs exactly this, so a gate that
+# runs `pytest -q` must not hit an ImportError for an optional backend.
+dev = ["pytest>=7.4", "langchain-core>=0.3", "cryptography>=41.0", "PyYAML>=6.0"]
 
 # -- backing stores ----------------------------------------------------------
 # redis: RedisWAL, RedisLimitStore, RedisApprovalStore, RedisSwitchStore.

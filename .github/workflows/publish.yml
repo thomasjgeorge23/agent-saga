@@ -10,8 +10,36 @@ permissions:
   contents: read
 
 jobs:
+  release-gate:
+    # Nothing reaches PyPI until the suite passes AND the engine, run for real,
+    # produces a log in which every committed effect is accounted for. A release
+    # that could strand an uncompensated charge must not be publishable.
+    name: Tests & rollback-safety gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Test suite
+        run: python -m pytest -q
+
+      - name: End-to-end scenario
+        run: python scripts/ci_safety_scenario.py release-check.wal
+
+      - name: Gate -- log unaltered
+        run: agent-saga verify --wal release-check.wal
+
+      - name: Gate -- every effect accounted for
+        run: agent-saga certify --wal release-check.wal
+
   pypi-publish:
     name: Build & Publish to PyPI
+    needs: release-gate
     runs-on: ubuntu-latest
     permissions:
       id-token: write

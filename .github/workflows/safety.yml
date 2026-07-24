@@ -1,0 +1,89 @@
+name: safety gate
+
+# The unit tests prove each part. This proves the property the product actually
+# sells: run the engine for real -- one saga that succeeds, one that fails and
+# rolls back -- then make the shipped audit tools assert, on the resulting log,
+# that nothing was left unaccounted for.
+#
+# A regression that strands an uncompensated effect fails the build here, rather
+# than the customer discovering it.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rollback-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Run the end-to-end scenario
+        # Also asserts in-process that the rolled-back saga left the world
+        # exactly as it found it.
+        run: python scripts/ci_safety_scenario.py ci-scenario.wal
+
+      - name: Gate 1 -- the log is unaltered
+        run: agent-saga verify --wal ci-scenario.wal
+
+      - name: Gate 2 -- every committed effect is accounted for
+        # Non-zero exit on an orphaned effect, an unclean rollback, or a
+        # COMPENSABLE step that recorded no compensation.
+        run: agent-saga certify --wal ci-scenario.wal --out safety-certificate.json
+
+      - name: Publish the Merkle commitment
+        # The root is the anchor every future selective disclosure is proven
+        # against (see PROVENANCE.md). Recording it per build gives an auditable
+        # history of commitments with no secrets to manage.
+        run: |
+          ROOT=$(agent-saga audit-root --wal ci-scenario.wal 2>/dev/null)
+          echo "merkle_root=$ROOT" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Rollback safety gate"
+            echo
+            echo '```'
+            agent-saga certify --wal ci-scenario.wal
+            echo '```'
+            echo
+            echo "**Merkle root:** \`$ROOT\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+        id: commitment
+
+      - name: Prove a disclosure round-trips
+        # Emit a selective-disclosure bundle for one saga and verify it against
+        # the published root, so the auditor-facing path is exercised too.
+        run: |
+          SAGA=$(python -c "
+          import json
+          ids=[]
+          for line in open('ci-scenario.wal', encoding='utf-8'):
+              line=line.strip()
+              if not line: continue
+              r=json.loads(line)
+              if r.get('event')=='SAGA_START': ids.append(r['saga_id'])
+          print(ids[0])
+          ")
+          agent-saga prove "$SAGA" --wal ci-scenario.wal --out disclosure.json
+          agent-saga verify-proof disclosure.json --root "${{ steps.commitment.outputs.merkle_root }}"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-evidence
+          path: |
+            ci-scenario.wal
+            safety-certificate.json
+            disclosure.json
+          if-no-files-found: warn

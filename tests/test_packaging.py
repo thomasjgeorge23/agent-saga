@@ -85,3 +85,13 @@ def test_sqlalchemy_adapter_gives_actionable_hint_without_extra():
     with pytest.raises(ImportError) as exc:
         SQLAlchemyAdapter(lambda: None)
     assert "agent-saga[postgres]" in str(exc.value)
+
+
+def test_dev_extra_covers_what_the_suite_imports():
+    """CI installs only [dev] and runs the whole suite, so [dev] must carry every
+    optional backend the tests actually import. Two tests once failed in CI for a
+    missing `cryptography`; this pins it."""
+    extras, _ = _extras()
+    dev = " ".join(extras["dev"])
+    assert "pytest" in dev
+    assert "cryptography" in dev      # test_audit_hardening / test_v019_features

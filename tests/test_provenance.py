@@ -183,3 +183,49 @@ def test_cli_verify_proof_rejects_tampering(tmp_path, capsys):
 def test_cli_prove_unknown_saga(tmp_path):
     from agent_saga.cli import main
     assert main(["prove", "nope", "--wal", str(_write_log(tmp_path))]) == 1
+
+
+# -- the documented independent verifier (PROVENANCE.md §6) -------------------
+
+def _documented_canonical(obj):
+    """Verbatim from PROVENANCE.md. If this drifts from the implementation, an
+    auditor following the doc gets wrong hashes -- so it is pinned here."""
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False, default=str).encode("utf-8")
+
+
+def _documented_leaf(record):
+    import hashlib
+    return hashlib.sha256(b"\x00" + _documented_canonical(record)).hexdigest()
+
+
+def _documented_node(left, right):
+    import hashlib
+    return hashlib.sha256(b"\x01" + bytes.fromhex(left) + bytes.fromhex(right)).hexdigest()
+
+
+def test_documented_verifier_matches_implementation():
+    # ASCII, non-ASCII, and nested -- the non-ASCII case is the one that breaks
+    # if ensure_ascii is left at its default.
+    for rec in (
+        {"seq": 1, "saga_id": "s", "event": "SAGA_START"},
+        {"seq": 2, "saga_id": "s", "customer": "Renée Müller", "note": "café"},
+        {"seq": 3, "saga_id": "s", "nested": {"b": 2, "a": 1}, "amount": 42.5},
+    ):
+        assert _documented_leaf(rec) == leaf_hash(rec)
+
+
+def test_documented_verifier_validates_a_real_bundle():
+    """An auditor following PROVENANCE.md §6 with nothing but hashlib+json must
+    be able to verify a bundle we produced."""
+    recs = _log()
+    recs[1]["customer"] = "Renée Müller"          # force the non-ASCII path
+    published_root = audit_root(recs)
+    bundle = build_disclosure(recs, "saga-A")
+
+    for entry in bundle["entries"]:
+        h = _documented_leaf(entry["record"])
+        assert h == entry["leaf"]
+        for sibling, side in entry["path"]:
+            h = _documented_node(sibling, h) if side == "L" else _documented_node(h, sibling)
+        assert h == published_root                # independently verified

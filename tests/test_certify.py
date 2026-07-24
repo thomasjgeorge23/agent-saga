@@ -93,3 +93,29 @@ def test_cli_certify_gates_ci(tmp_path, capsys):
         {"seq": 1, "saga_id": "q", "event": "SAGA_COMPLETE", "ts": 1.0}) + "\n",
         encoding="utf-8")
     assert main(["certify", "--wal", str(safe)]) == 0
+
+
+# -- the CI scenario the safety gate runs -------------------------------------
+
+def test_ci_safety_scenario_produces_a_certifiable_log(tmp_path):
+    """The scenario the safety-gate workflow runs must always certify SAFE and
+    leave the world exactly as the happy path left it. If this ever fails, the
+    engine stranded an effect."""
+    import subprocess
+    import sys
+    from pathlib import Path
+    from agent_saga.cli import _read_wal
+    from agent_saga.provenance import audit_root
+
+    wal = tmp_path / "ci.wal"
+    script = Path(__file__).parent.parent / "scripts" / "ci_safety_scenario.py"
+    proc = subprocess.run([sys.executable, str(script), str(wal)],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert "ch_1" in proc.stdout and "acct-1" in proc.stdout
+
+    records = _read_wal(str(wal))
+    cert = certify_rollback_safety(records)
+    assert cert.safe and not cert.critical, [str(f) for f in cert.critical]
+    assert cert.sagas_audited == 2
+    assert cert.merkle_root == audit_root(records)      # cert binds to this log
