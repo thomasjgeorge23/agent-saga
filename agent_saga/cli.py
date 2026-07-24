@@ -749,6 +749,33 @@ def build_parser() -> argparse.ArgumentParser:
     quar.add_argument("--release", action="store_true", help="un-quarantine it")
     quar.set_defaults(func=_cmd_quarantine)
 
+    aroot = sub.add_parser(
+        "audit-root",
+        help="print the Merkle commitment for a WAL (publish it once, prove "
+             "disclosures against it forever)")
+    aroot.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
+                       help="path to the WAL file (default: ./agent-saga.wal)")
+    aroot.set_defaults(func=_cmd_audit_root)
+
+    prove = sub.add_parser(
+        "prove",
+        help="emit a selective-disclosure proof for ONE saga -- provable to an "
+             "auditor without revealing any other saga")
+    prove.add_argument("saga_id", help="the saga to disclose")
+    prove.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
+                       help="path to the WAL file (default: ./agent-saga.wal)")
+    prove.add_argument("--out", default=None, help="write the bundle here (default: stdout)")
+    prove.add_argument("--note", default="", help="free-text note recorded in the bundle")
+    prove.set_defaults(func=_cmd_prove)
+
+    vproof = sub.add_parser(
+        "verify-proof",
+        help="verify a disclosure bundle against a published Merkle root")
+    vproof.add_argument("bundle", help="path to the disclosure bundle JSON")
+    vproof.add_argument("--root", default=None,
+                        help="the previously published Merkle root to prove against")
+    vproof.set_defaults(func=_cmd_verify_proof)
+
     rpy = sub.add_parser(
         "replay",
         help="time-travel debugger: walk a historical saga's steps, "
@@ -775,6 +802,82 @@ def build_parser() -> argparse.ArgumentParser:
                      help="list every unverifiable effect, not just a count")
     rec.set_defaults(func=_cmd_reconcile)
     return p
+
+
+def _cmd_audit_root(args: argparse.Namespace) -> int:
+    """Print the Merkle commitment for a WAL. Publish/notarise this once; every
+    future disclosure is checkable against it."""
+    from .provenance import MerkleAuditTree
+
+    try:
+        records = _read_wal(args.wal_path)
+    except OSError as exc:
+        print(f"cannot read {args.wal_path}: {exc}", file=sys.stderr)
+        return 2
+    tree = MerkleAuditTree(records)
+    print(tree.root)
+    print(f"  records committed : {tree.size}", file=sys.stderr)
+    print(f"  algorithm         : sha256-merkle-v1", file=sys.stderr)
+    print("\nPublish this root (transparency log, notary, countersigned email).",
+          file=sys.stderr)
+    print("Any later disclosure can then be proven against it.", file=sys.stderr)
+    return 0
+
+
+def _cmd_prove(args: argparse.Namespace) -> int:
+    """Emit a selective-disclosure bundle for one saga: its records plus a
+    Merkle inclusion proof for each, and nothing about any other saga."""
+    from .provenance import build_disclosure
+
+    try:
+        records = _read_wal(args.wal_path)
+    except OSError as exc:
+        print(f"cannot read {args.wal_path}: {exc}", file=sys.stderr)
+        return 2
+
+    reader_ids = {r.get("saga_id") for r in records}
+    if args.saga_id not in reader_ids:
+        print(f"no records for saga {args.saga_id!r} in {args.wal_path}", file=sys.stderr)
+        return 1
+
+    bundle = build_disclosure(records, args.saga_id, note=args.note or "")
+    text = json.dumps(bundle, indent=2, default=str)
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+        print(f"disclosure written to {args.out}", file=sys.stderr)
+    else:
+        sys.stdout.write(text + "\n")
+    print(f"  saga      : {bundle['saga_id']}", file=sys.stderr)
+    print(f"  disclosed : {bundle['disclosed']} of {bundle['log_size']} record(s)",
+          file=sys.stderr)
+    print(f"  root      : {bundle['merkle_root']}", file=sys.stderr)
+    return 0
+
+
+def _cmd_verify_proof(args: argparse.Namespace) -> int:
+    """Verify a disclosure bundle. With --root, also prove it came from the log
+    whose commitment was published -- not one the discloser fabricated."""
+    from .provenance import verify_disclosure
+
+    try:
+        bundle = json.loads(Path(args.bundle).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"cannot read bundle {args.bundle}: {exc}", file=sys.stderr)
+        return 2
+
+    result = verify_disclosure(bundle, expected_root=args.root)
+    print(result.summary())
+    if not result.valid:
+        for f in result.failures[:20]:
+            print(f"  - {f}")
+        if not args.root:
+            print("\nNote: without --root this only checks internal consistency. "
+                  "Pass the published root to prove provenance.", file=sys.stderr)
+        return 1
+    if not args.root:
+        print("\nNote: verified against the bundle's own root. Pass --root <published> "
+              "to prove it came from the committed log.", file=sys.stderr)
+    return 0
 
 
 def _resolve_saga_id(reader, target: str):

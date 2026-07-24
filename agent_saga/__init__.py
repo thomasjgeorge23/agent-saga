@@ -203,6 +203,13 @@ from .determinism import ReplayVerifier, verify_replay_determinism, DeterminismR
 from .slack_app import SlackBlockKitApp
 from .tenant import TenantContext, get_current_tenant, set_current_tenant
 from .cloud import SagaCloudClient
+from .provenance import (
+    MerkleAuditTree,
+    DisclosureResult,
+    audit_root,
+    build_disclosure,
+    verify_disclosure,
+)
 from .schemas import SchemaContractError, validate_schema
 from .testing import ChaosRunner, ChaosResult, verify_saga_replay
 
@@ -215,6 +222,11 @@ __all__ = [
     "get_current_tenant",
     "set_current_tenant",
     "SagaCloudClient",
+    "MerkleAuditTree",
+    "DisclosureResult",
+    "audit_root",
+    "build_disclosure",
+    "verify_disclosure",
     "SchemaContractError",
     "validate_schema",
     "ChaosRunner",

@@ -60,9 +60,15 @@ def fast(**kwargs):
 
 
 def decide_after(store, delay, **kwargs):
-    """Answer out-of-band, the way a Slack click in another process would."""
+    """Answer out-of-band, the way a Slack click in another process would.
+
+    The worker deadline must comfortably outlive the gateway's own timeout: it
+    starts *before* the call it answers, so a deadline equal to the gateway's
+    (both were 5s) let a loaded machine expire the worker first and flake the
+    test. It returns the moment it decides, so a generous ceiling costs nothing.
+    """
     def worker():
-        deadline = time.time() + 5
+        deadline = time.time() + 30
         while time.time() < deadline:
             pending = store.pending()
             if pending:
