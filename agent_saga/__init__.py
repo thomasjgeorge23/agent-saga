@@ -70,6 +70,8 @@ from .reconcile import (
     Reconciliation,
     reconciler,
 )
+from .ha import LeaderElection, NodeState, SagaDiagnosticSuite, WALReplicator
+from .vault import ComplianceEngine, VaultTamperError, WORMVault
 from .killswitch import (
     FileSwitchStore,
     Halted,
