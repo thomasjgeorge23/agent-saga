@@ -32,6 +32,7 @@ honest guarantee, and still detects tampering with any device's history.
 from __future__ import annotations
 
 import hashlib
+import math
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Optional, Sequence
@@ -54,11 +55,30 @@ def record_identity(record: Mapping[str, Any]) -> str:
 
 
 def _order_key(record: Mapping[str, Any], identity: str) -> tuple:
-    """A total order both devices compute identically from the data alone."""
-    ts = record.get("ts")
-    ts = float(ts) if isinstance(ts, (int, float)) else 0.0
-    seq = record.get("seq")
-    seq = int(seq) if isinstance(seq, int) else 0
+    """A total order both devices compute identically from the data alone.
+
+    `ts` and `seq` arrive from a peer, so neither can be trusted to be a sane
+    number. NaN is the dangerous one: every comparison against it is False, so a
+    single record carrying `"ts": NaN` makes `sorted()` depend on input order and
+    two devices end up disagreeing about their shared history. It is normalised
+    to 0.0 -- "no usable timestamp" -- which keeps the order total.
+
+    Infinities are left alone: they compare consistently, so a peer can nudge its
+    own records to the front or back but cannot make the two devices disagree.
+    Determinism is the guarantee here, not fairness -- any peer can claim any
+    timestamp, and identity is the final tie-break either way.
+    """
+    raw_ts = record.get("ts")
+    if isinstance(raw_ts, (int, float)) and not isinstance(raw_ts, bool):
+        ts = float(raw_ts)
+        if math.isnan(ts):
+            ts = 0.0
+    elif isinstance(raw_ts, bool):
+        ts = float(raw_ts)
+    else:
+        ts = 0.0
+    raw_seq = record.get("seq")
+    seq = int(raw_seq) if isinstance(raw_seq, int) and not isinstance(raw_seq, bool) else 0
     return (ts, str(record.get(DEVICE_FIELD) or ""), seq, identity)
 
 

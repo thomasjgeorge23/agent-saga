@@ -46,6 +46,10 @@ def correlation():
     yield
     set_saga_id(None)
     set_step_id(None)
+    # Retire any out-of-band decider before its store is torn down.
+    for stop in _DECIDERS:
+        stop.set()
+    _DECIDERS.clear()
 
 
 def a_call(tool="wire.send", **kwargs):
@@ -59,22 +63,37 @@ def fast(**kwargs):
     return ApprovalPolicy(**kwargs)
 
 
+# Every out-of-band decider registers its stop flag here so the autouse fixture
+# below can retire it at teardown. A worker that outlives its test keeps polling
+# a store whose temp directory has been deleted, and the exception it raises in
+# that thread surfaces as an unraisable-exception failure attributed to whatever
+# test happens to be running -- which is exactly the flake this caused.
+_DECIDERS: list = []
+
+
 def decide_after(store, delay, **kwargs):
     """Answer out-of-band, the way a Slack click in another process would.
 
-    The worker deadline must comfortably outlive the gateway's own timeout: it
-    starts *before* the call it answers, so a deadline equal to the gateway's
-    (both were 5s) let a loaded machine expire the worker first and flake the
-    test. It returns the moment it decides, so a generous ceiling costs nothing.
+    The deadline must comfortably outlive the gateway's own timeout, because the
+    worker starts *before* the call it answers -- with both at 5s a loaded
+    machine expired the worker first. It exits the moment it decides, the moment
+    its test ends, or if the store goes away underneath it.
     """
+    stop = threading.Event()
+    _DECIDERS.append(stop)
+
     def worker():
         deadline = time.time() + 30
-        while time.time() < deadline:
-            pending = store.pending()
-            if pending:
-                store.decide(pending[0].id, **kwargs)
-                return
-            time.sleep(0.01)
+        while time.time() < deadline and not stop.is_set():
+            try:
+                pending = store.pending()
+                if pending:
+                    store.decide(pending[0].id, **kwargs)
+                    return
+            except Exception:
+                return          # store torn down with the test; nothing to answer
+            stop.wait(0.01)
+
     t = threading.Thread(target=worker, daemon=True)
     time.sleep(0) if delay == 0 else None
     t.start()
