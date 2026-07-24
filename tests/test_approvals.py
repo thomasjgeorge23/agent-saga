@@ -378,9 +378,17 @@ async def test_the_approval_trail_is_tamper_evident(store, tmp_path):
 
 @aio
 async def test_an_over_budget_call_escalates_to_a_human(store):
-    """Step 2 gave overages somewhere to escalate; this is where they go."""
+    """Step 2 gave overages somewhere to escalate; this is where they go.
+
+    The approval arrives from another thread, so the gateway's timeout is a
+    scheduling margin, not a deadline under test. At 5s it flaked roughly one
+    full-suite run in four -- the worker simply had not been scheduled yet. It is
+    generous here (and still well inside the decider's own 30s ceiling) because
+    the test returns the moment the decision lands; a large timeout costs nothing
+    when things work and only buys patience when the machine is loaded.
+    """
     set_limit_store(InProcessLimitStore())
-    gw = ApprovalGateway(store=store, policy=fast(timeout=5))
+    gw = ApprovalGateway(store=store, policy=fast(timeout=20))
     gate = PreFlightGate(rules=[], approval_provider=gw, limits=[
         BudgetLimit("daily", arg="amount", max_total=100, window=60,
                     escalate_to_human=True)])

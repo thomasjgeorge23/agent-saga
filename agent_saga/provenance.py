@@ -33,7 +33,7 @@ import hashlib
 import hmac
 import time
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any, Iterable, Mapping, Optional, Sequence
 
 from .integrity import canonical
 
@@ -109,14 +109,35 @@ class MerkleAuditTree:
         return path
 
 
-def verify_inclusion(leaf: str, path: Sequence[Sequence[str]], root: str) -> bool:
-    """Recompute the root from a leaf and its sibling path."""
-    h = leaf
-    try:
-        for sibling, side in path:
-            h = _node_hash(sibling, h) if side == "L" else _node_hash(h, sibling)
-    except (ValueError, TypeError):
+_HEX = set("0123456789abcdef")
+
+
+def _is_hash(value: Any) -> bool:
+    """A well-formed lowercase sha256 hex digest. Anything else is not a hash we
+    will compute with -- the value came from the party being audited."""
+    return (isinstance(value, str) and len(value) == 64
+            and all(c in _HEX for c in value))
+
+
+def verify_inclusion(leaf: Any, path: Any, root: Any) -> bool:
+    """Recompute the root from a leaf and its sibling path.
+
+    Every input is untrusted, so a malformed path is a failed proof rather than
+    an exception. Returns False for anything that is not a well-formed chain of
+    sha256 siblings ending at `root`.
+    """
+    if not (_is_hash(leaf) and _is_hash(root)):
         return False
+    if not isinstance(path, (list, tuple)):
+        return False
+    h = leaf
+    for step in path:
+        if not isinstance(step, (list, tuple)) or len(step) != 2:
+            return False
+        sibling, side = step
+        if not _is_hash(sibling) or side not in ("L", "R"):
+            return False
+        h = _node_hash(sibling, h) if side == "L" else _node_hash(h, sibling)
     return hmac.compare_digest(h, root)
 
 
@@ -174,25 +195,59 @@ def verify_disclosure(bundle: dict, *, expected_root: Optional[str] = None) -> D
     prove the bundle was built from *that* log rather than one the discloser
     made up. Without it, the bundle is only internally consistent.
     """
-    root = bundle.get("merkle_root") or ""
-    entries = bundle.get("entries") or []
+    # The bundle is supplied by the party being audited, so nothing in it is
+    # trusted to be well-formed. Every access below is defensive: a malformed
+    # bundle must come back as *invalid*, never as an exception. A verifier that
+    # crashes on hostile input gives the discloser a way to turn a failed proof
+    # into what looks like a broken tool.
+    if not isinstance(bundle, Mapping):
+        return DisclosureResult(valid=False, root="",
+                                failures=["bundle is not an object"])
+
+    raw_root = bundle.get("merkle_root")
+    root = raw_root if _is_hash(raw_root) else ""
+    raw_entries = bundle.get("entries")
+    entries = raw_entries if isinstance(raw_entries, (list, tuple)) else []
     result = DisclosureResult(valid=False, root=root, disclosed=len(entries))
 
     if bundle.get("algorithm") != ALGORITHM:
         result.failures.append(f"unknown algorithm {bundle.get('algorithm')!r}")
         return result
-    if expected_root is not None and root != expected_root:
+    if not root:
+        result.failures.append("bundle carries no usable merkle_root")
+        return result
+    if expected_root is not None and not hmac.compare_digest(root, str(expected_root)):
         result.failures.append(
-            f"root mismatch: bundle {root[:16]}... != expected {expected_root[:16]}...")
+            f"root mismatch: bundle {root[:16]}... != expected {str(expected_root)[:16]}...")
+        return result
+    if not isinstance(raw_entries, (list, tuple)):
+        result.failures.append("bundle carries no entries list")
         return result
 
-    for e in entries:
-        idx = e.get("index")
+    # A bundle claims to be about one saga. If that claim is absent we cannot
+    # check scope, and silently skipping the check would let a discloser omit
+    # `saga_id` to smuggle in records belonging to other sagas.
+    claimed_saga = bundle.get("saga_id")
+    if not isinstance(claimed_saga, str) or not claimed_saga:
+        result.failures.append("bundle does not name the saga it discloses")
+        return result
+
+    for position, e in enumerate(entries):
+        if not isinstance(e, Mapping):
+            result.failures.append(f"entry {position}: not an object")
+            continue
+        idx = e.get("index", position)
         rec = e.get("record")
-        claimed_leaf = e.get("leaf") or ""
+        claimed_leaf = e.get("leaf")
+
+        if not isinstance(rec, Mapping):
+            result.failures.append(f"entry {idx}: record is not an object")
+            continue
+        if not _is_hash(claimed_leaf):
+            result.failures.append(f"entry {idx}: leaf is not a sha256 hash")
+            continue
         # 1. the record must actually hash to the leaf it claims
-        recomputed = leaf_hash(rec) if isinstance(rec, dict) else ""
-        if recomputed != claimed_leaf:
+        if not hmac.compare_digest(leaf_hash(dict(rec)), claimed_leaf):
             result.failures.append(f"record {idx}: content does not match its leaf hash")
             continue
         # 2. the leaf must be provably in the committed tree
@@ -200,7 +255,7 @@ def verify_disclosure(bundle: dict, *, expected_root: Optional[str] = None) -> D
             result.failures.append(f"record {idx}: inclusion proof does not reach the root")
             continue
         # 3. it must belong to the saga this bundle claims to be about
-        if bundle.get("saga_id") and rec.get("saga_id") != bundle["saga_id"]:
+        if rec.get("saga_id") != claimed_saga:
             result.failures.append(f"record {idx}: belongs to a different saga")
             continue
         result.verified += 1

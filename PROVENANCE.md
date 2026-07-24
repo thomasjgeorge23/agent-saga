@@ -107,7 +107,9 @@ establishes all of the following:
 
 ### Attacks explicitly defeated
 
-Each has a regression test in `tests/test_provenance.py`.
+Each has a regression test in `tests/test_provenance.py`, and the adversarial
+suite in `tests/test_provenance_fuzz.py` re-checks them against fuzzed logs and
+every tree size from 1 to 33 (odd sizes exercise the self-pairing padding).
 
 | Attack | Result |
 |---|---|
@@ -115,7 +117,42 @@ Each has a regression test in `tests/test_provenance.py`.
 | Insert a record that was never logged | `inclusion proof does not reach the root` |
 | Delete an inconvenient record, then disclose | `root mismatch` against the published root |
 | Smuggle in another saga's record | `belongs to a different saga` |
+| Omit `saga_id` so the scope check is skipped | `bundle does not name the saga it discloses` |
 | Present an internal tree node as a leaf | Blocked by domain separation (see §5) |
+| Truncate or re-order a proof path | `inclusion proof does not reach the root` |
+| Send a malformed bundle to crash the verifier | Rejected as invalid; the verifier never raises |
+
+### 3.1 What the proof covers, exactly
+
+Some of a bundle's fields carry the cryptographic claim; the rest are
+convenience metadata. The distinction is deliberate and pinned by tests — a
+proof must not hinge on a counter, and must not tolerate a changed hash.
+
+| Field | Status | Corrupted or missing |
+|---|---|---|
+| `merkle_root` | **load-bearing** | rejected |
+| `algorithm` | **load-bearing** | rejected |
+| `saga_id` | **load-bearing** | rejected |
+| `entries` | **load-bearing** | rejected |
+| entry `leaf` | **load-bearing** | rejected |
+| entry `record` | **load-bearing** | rejected |
+| entry `path` | **load-bearing** | rejected |
+| `log_size`, `disclosed` | informational | still verifies |
+| `generated_at`, `note`, `version` | informational | still verifies |
+| entry `index` | informational | still verifies |
+
+Practically: **do not rely on `log_size` or `disclosed`.** They describe the
+bundle, they are not proven by it. A discloser can misstate them without
+affecting verification — which is harmless (it forges nothing) but means those
+numbers are claims, not evidence.
+
+### 3.2 The verifier is total
+
+`verify_disclosure` never raises. Any malformed bundle — wrong types, missing
+keys, non-hex hashes, a path that is not a list of `[hash, side]` pairs —
+returns `valid=False` with a reason. This matters because the input comes from
+the party being audited: a verifier that crashes on hostile input lets a failed
+proof be passed off as a broken tool.
 
 ---
 
