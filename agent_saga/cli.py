@@ -757,6 +757,18 @@ def build_parser() -> argparse.ArgumentParser:
                        help="path to the WAL file (default: ./agent-saga.wal)")
     aroot.set_defaults(func=_cmd_audit_root)
 
+    mrg = sub.add_parser(
+        "merge",
+        help="merge WAL segments from several devices into one deterministic "
+             "log (offline-first reconciliation)")
+    mrg.add_argument("--wal", action="append", required=True, metavar="[DEVICE=]PATH",
+                     help="a device's WAL; repeat per device. Prefix with "
+                          "'name=' to label it, else the filename is used.")
+    mrg.add_argument("--out", default=None, help="write the merged log here (default: stdout)")
+    mrg.add_argument("--verify", action="store_true",
+                     help="also verify each device's hash chain independently")
+    mrg.set_defaults(func=_cmd_merge)
+
     cert = sub.add_parser(
         "certify",
         help="prove every committed effect is accounted for (non-zero exit on "
@@ -833,6 +845,52 @@ def _cmd_audit_root(args: argparse.Namespace) -> int:
     print("\nPublish this root (transparency log, notary, countersigned email).",
           file=sys.stderr)
     print("Any later disclosure can then be proven against it.", file=sys.stderr)
+    return 0
+
+
+def _cmd_merge(args: argparse.Namespace) -> int:
+    """Merge WAL segments from several devices into one deterministic log --
+    the reconciliation step after devices have been offline."""
+    from .mesh import merge_wals, verify_merged
+
+    sources: dict[str, list] = {}
+    for spec in args.wal:
+        # "device=path" names the device; a bare path is named after the file.
+        if "=" in spec:
+            device, path = spec.split("=", 1)
+        else:
+            device, path = Path(spec).stem, spec
+        try:
+            sources[device] = _read_wal(path)
+        except OSError as exc:
+            print(f"cannot read {path}: {exc}", file=sys.stderr)
+            return 2
+
+    merged, report = merge_wals(sources)
+    print(report.summary())
+    if report.diverged_sagas:
+        print("  sagas advanced on more than one device:")
+        for sid in report.diverged_sagas[:20]:
+            print(f"    - {sid}")
+
+    if args.verify:
+        result = verify_merged(merged)
+        for device, info in sorted(result["devices"].items()):
+            mark = "ok " if info["intact"] else "!! "
+            print(f"  {mark}{device}: {info['summary']}")
+        if not result["intact"]:
+            print("\nA device's chain does not verify -- that history was altered.",
+                  file=sys.stderr)
+            return 1
+
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as fh:
+            for rec in merged:
+                fh.write(json.dumps(rec, default=str) + "\n")
+        print(f"merged log written to {args.out}", file=sys.stderr)
+    else:
+        for rec in merged:
+            sys.stdout.write(json.dumps(rec, default=str) + "\n")
     return 0
 
 

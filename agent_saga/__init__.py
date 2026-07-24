@@ -140,6 +140,12 @@ from .mission_critical import (
 from .auto import patch_all
 from .entanglement import EntangledNode, EntanglementMatrix
 from .propagation import EntanglementPropagator
+from .mesh import (
+    MergeReport,
+    merge_wals,
+    record_identity,
+    verify_merged,
+)
 from .hardware import (
     ActionChallenge,
     HardwareApprovalProvider,
@@ -428,6 +434,10 @@ __all__ = [
     "EntangledNode",
     "EntanglementMatrix",
     "EntanglementPropagator",
+    "merge_wals",
+    "verify_merged",
+    "record_identity",
+    "MergeReport",
     "HardwareApprovalProvider",
     "ActionChallenge",
     "action_digest",
