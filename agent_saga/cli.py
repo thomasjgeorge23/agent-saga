@@ -757,6 +757,18 @@ def build_parser() -> argparse.ArgumentParser:
                        help="path to the WAL file (default: ./agent-saga.wal)")
     aroot.set_defaults(func=_cmd_audit_root)
 
+    cert = sub.add_parser(
+        "certify",
+        help="prove every committed effect is accounted for (non-zero exit on "
+             "an orphaned/uncompensated effect -- use it as a CI gate)")
+    cert.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
+                      help="path to the WAL file (default: ./agent-saga.wal)")
+    cert.add_argument("--out", default=None, help="write the certificate JSON here")
+    cert.add_argument("--check-handlers", action="store_true",
+                      help="also warn when a compensation handler is not registered "
+                           "in this process (unrecoverable after a deploy)")
+    cert.set_defaults(func=_cmd_certify)
+
     prove = sub.add_parser(
         "prove",
         help="emit a selective-disclosure proof for ONE saga -- provable to an "
@@ -821,6 +833,37 @@ def _cmd_audit_root(args: argparse.Namespace) -> int:
     print("\nPublish this root (transparency log, notary, countersigned email).",
           file=sys.stderr)
     print("Any later disclosure can then be proven against it.", file=sys.stderr)
+    return 0
+
+
+def _cmd_certify(args: argparse.Namespace) -> int:
+    """Certify that every committed effect in the log is accounted for. Exits
+    non-zero on any critical finding, so CI fails a deploy that would strand an
+    uncompensated effect."""
+    from .certify import certify_rollback_safety
+
+    try:
+        records = _read_wal(args.wal_path)
+    except OSError as exc:
+        print(f"cannot read {args.wal_path}: {exc}", file=sys.stderr)
+        return 2
+
+    cert = certify_rollback_safety(
+        records, require_registered_handlers=args.check_handlers)
+    print(cert.summary())
+    for f in cert.critical:
+        print(f"  {f}")
+    for f in cert.warnings[:20]:
+        print(f"  {f}")
+
+    if args.out:
+        Path(args.out).write_text(json.dumps(cert.to_dict(), indent=2), encoding="utf-8")
+        print(f"\ncertificate written to {args.out}", file=sys.stderr)
+
+    if not cert.safe:
+        print("\nAn effect in this log cannot be accounted for. Investigate before "
+              "shipping.", file=sys.stderr)
+        return 1
     return 0
 
 
