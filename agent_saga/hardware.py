@@ -267,8 +267,59 @@ class HardwareApprovalProvider:
         return self.decide(ctx, rule)
 
 
+class MultiSigApprovalProvider(HardwareApprovalProvider):
+    """M-of-N Multi-Signature Quorum Hardware Approval Provider.
+    
+    Demands signatures from M distinct registered credential keys out of N total
+    registered keys before allowing high-risk action execution.
+    """
+
+    def __init__(self, required_signatures: int = 2, **kwargs):
+        super().__init__(**kwargs)
+        self.required_signatures = required_signatures
+        self._quorum_approvals: dict[str, set[str]] = {}  # action_digest -> set(credential_ids)
+
+    def submit(self, challenge_id: str, credential_id: str, signature: bytes) -> bool:
+        ch = self._challenges.get(challenge_id)
+        if ch is None or ch.expired(self._clock()):
+            return False
+
+        public_key = self.credentials.get(credential_id)
+        if public_key is None:
+            return False
+
+        fingerprint = hashlib.sha256(signature).hexdigest()
+        if fingerprint in self._used_signatures:
+            return False
+
+        if not self.verifier(public_key, ch.signing_payload(), signature):
+            return False
+
+        self._used_signatures.add(fingerprint)
+        self._challenges.pop(challenge_id, None)
+
+        digest = ch.action_digest
+        if digest not in self._quorum_approvals:
+            self._quorum_approvals[digest] = set()
+        self._quorum_approvals[digest].add(credential_id)
+
+        if len(self._quorum_approvals[digest]) >= self.required_signatures:
+            self._approvals[digest] = _Approval(
+                action_digest=digest,
+                credential_id="QUORUM_SATISFIED",
+                approved_at=self._clock(),
+            )
+            logger.info("M-of-N Quorum satisfied for action %s (%d/%d signatures)",
+                        ch.tool, len(self._quorum_approvals[digest]), self.required_signatures)
+            return True
+        else:
+            logger.info("Quorum signature recorded for %s (%d/%d required)",
+                        ch.tool, len(self._quorum_approvals[digest]), self.required_signatures)
+            return False
+
+
 __all__ = [
-    "HardwareApprovalProvider", "ActionChallenge", "HardwareApprovalError",
+    "HardwareApprovalProvider", "MultiSigApprovalProvider", "ActionChallenge", "HardwareApprovalError",
     "action_digest", "ed25519_verifier",
     "DEFAULT_CHALLENGE_TTL", "DEFAULT_PROTECTED",
 ]

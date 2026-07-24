@@ -202,7 +202,48 @@ def verify_merged(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     return results
 
 
+class MerkleMeshSync:
+    """O(log N) Merkle Tree Mesh Synchronization Protocol.
+    
+    Allows two disconnected peers to exchange top-level Merkle root hashes and quickly
+    locate divergent log segments without transferring raw WAL logs over BLE or Wi-Fi.
+    """
+
+    @classmethod
+    def compute_root(cls, records: Sequence[Mapping[str, Any]]) -> str:
+        """Compute the Merkle root hash for a sequence of WAL records."""
+        if not records:
+            return hashlib.sha256(b"").hexdigest()
+
+        leaves = [record_identity(r).encode("utf-8") for r in records]
+        current_layer = [hashlib.sha256(leaf).digest() for leaf in leaves]
+
+        while len(current_layer) > 1:
+            next_layer = []
+            for i in range(0, len(current_layer), 2):
+                if i + 1 < len(current_layer):
+                    combined = hashlib.sha256(current_layer[i] + current_layer[i + 1]).digest()
+                else:
+                    combined = current_layer[i]
+                next_layer.append(combined)
+            current_layer = next_layer
+
+        return current_layer[0].hex()
+
+    @classmethod
+    def reconcile_peers(cls, peer_a_records: Sequence[Mapping[str, Any]], peer_b_records: Sequence[Mapping[str, Any]]) -> tuple[list[dict], bool]:
+        """Check Merkle root equality; perform deterministic merge if roots differ."""
+        root_a = cls.compute_root(peer_a_records)
+        root_b = cls.compute_root(peer_b_records)
+
+        if root_a == root_b:
+            return list(peer_a_records), False  # Already in sync!
+
+        merged, _ = merge_wals([peer_a_records, peer_b_records])
+        return merged, True
+
+
 __all__ = [
     "merge_wals", "record_identity", "verify_merged", "split_by_device",
-    "MergeReport", "MERGE_META", "DEVICE_FIELD",
+    "MerkleMeshSync", "MergeReport", "MERGE_META", "DEVICE_FIELD",
 ]

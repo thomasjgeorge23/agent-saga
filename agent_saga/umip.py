@@ -215,7 +215,40 @@ def set_registry(registry: Optional[UMIPRegistry]) -> None:
     _REGISTRY = registry
 
 
+class MCPTransactionProxy:
+    """Model Context Protocol (MCP) Native Transaction Proxy.
+    
+    Transparently intercepts MCP JSON-RPC 'tools/call' messages and converts them into
+    UMIP participants with full ACID saga guarantees, pre-flight gate checks, and LIFO compensation.
+    """
+
+    def __init__(self, registry: Optional[UMIPRegistry] = None):
+        self.registry = registry or get_registry()
+
+    def wrap_mcp_tool(
+        self,
+        tool_name: str,
+        tool_fn: Callable[..., Any],
+        semantics: ActionSemantics,
+        compensate_fn: Optional[CompensationFactory] = None,
+    ) -> Participant:
+        """Wrap a raw MCP tool function into a UMIP participant."""
+        participant = Participant(
+            name=f"mcp.{tool_name}",
+            framework="mcp",
+            semantics=semantics,
+            call=tool_fn,
+            compensate=compensate_fn,
+        )
+        return self.registry.register(participant)
+
+    async def execute_mcp_request(self, tool_name: str, arguments: dict[str, Any]) -> Any:
+        """Execute an incoming MCP JSON-RPC tool call through UMIP registry."""
+        mcp_name = f"mcp.{tool_name}" if not tool_name.startswith("mcp.") else tool_name
+        return await self.registry.invoke(mcp_name, **arguments)
+
+
 __all__ = [
-    "Participant", "UMIPRegistry", "UMIPConformanceError", "check_conformance",
+    "Participant", "UMIPRegistry", "MCPTransactionProxy", "UMIPConformanceError", "check_conformance",
     "get_registry", "set_registry", "UMIP_VERSION",
 ]

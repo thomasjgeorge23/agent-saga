@@ -145,20 +145,24 @@ from .entanglement import EntangledNode, EntanglementMatrix
 from .propagation import EntanglementPropagator
 from .umip import (
     Participant,
-    UMIPRegistry,
     UMIPConformanceError,
+    UMIPRegistry,
+    MCPTransactionProxy,
     get_registry,
     set_registry,
 )
 from .mesh import (
     MergeReport,
+    MerkleMeshSync,
     merge_wals,
     record_identity,
     verify_merged,
 )
 from .hardware import (
     ActionChallenge,
+    HardwareApprovalError,
     HardwareApprovalProvider,
+    MultiSigApprovalProvider,
     action_digest,
 )
 from .predictive import (

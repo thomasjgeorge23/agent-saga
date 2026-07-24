@@ -89,27 +89,24 @@ class SagaContext:
         slug: Optional[str] = None,
         lease_ttl: float = DEFAULT_LEASE_TTL,
         durable_commit: bool = True,
+        compensation_max_retries: int = 3,
+        compensation_retry_delay: float = 0.5,
     ):
         self.name = name or slug
         self.slug = self.name
         if not saga_id:
             uid = str(uuid.uuid4())
             saga_id = f"{self.name}-{uid[:8]}" if self.name else uid
+        self.saga_id = saga_id
         self.durable_commit = durable_commit
-        """Fsync the compensation descriptor before returning to the agent.
-        Turning this off halves durable-path latency and makes crash recovery
-        best-effort. That is a legitimate choice for low-value COMPENSABLE work
-        and a terrible one for payments."""
         self.gate = gate or PreFlightGate()
         self.wal = wal or AsyncWAL()
         self.stack: list[SagaStep] = []
         self.halt_on_compensation_failure = halt_on_compensation_failure
-        """Default True. If compensating step N fails, step N-1's compensation may
-        operate on state that is no longer what it assumed. Continuing blindly is
-        how a partial rollback becomes a worse outcome than no rollback."""
         self.default_timeout = default_timeout
-        self.saga_id = saga_id or uuid.uuid4().hex
         self.lease_ttl = lease_ttl
+        self.compensation_max_retries = max(1, compensation_max_retries)
+        self.compensation_retry_delay = max(0.0, compensation_retry_delay)
         self._rolled_back = False
         self._heartbeat: Optional[asyncio.Task] = None
         self._obs_token = None
@@ -118,10 +115,22 @@ class SagaContext:
         self._span_cm = None
         self._span = None
         self._tentatives: list = []
-        """Resources held in PENDING for this saga's lifetime. Resolved exactly
-        once at the boundary, so the failure path -- the one callers forget --
-        is handled for them."""
         self._semantic_locks: list[str] = []
+
+    def create_child_scope(self, child_name: str) -> SagaContext:
+        """Create a nested child SagaContext for sub-tree agent execution and localized rollback."""
+        child_id = f"{self.saga_id}.{child_name}"
+        return SagaContext(
+            gate=self.gate,
+            wal=self.wal,
+            default_timeout=self.default_timeout,
+            saga_id=child_id,
+            name=f"{self.name or self.saga_id} -> {child_name}",
+            lease_ttl=self.lease_ttl,
+            durable_commit=self.durable_commit,
+            compensation_max_retries=self.compensation_max_retries,
+            compensation_retry_delay=self.compensation_retry_delay,
+        )
 
     # -- isolation countermeasures -----------------------------------------
     # A saga has no ACID isolation: every step commits as it runs. These are the
@@ -593,22 +602,43 @@ class SagaContext:
                 )
                 continue
 
-            try:
-                from .observability.otel import (
-                    ATTR_IS_COMPENSATION as _IS_COMP,
-                    ATTR_STEP_ID as _SID,
-                    ATTR_TOOL as _TOOL,
-                    get_tracer as _tracer,
-                    rollback_span_name as _rb_name,
-                )
+            from .observability.otel import (
+                ATTR_IS_COMPENSATION as _IS_COMP,
+                ATTR_STEP_ID as _SID,
+                ATTR_TOOL as _TOOL,
+                get_tracer as _tracer,
+                rollback_span_name as _rb_name,
+            )
 
-                with _tracer().span(_rb_name(step.tool), {
-                    _SID: step.step_id,
-                    _TOOL: step.tool,
-                    _IS_COMP: True,
-                }):
-                    await _invoke(step.compensation.fn, step.compensation.kwargs, None)
-            except BaseException as exc:
+            comp_attempts = 0
+            comp_success = False
+            last_comp_exc = None
+
+            while comp_attempts < self.compensation_max_retries:
+                comp_attempts += 1
+                try:
+                    with _tracer().span(_rb_name(step.tool), {
+                        _SID: step.step_id,
+                        _TOOL: step.tool,
+                        _IS_COMP: True,
+                    }):
+                        await _invoke(step.compensation.fn, step.compensation.kwargs, None)
+                    comp_success = True
+                    break
+                except BaseException as exc:
+                    if isinstance(exc, (asyncio.CancelledError, SystemExit, KeyboardInterrupt)):
+                        raise
+                    last_comp_exc = exc
+                    if comp_attempts < self.compensation_max_retries:
+                        delay = self.compensation_retry_delay * (2 ** (comp_attempts - 1))
+                        logger.warning(
+                            "compensation attempt %d/%d for %r failed (%r); retrying in %.2fs",
+                            comp_attempts, self.compensation_max_retries, step.tool, exc, delay
+                        )
+                        await asyncio.sleep(delay)
+
+            if not comp_success:
+                exc = last_comp_exc
                 step.state = StepState.COMPENSATION_FAILED
                 step.error = repr(exc)
                 report.failed.append(step)
@@ -616,10 +646,9 @@ class SagaContext:
                     "COMPENSATION_FAILED",
                     {"saga_id": self.saga_id, "step_id": step.step_id, "tool": step.tool,
                      "error": repr(exc),
+                     "attempts": comp_attempts,
                      "idempotency_key": step.compensation.idempotency_key},
                 )
-                # ASCII only: these lines print to consoles whose encoding is not
-                # UTF-8 (Windows cp1252), where a dash or arrow becomes mojibake.
                 logger.error("compensation FAILED for %r: %r%s", step.tool, exc,
                              " - halting rollback" if self.halt_on_compensation_failure else "")
                 if self.halt_on_compensation_failure:

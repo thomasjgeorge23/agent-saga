@@ -126,10 +126,25 @@ class PreFlightGate:
         self.limits = list(limits)
         self.risk_scorer = risk_scorer
         self.risk_threshold = risk_threshold
+        self._schema_rules: dict[str, Sequence[str]] = {}
+
+    def add_schema_rule(self, tool_name: str, required_fields: Sequence[str]) -> None:
+        """Enforce strict argument schema presence for a tool before execution."""
+        self._schema_rules[tool_name] = list(required_fields)
 
     async def evaluate(self, ctx: GateContext) -> Decision:
         # Phase 0: is this system allowed to do anything at all?
         self._check_kill_switch(ctx)
+
+        # Schema structural validation check
+        if ctx.tool in self._schema_rules:
+            missing = [f for f in self._schema_rules[ctx.tool] if f not in ctx.kwargs or ctx.kwargs[f] is None]
+            if missing:
+                return Decision(
+                    Verdict.BLOCK,
+                    "schema_validation",
+                    f"Tool '{ctx.tool}' missing required arguments: {', '.join(missing)}"
+                )
 
         # Dynamic AI Risk Scorer check
         if self.risk_scorer is not None:

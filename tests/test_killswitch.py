@@ -107,10 +107,10 @@ def test_resuming_something_not_halted_reports_it(switch):
 
 def test_a_halt_can_expire_on_its_own(switch):
     """A halt nobody remembers to lift is its own outage."""
-    switch.halt(reason="deploy", by="ci@corp", ttl=0.15)
+    switch.halt(reason="deploy", by="ci@corp", ttl=0.5)
     with pytest.raises(Halted):
         switch.check_step("stripe.charge")
-    time.sleep(0.2)
+    time.sleep(0.55)
     switch.check_step("stripe.charge")
 
 
