@@ -140,6 +140,13 @@ from .mission_critical import (
 from .auto import patch_all
 from .entanglement import EntangledNode, EntanglementMatrix
 from .propagation import EntanglementPropagator
+from .umip import (
+    Participant,
+    UMIPRegistry,
+    UMIPConformanceError,
+    get_registry,
+    set_registry,
+)
 from .mesh import (
     MergeReport,
     merge_wals,
@@ -434,6 +441,9 @@ __all__ = [
     "EntangledNode",
     "EntanglementMatrix",
     "EntanglementPropagator",
+    "UMIPRegistry",
+    "Participant",
+    "UMIPConformanceError",
     "merge_wals",
     "verify_merged",
     "record_identity",
