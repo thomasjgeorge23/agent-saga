@@ -247,11 +247,14 @@ from .provenance import (
 )
 from .schemas import SchemaContractError, validate_schema
 from .testing import ChaosRunner, ChaosResult, verify_saga_replay
+from .agentkit import AgentKit, describe_guarantees
 
 from ._version import __version__
 __author__ = "SagaOps"
 
 __all__ = [
+    "AgentKit",
+    "describe_guarantees",
     "SlackBlockKitApp",
     "TenantContext",
     "get_current_tenant",

@@ -36,6 +36,7 @@ logs/
 *.jsonl
 .agent_saga_snapshots/
 approvals.json/
+.agent-saga-switch.json
 .claims/
 bench/results-*.json
 
