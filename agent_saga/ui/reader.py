@@ -125,6 +125,20 @@ def iter_records(
 # Status derivation
 # ---------------------------------------------------------------------------
 
+
+def _coerce_ts(ts: Any) -> Optional[float]:
+    """A real, finite timestamp or None. The WAL may be corrupt or adversarial,
+    so a ts that is a string, list, dict, bool, NaN, or infinity is treated as
+    'no usable timestamp' rather than allowed to poison the arithmetic
+    downstream (min/max, latency subtraction). The reader -- and the certify and
+    replay tools built on it -- must never crash on a bad record."""
+    import math
+    if isinstance(ts, bool) or not isinstance(ts, (int, float)):
+        return None
+    f = float(ts)
+    return None if (math.isnan(f) or math.isinf(f)) else f
+
+
 # Saga-level, matching the brief's vocabulary plus one the brief omits.
 SUCCESS = "SUCCESS"          # SAGA_COMPLETE
 ROLLED_BACK = "ROLLED_BACK"  # aborted, rollback clean
@@ -179,6 +193,8 @@ class _SagaAcc:
     _order: int = 0
 
     def touch(self, ts: Optional[float]) -> None:
+        # ts is already coerced to a real float or None at ingestion (see
+        # _coerce_ts / _SagaAcc.apply), so min()/max() are safe here.
         if ts is None:
             return
         self.first_ts = ts if self.first_ts is None else min(self.first_ts, ts)
@@ -202,7 +218,11 @@ class _SagaAcc:
 
     def apply(self, rec: dict) -> None:
         ev = rec.get("event")
-        ts = rec.get("ts")
+        # Coerce once at ingestion: every use of `ts` below (touch, and the step
+        # intent/committed timestamps that feed latency_ms) is then guaranteed a
+        # real float or None, so no downstream arithmetic can crash on a hostile
+        # value like [] or NaN.
+        ts = _coerce_ts(rec.get("ts"))
         self.touch(ts)
         sid = rec.get("step_id")
 

@@ -3,6 +3,7 @@ accounted for, and fail CI when one is not."""
 
 import json
 
+import pytest
 from conftest import aio
 from agent_saga import ActionSemantics, PreFlightGate
 from agent_saga.context import Compensation, SagaContext
@@ -119,3 +120,59 @@ def test_ci_safety_scenario_produces_a_certifiable_log(tmp_path):
     assert cert.safe and not cert.critical, [str(f) for f in cert.critical]
     assert cert.sagas_audited == 2
     assert cert.merkle_root == audit_root(records)      # cert binds to this log
+
+
+# -- adversarial: the audit tool must survive a hostile log -------------------
+
+import random as _random
+
+
+def _hostile_step(rng, saga, event):
+    r = {"saga_id": saga, "event": event}
+    if rng.random() < 0.7:
+        r["ts"] = rng.choice([None, "", 0, -1, [], {}, True, float("nan"),
+                              float("inf"), "x", 2 ** 63, ["a"]])
+    if rng.random() < 0.6:
+        r["semantics"] = rng.choice(["COMPENSABLE", "IRREVERSIBLE", None, "BOGUS", 1])
+    if rng.random() < 0.5:
+        r["step_id"] = rng.choice(["s1", "", None, 123])
+        r["tool"] = rng.choice(["t", None, 42])
+    return r
+
+
+@pytest.mark.parametrize("seed", list(range(120)))
+def test_certify_never_crashes_on_a_hostile_log(seed):
+    rng = _random.Random(seed)
+    records = [{"saga_id": "s", "event": "SAGA_START", "ts": rng.choice([1.0, "bad", None])}]
+    for _ in range(rng.randint(0, 6)):
+        records.append(_hostile_step(rng, "s", rng.choice(
+            ["STEP_COMMITTED", "SAGA_ABORTED", "ROLLBACK_END", "??", None, ""])))
+    cert = certify_rollback_safety(records)      # must not raise
+    assert isinstance(cert.safe, bool)
+
+
+def test_certify_never_false_safe_on_a_genuine_orphan():
+    """The one catastrophic bug: SAFE when an effect was stranded. A hostile ts
+    on the same log must not flip the verdict."""
+    records = [
+        {"saga_id": "s", "event": "SAGA_START", "ts": float("nan")},   # hostile ts
+        {"saga_id": "s", "event": "STEP_INTENT", "step_id": "s1",
+         "tool": "email.send", "semantics": "IRREVERSIBLE", "ts": []},   # hostile ts
+        {"saga_id": "s", "event": "STEP_COMMITTED", "step_id": "s1",
+         "tool": "email.send", "semantics": "IRREVERSIBLE", "ts": {}},   # hostile ts
+        {"saga_id": "s", "event": "SAGA_ABORTED", "ts": "x"},
+        {"saga_id": "s", "event": "ROLLBACK_START"},
+        {"saga_id": "s", "event": "ROLLBACK_END", "clean": False},
+    ]
+    cert = certify_rollback_safety(records)
+    assert not cert.safe                          # the orphan is still caught
+    assert any("orphan" in f.issue.lower() or "cleanly" in f.issue for f in cert.critical)
+
+
+def test_reader_touch_ignores_non_numeric_timestamps():
+    from agent_saga.ui.reader import _SagaAcc
+    acc = _SagaAcc(saga_id="s")
+    for bad in (None, "x", [], {}, True, float("nan"), float("inf")):
+        acc.apply({"saga_id": "s", "event": "SAGA_START", "ts": bad})   # must not raise
+    acc.apply({"saga_id": "s", "event": "SAGA_START", "ts": 5.0})
+    assert acc.first_ts == 5.0                     # only the real number counted
