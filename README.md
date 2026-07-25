@@ -15,7 +15,7 @@ python examples/multi_domain.py   # 5 systems, 1 transaction, no network needed
 python examples/chaos_demo.py     # optimistic vs. transactional, side by side
 ```
 
-## The 30-second version — `AgentKit` (new in 0.3.0)
+## The 30-second version — Universal Agent Engine & `AgentKit` (v0.3.1)
 
 The whole engine behind one object. Wrap a tool once, run work in a transaction,
 and — the part that's new — let the agent *read what it's guaranteed*.

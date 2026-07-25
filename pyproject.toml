@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agent-saga"
 dynamic = ["version"]
-description = "The ultimate human-centric transaction & safety engine for autonomous AI agents — everything your team needs for bulletproof reliability, zero-friction developer ergonomics, and total peace of mind."
+description = "The ultimate human-centric transaction & safety engine for autonomous AI agents — empowering any LLM with speculative pre-flight intelligence, self-healing fallbacks, durable memory, and total peace of mind."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
