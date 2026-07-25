@@ -41,7 +41,7 @@ transaction, so it works identically in a script, a notebook, or a test. Reach
 for the lower-level `saga_scope` / `Compensation` API (below) when you need full
 control; `AgentKit` is the ergonomic front door onto the exact same guarantees.
 
-📖 **[MANUAL.md](MANUAL.md)** — the complete reference: every subsystem, how it
+📖 **[MANUAL.md](https://github.com/thomasjgeorge23/agent-saga/blob/main/MANUAL.md)** — the complete reference: every subsystem, how it
 works and why, CLI and configuration, deployment checklists, and troubleshooting.
 
 ---
@@ -848,13 +848,13 @@ By SagaOps. Implemented and tested (2007 tests; the base suite runs with only
 
 Available on PyPI: `pip install agent-saga`.
 
-Known-pending, tracked openly (see [SECURITY.md](SECURITY.md)): a shipped
+Known-pending, tracked openly (see [SECURITY.md](https://github.com/thomasjgeorge23/agent-saga/blob/main/SECURITY.md)): a shipped
 distributed lock backend and async-native connectors. KMS/Vault key resolution
 is an intended Enterprise-tier feature, deliberately absent from this BYOK core.
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Apache-2.0. See [LICENSE](https://github.com/thomasjgeorge23/agent-saga/blob/main/LICENSE) and [NOTICE](https://github.com/thomasjgeorge23/agent-saga/blob/main/NOTICE).
 Copyright 2026 SagaOps.
 
 Permissive on purpose. This library is `import`ed directly into the process that
@@ -866,7 +866,7 @@ review actually looks for.
 
 - **Use it in a closed-source product.** No obligation to publish anything.
 - **Run it as a service.** No network-use clause, no source-offer requirement.
-- **Fork it.** Genuinely — just rename it, per [TRADEMARKS.md](TRADEMARKS.md).
+- **Fork it.** Genuinely — just rename it, per [TRADEMARKS.md](https://github.com/thomasjgeorge23/agent-saga/blob/main/TRADEMARKS.md).
 
 The code is open; the **name** is not (Apache-2.0 section 6 grants no trademark
 rights). SagaOps' commercial products are separate hosted components — they are
