@@ -46,6 +46,32 @@ works and why, CLI and configuration, deployment checklists, and troubleshooting
 
 ---
 
+## 🏛️ Core Design Philosophy: The 5 Fundamental Principles
+
+1. **🎯 "The rollback engine is the demo. Auditable consistency is the contract."**
+   > *“A bank does not buy a post-disaster cleanup script — it buys a control that refuses to enter an uncompensable boundary without a human on the hook.”*  
+   `agent-saga` isn’t just an undo library; it’s an audit and safety boundary designed to prevent unrecoverable side effects in autonomous AI agents.
+
+2. **⚡ Runtime-Derived Compensations (The "Temporal Wedge")**
+   - In traditional orchestrators (like Temporal), compensating steps are statically declared at authoring time.
+   - With **AI Agents**, forward tools are chosen dynamically at runtime.
+   - **The Core Rule**: The inverse action can only be known *after* the forward step executes and returns concrete state parameters (e.g., specific row IDs, charge IDs, or message timestamps).
+
+3. **🔍 Honest Rollbacks (`clean` vs `partial`)**
+   - Swallowing partial rollback failures is the single biggest failure mode in transactional software.
+   - Callers and compliance operators must always be able to distinguish a **100% clean rollback** from a **partial/dirty failure** that requires human intervention (`RollbackReport.clean`).
+
+4. **🛑 Pre-Flight Gates over Post-Disaster Cleanup**
+   - High-risk or non-compensable actions (e.g., sending emails, executing wire transfers above thresholds) should trigger policy gates **before** any database row or API side-effect is modified.
+
+5. **💥 Fail Loud, Never Silent**
+   - Systems handling Write-Ahead Logging (WAL) must **never** silently swallow unreadable or corrupted records (e.g., missing encryption keys).
+   - If a background recovery daemon cannot parse a log entry, it must halt and alert rather than assuming "there is no work to do."
+
+> 💡 **Developer Takeaway**: *If your AI agent has write permissions, every tool must declare its exact semantics (`COMPENSABLE` vs `IRREVERSIBLE`). Never assume an undo succeeded—log it in a crash-resilient WAL, verify state integrity, and demand strict human-in-the-loop gates for uncompensable actions.*
+
+---
+
 ## Why this is not just the Saga pattern, or just Temporal
 
 **Undo is not one thing.** Every side effect is classified:

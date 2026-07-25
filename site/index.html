@@ -320,6 +320,44 @@ async with kit.transaction():
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
       </div>
+  <!-- CORE DESIGN PHILOSOPHY -->
+  <section style="background: var(--panel); border-y: 1px solid var(--border); padding: 4rem 0;">
+    <div class="wrap">
+      <p class="eyebrow">Core Design Philosophy</p>
+      <h2>The 5 Fundamental Principles of agent-saga.</h2>
+      <p class="lede">The core contract that separates true transactional safety from post-disaster cleanup scripts.</p>
+
+      <div class="category-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-top: 2rem;">
+        <div class="cat-card">
+          <span class="cat-badge" style="background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent);">Principle 1</span>
+          <h3 style="margin-top: 0.8rem;">🎯 Auditable Consistency is the Contract</h3>
+          <p><i>“A bank does not buy a post-disaster cleanup script — it buys a control that refuses to enter an uncompensable boundary without a human on the hook.”</i></p>
+        </div>
+
+        <div class="cat-card">
+          <span class="cat-badge" style="background: color-mix(in srgb, var(--reversible) 15%, transparent); color: var(--reversible);">Principle 2</span>
+          <h3 style="margin-top: 0.8rem;">⚡ Runtime-Derived Compensations</h3>
+          <p>AI agents choose forward tools dynamically at runtime. The inverse action can only be derived <b>after</b> the forward step executes and returns concrete state parameters (e.g., charge IDs, row IDs).</p>
+        </div>
+
+        <div class="cat-card">
+          <span class="cat-badge" style="background: color-mix(in srgb, var(--compensable) 15%, transparent); color: var(--compensable);">Principle 3</span>
+          <h3 style="margin-top: 0.8rem;">🔍 Honest Rollbacks (clean vs. partial)</h3>
+          <p>Swallowing partial failures is a critical vulnerability. Operators must always distinguish a 100% clean rollback from a partial failure requiring human intervention (<code>RollbackReport.clean</code>).</p>
+        </div>
+
+        <div class="cat-card">
+          <span class="cat-badge" style="background: color-mix(in srgb, var(--irreversible) 15%, transparent); color: var(--irreversible);">Principle 4</span>
+          <h3 style="margin-top: 0.8rem;">🛑 Pre-Flight Gates over Post-Cleanup</h3>
+          <p>High-risk or non-compensable actions trigger policy gates <b>before</b> any side-effect is modified — the only point at which refusal is completely free.</p>
+        </div>
+
+        <div class="cat-card">
+          <span class="cat-badge" style="background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent);">Principle 5</span>
+          <h3 style="margin-top: 0.8rem;">💥 Fail Loud, Never Silent</h3>
+          <p>Write-Ahead Logs must <b>never</b> silently swallow unreadable or corrupted records. If a recovery daemon cannot parse an entry, it halts and alerts immediately.</p>
+        </div>
+      </div>
     </div>
   </section>
 
