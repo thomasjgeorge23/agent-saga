@@ -182,6 +182,17 @@ class IdempotencyManager:
                         counts[token] = counts.get(token, 0) + 1
         return counts
 
+    def __init__(self) -> None:
+        self._executed: dict[str, Any] = {}
+
+    def is_duplicate(self, key: str) -> bool:
+        """Check if an idempotency key has already been executed."""
+        return key in self._executed
+
+    def record_execution(self, key: str, result: Any = None) -> None:
+        """Record an execution result for an idempotency key."""
+        self._executed[key] = result or {"status": "COMPLETED"}
+
     @staticmethod
     def should_skip(key: str, completed: set[str], step_id: str) -> bool:
         """Whether to no-op this compensation, logging why when we do."""
