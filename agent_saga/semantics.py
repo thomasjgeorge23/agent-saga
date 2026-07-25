@@ -17,6 +17,11 @@ from typing import Any, Awaitable, Callable, Optional
 class ActionSemantics(enum.Enum):
     """How cleanly the world can be returned to its prior state."""
 
+    PREVIEW = "PREVIEW"
+    """Non-destructive dry-run pre-flight check.
+    e.g. verifying wallet balance, querying inventory, checking seller availability.
+    Executed speculatively in the background before real-world forward execution."""
+
     REVERSIBLE = "REVERSIBLE"
     """State can be restored exactly. No observer can tell it happened.
     e.g. a row update where we hold the prior snapshot, an in-memory cache write."""

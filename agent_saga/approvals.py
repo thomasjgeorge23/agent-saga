@@ -108,11 +108,43 @@ class ApprovalRequest:
         known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**known)
 
+    def to_ui_artifact(self) -> UIConfirmationArtifact:
+        """Convert a pending approval request into a structured interactive UI confirmation card schema."""
+        return UIConfirmationArtifact(
+            saga_id=self.saga_id,
+            request_id=self.id,
+            tool_name=self.tool,
+            title=f"Confirmation Required: {self.tool}",
+            description=f"Action '{self.tool}' is SUSPENDED awaiting user confirmation. Reason: {self.reason}",
+            parameters=dict(self.context),
+            approve_action=f"agent-saga approvals approve {self.id}",
+            deny_action=f"agent-saga approvals deny {self.id}",
+            expires_at=self.expires_at,
+        )
+
     def summary(self) -> str:
         age = int(time.time() - self.requested_at)
         label = f"{self.saga_name} " if self.saga_name else ""
         return (f"[{self.status}] {label}{self.tool} -- {self.reason} "
                 f"(rule {self.rule}, {age}s old, id {self.id[:12]})")
+
+
+@dataclass
+class UIConfirmationArtifact:
+    """Interactive UI Confirmation Card Schema emitted during SUSPENDED saga state."""
+
+    saga_id: str
+    request_id: str
+    tool_name: str
+    title: str
+    description: str
+    parameters: dict
+    approve_action: str
+    deny_action: str
+    expires_at: float
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
 # ---------------------------------------------------------------------------

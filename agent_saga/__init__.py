@@ -165,6 +165,11 @@ from .hardware import (
     MultiSigApprovalProvider,
     action_digest,
 )
+from .preview import PreviewPlan, PreviewSaga
+from .healing import HealingPath, SelfHealedProposal, SelfHealingGraph
+from .approvals import UIConfirmationArtifact
+from .dag import DAGNode, DAGSaga
+from .durable_memory import DurableSagaMemory
 from .predictive import (
     PredictiveExecutor,
     Speculation,

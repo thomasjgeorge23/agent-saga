@@ -22,6 +22,17 @@ class HealingPath:
     param_mapper: Optional[Callable[[dict, Exception], dict]] = None
 
 
+@dataclass
+class SelfHealedProposal:
+    """Structure emitted when a saga automatically heals a failed step via adaptive fallbacks."""
+
+    healed: bool
+    primary_tool: str
+    fallback_tool: str
+    result: Any
+    explanation: str
+
+
 class SelfHealingGraph:
     """Topological graph repair engine for autonomous AI tool recovery."""
 
@@ -33,6 +44,29 @@ class SelfHealingGraph:
 
     def register_path(self, path: HealingPath) -> None:
         self._paths.setdefault(path.primary_tool, []).append(path)
+
+    async def try_heal_with_proposal(
+        self,
+        tool: str,
+        kwargs: dict,
+        error: Exception,
+    ) -> Optional[SelfHealedProposal]:
+        """Attempt self-healing and return a human-readable proposal for the AI."""
+        success, result, fallback_tool = await self.try_heal(tool, kwargs, error)
+        if not success:
+            return None
+
+        explanation = (
+            f"Primary tool '{tool}' failed ({error}). Automatically self-healed by "
+            f"switching execution to fallback tool '{fallback_tool}' successfully."
+        )
+        return SelfHealedProposal(
+            healed=True,
+            primary_tool=tool,
+            fallback_tool=fallback_tool,
+            result=result,
+            explanation=explanation,
+        )
 
     async def try_heal(
         self,
@@ -67,4 +101,4 @@ class SelfHealingGraph:
         return False, None, ""
 
 
-__all__ = ["HealingPath", "SelfHealingGraph"]
+__all__ = ["HealingPath", "SelfHealingGraph", "SelfHealedProposal"]
