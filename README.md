@@ -15,6 +15,32 @@ python examples/multi_domain.py   # 5 systems, 1 transaction, no network needed
 python examples/chaos_demo.py     # optimistic vs. transactional, side by side
 ```
 
+## The 30-second version — `AgentKit` (new in 0.3.0)
+
+The whole engine behind one object. Wrap a tool once, run work in a transaction,
+and — the part that's new — let the agent *read what it's guaranteed*.
+
+```python
+from agent_saga import AgentKit
+
+kit = AgentKit(name="my-agent")
+
+charge = kit.safe_tool(stripe_charge, semantics="COMPENSABLE",
+                       compensate=lambda r: {"handler": "refund", "kwargs": {"id": r["id"]}})
+
+async with kit.transaction():        # a saga boundary
+    await charge(amount=4200)        # gated, logged, refunded on any failure
+    await ship_order(...)            # if this throws, the charge is rolled back
+
+kit.guarantees()   # machine-readable manifest: exactly what is enforced, versioned
+kit.status()       # live posture — fail-closed if a safety signal can't be read
+```
+
+`safe_tool` is zero-ceremony: the same wrapped callable runs untouched outside a
+transaction, so it works identically in a script, a notebook, or a test. Reach
+for the lower-level `saga_scope` / `Compensation` API (below) when you need full
+control; `AgentKit` is the ergonomic front door onto the exact same guarantees.
+
 📖 **[MANUAL.md](MANUAL.md)** — the complete reference: every subsystem, how it
 works and why, CLI and configuration, deployment checklists, and troubleshooting.
 
@@ -661,6 +687,31 @@ artifact that looks authoritative.
 > For a fleet, each node's log is independently provable; correlating them is a
 > control-plane concern.
 
+**Rollback-safety certificates.** Chain-intact proves the log wasn't *altered*;
+it doesn't prove the agent left nothing stranded. `certify` reads a log and
+proves the stronger property — that every committed effect was accounted for
+(compensated, or explicitly terminal) — and names the exact step if one wasn't.
+It returns non-zero, so a release that could strand an uncompensated charge fails
+CI instead of shipping.
+
+```bash
+agent-saga verify  --wal-path ./agent-saga.wal   # the log was not altered
+agent-saga certify --wal-path ./agent-saga.wal   # every effect is accounted for
+```
+
+**Selective-disclosure proofs.** An auditor often needs to verify *one* saga
+without seeing everyone else's. The records sit under a Merkle tree with
+domain-separated leaves, so you can publish a single root and hand out a compact
+inclusion proof for exactly one saga — every other run stays private.
+
+```python
+from agent_saga import audit_root, build_disclosure, verify_disclosure
+
+root  = audit_root(all_records)                        # publish once
+proof = build_disclosure(all_records, saga_id="checkout_402")
+verify_disclosure(proof, root)                         # -> valid, and only 402 is revealed
+```
+
 ---
 
 ## Time-travel debugger
@@ -680,9 +731,27 @@ credentials shown as references, never values. Binds to `127.0.0.1` by default.
 
 ## Status
 
-Pre-alpha, by SagaOps. Implemented and tested (461 tests; the base suite runs
-with only `pytest`; optional extras add their own SDKs):
+By SagaOps. Implemented and tested (2007 tests; the base suite runs with only
+`pytest`; optional extras add their own SDKs):
 
+- **`AgentKit`** — the one-call agent-facing SDK: `safe_tool()` to wrap a tool,
+  `transaction()` for a saga boundary, and machine-readable introspection with
+  `guarantees()` (a versioned manifest of what's enforced, including an explicit
+  `not_claimed` clause) and `status()` (live posture, fail-closed when a safety
+  signal can't be read).
+- **Rollback-safety certificates** (`agent-saga certify`): machine-checkable
+  proof that every committed effect was accounted for; non-zero exit gates CI.
+- **Selective-disclosure audit proofs**: a Merkle tree with domain-separated
+  leaves lets you prove one saga under a published root without revealing others.
+- **Predictive pre-execution**: speculatively run REVERSIBLE-only steps behind an
+  HMAC lease bound to (intent, tool, expiry); stale/forged/cross-intent
+  speculations can never be redeemed.
+- **Passkey / hardware approvals**: an IRREVERSIBLE step can require a
+  hardware-bound Ed25519 signature over a digest of the exact action.
+- **Offline mesh sagas**: per-device local WALs merge with a commutative,
+  idempotent, associative G-Set CRDT — any sync order converges.
+- **Edge / async storage sink**: the engine is separable from disk (proven, not
+  asserted), so the same guarantees run against any async store.
 - Core engine, recovery daemon (truncation-tolerant), and a time-travel debugger
   with optional bearer-token auth for shared environments.
 - Durable human-in-the-loop approvals: requests survive a crash, are answerable
@@ -777,7 +846,7 @@ with only `pytest`; optional extras add their own SDKs):
   formatter for incidents and a JSON one for log pipelines. `configure_logging()`
   is opt-in and never touches the root logger.
 
-Not yet published to PyPI.
+Available on PyPI: `pip install agent-saga`.
 
 Known-pending, tracked openly (see [SECURITY.md](SECURITY.md)): a shipped
 distributed lock backend and async-native connectors. KMS/Vault key resolution

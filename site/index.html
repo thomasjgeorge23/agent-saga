@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v0.2.4 — Supreme Autonomous Multi-Agent Transaction Engine</title>
-<meta name="description" content="Sub-microsecond MmapWAL binary logging, WebAuthn Passkey hardware approvals, ~0.01ms predictive intent staging, offline P2P mesh sagas, UMIP multi-agent protocol, and machine-checkable rollback safety certificates." />
+<title>agent-saga v0.3.0 — Transactional Safety for Autonomous AI Agents</title>
+<meta name="description" content="One-call AgentKit SDK, machine-checkable rollback-safety certificates, selective-disclosure audit proofs, hash-chained tamper-evident WAL, passkey/hardware approvals, predictive pre-execution, and offline mesh sagas — the transaction layer for AI agents that act on the real world." />
 <style>
   :root {
     --bg: #070c16; --panel: #0f172a; --elev: #1e293b;
@@ -224,11 +224,12 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top">agent-saga <span class="seq">v0.2.4</span></a>
+    <a class="brand" href="#top">agent-saga <span class="seq">v0.3.0</span></a>
     <nav class="nav-links">
+      <a href="#sdk">Agent SDK</a>
       <a href="#categories">Industries</a>
-      <a href="#sandbox">Live Input Sandbox</a>
-      <a href="#features">Innovations</a>
+      <a href="#sandbox">Live Sandbox</a>
+      <a href="#features">Capabilities</a>
       <a href="#install">Docs</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank" rel="noopener">GitHub</a>
       <button class="toggle" id="themeBtn">theme</button>
@@ -241,11 +242,10 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">⚡ Supreme AI Reliability Infrastructure · PyPI v0.2.4</p>
-        <h1>The supreme transactional engine for <span class="amber">autonomous AI agents</span>.</h1>
+        <p class="eyebrow">⚡ Transactional Safety for AI Agents · PyPI v0.3.0</p>
+        <h1>Give your agent a <span class="amber">transaction it can reason about</span>.</h1>
         <p class="lede">
-          From hobby builders and indie coders to high-precision medical examination, banking settlements, and flight control — 
-          <b>agent-saga v0.2.4</b> guarantees 99.999% reliability with pre-flight safety gates, anti-hallucination reality anchors, OpenTelemetry & LangSmith tracing, GitHub/AWS/Slack connectors, and automatic LIFO rollbacks.
+          <b>agent-saga v0.3.0</b> wraps an AI agent's real-world actions in a transaction: a pre-flight gate stops the dangerous call <i>before</i> it runs, every intent is written to a hash-chained tamper-evident log, and any failure rolls the committed steps back in reverse order. New in 0.3.0 — the <b>AgentKit</b> one-call SDK the agent uses to wrap a tool <i>and read exactly what it is guaranteed</i>.
         </p>
         <div class="install">
           <span class="prompt">$</span><code>pip install agent-saga</code>
@@ -261,16 +261,63 @@
       <div>
         <div class="wal">
           <div class="wal-bar">
-            <span class="dot"></span><span>Write-Ahead Log (WAL v0.2.4)</span>
-            <span class="fn">SAGA_LIVE · 99.999% Grounded</span>
+            <span class="dot"></span><span>Tamper-Evident WAL · hash-chained</span>
+            <span class="fn">SAGA_LIVE</span>
           </div>
           <div class="wal-body">
-            <div class="logline"><span class="seq">001</span><span class="ev"><b>SAGA_START</b> user_tenant_402</span><span class="tag t-rev">reversible</span></div>
-            <div class="logline"><span class="seq">002</span><span class="ev">REALITY_ANCHOR <b>verify_dosage</b></span><span class="tag t-rev">3/3 consensus</span></div>
-            <div class="logline"><span class="seq">003</span><span class="ev">STEP_COMMITTED <b>github.create_pr</b></span><span class="tag t-comp">compensable</span></div>
-            <div class="logline roll"><span class="seq">004</span><span class="ev">PRE_FLIGHT_GATE <b>intercepted error</b></span><span class="tag t-irr">blocked</span></div>
-            <div class="logline done"><span class="seq">005</span><span class="ev">COMPENSATED <b>github.close_pr</b></span><span class="tag t-comp">↺ auto-reverted</span></div>
+            <div class="logline"><span class="seq">001</span><span class="ev"><b>SAGA_START</b> checkout_402</span><span class="tag t-rev">_h a1f9…</span></div>
+            <div class="logline"><span class="seq">002</span><span class="ev">STEP_COMMITTED <b>stripe.charge</b></span><span class="tag t-comp">compensable</span></div>
+            <div class="logline"><span class="seq">003</span><span class="ev">STEP_INTENT <b>email.send_receipt</b></span><span class="tag t-irr">irreversible</span></div>
+            <div class="logline roll"><span class="seq">004</span><span class="ev">PRE_FLIGHT_GATE <b>requires human approval</b></span><span class="tag t-irr">blocked</span></div>
+            <div class="logline done"><span class="seq">005</span><span class="ev">ROLLBACK <b>stripe.refund</b></span><span class="tag t-comp">↺ LIFO</span></div>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENT SDK — THE NEW ONE-CALL SURFACE -->
+  <section id="sdk">
+    <div class="wrap">
+      <p class="eyebrow">New in v0.3.0 · AgentKit</p>
+      <h2>One object. Three verbs. A safety net an agent can <span class="amber">read</span>.</h2>
+      <p class="lede">The whole engine — the gate, typed compensation, the tamper-evident log, the audit proofs — behind one import. An agent wraps a tool once, runs work inside a transaction, and (the genuinely new part) can ask the system what it is <i>guaranteed</i> and whether it is safe to act right now.</p>
+
+      <div style="display:grid; gap:1.6rem; grid-template-columns:1fr; margin-top:2.5rem;">
+        <div class="docs-card" style="margin-top:0;">
+          <div class="docs-code" style="margin-top:0;">
+<span style="color:var(--faint);"># wrap any tool once — gated + logged + compensable inside a transaction,</span>
+<span style="color:var(--faint);"># and a plain function everywhere else.</span>
+from agent_saga import AgentKit
+
+kit = AgentKit(name=<span style="color:var(--accent-ink);">"research-agent"</span>)
+
+charge = kit.safe_tool(stripe_charge, semantics=<span style="color:var(--compensable);">"COMPENSABLE"</span>,
+                       compensate=<span style="color:var(--reversible);">lambda r: {"handler": "refund", "kwargs": {"id": r["id"]}}</span>)
+
+<span style="color:var(--faint);"># any exception inside rolls the whole thing back, in reverse order</span>
+async with kit.transaction():
+    await charge(amount=4200)
+    await ship_order(...)          <span style="color:var(--faint);"># if this throws, the charge is refunded</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feat-grid" style="margin-top:1.6rem;">
+        <div class="feat-card" onclick="openFeatureModal('agentkit_guarantees')">
+          <h3>📜 guarantees() — a manifest it can trust</h3>
+          <p>A versioned, JSON-serialisable statement of exactly what is enforced <i>before</i> an effect and guaranteed <i>after</i> — including an explicit <code>not_claimed</code> clause. A safety surface that hides its limits is a liability; this one states them.</p>
+          <span class="feat-inspect-hint">Click to inspect the manifest →</span>
+        </div>
+        <div class="feat-card" onclick="openFeatureModal('agentkit_status')">
+          <h3>🚦 status() — fail-closed live posture</h3>
+          <p>Before a burst of effectful work, an agent asks <code>kit.status()</code>. If a global kill-switch is halting effects — or if that signal simply can't be read — it reports <b>not ready</b>. Never a confident green when the truth is unknown.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+        <div class="feat-card" onclick="openFeatureModal('agentkit_passthrough')">
+          <h3>🔌 Zero-ceremony pass-through</h3>
+          <p>The same wrapped tool runs untouched outside a transaction — so it works identically in a script, a notebook, or a test with no saga boundary and no special-casing.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
       </div>
     </div>
@@ -340,7 +387,7 @@
         <!-- MODE BANNER -->
         <div class="mode-banner">
           <div class="mode-banner-text" id="bannerText">
-            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.2.4 Active Protection)</span>
+            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.3.0 Active Protection)</span>
           </div>
           <div style="color: var(--dim); font-size: .8rem;">Toggle OFF to test Raw AI Failure Mode</div>
         </div>
@@ -369,7 +416,7 @@
           <!-- Real-Time Output Console -->
           <div class="output-console">
             <div class="console-header">
-              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.2.4)</span>
+              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.3.0)</span>
               <span id="consoleStatus">READY</span>
             </div>
             <div id="consoleBody" style="display: flex; flex-direction: column; gap: .65rem;">
@@ -386,10 +433,47 @@
   <!-- WORLD-CLASS INNOVATIONS -->
   <section id="features">
     <div class="wrap">
-      <p class="eyebrow">Engineered Innovations</p>
-      <h2>Click any feature to inspect its live code payload & architecture.</h2>
-      
+      <p class="eyebrow">Core Capabilities</p>
+      <h2>Click any capability to inspect its real code & architecture.</h2>
+      <p class="lede">Every card below maps to shipping, tested code in the package — not a roadmap. The suite is 2007 tests green.</p>
+
       <div class="feat-grid">
+        <div class="feat-card" onclick="openFeatureModal('certify')">
+          <h3>✅ Rollback-Safety Certificates</h3>
+          <p>Machine-checkable proof that every committed effect was accounted for. <code>agent-saga certify</code> returns non-zero in CI, so a release that could strand an uncompensated charge can't ship.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('provenance')">
+          <h3>🌳 Selective-Disclosure Audit Proofs</h3>
+          <p>Prove one saga to an auditor without revealing any other. A Merkle tree with domain-separated leaves yields a compact inclusion proof under a published root.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('predictive')">
+          <h3>⚡ Predictive Pre-Execution</h3>
+          <p>Speculatively run REVERSIBLE-only steps ahead of confirmation behind an HMAC lease bound to (intent, tool, expiry). Stale, forged, or cross-intent speculations can never be redeemed.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('passkey')">
+          <h3>🔐 Passkey / Hardware Approvals</h3>
+          <p>An IRREVERSIBLE step can demand a hardware-bound Ed25519 signature over a digest of the exact action — so an approval can't be replayed onto a different call.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('mesh')">
+          <h3>🕸️ Offline Mesh Sagas (CRDT)</h3>
+          <p>Agents acting offline on separate devices keep local WALs that merge with a commutative, idempotent, associative G-Set CRDT — any sync order converges to the same history.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
+        <div class="feat-card" onclick="openFeatureModal('async_sink')">
+          <h3>🛰️ Edge / Async Storage Sink</h3>
+          <p>The engine is separable from disk: point the WAL at any async store (proven, not asserted) to run the same guarantees at the edge or in a WASM sandbox.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
         <div class="feat-card" onclick="openFeatureModal('cloud_server')">
           <h3>☁️ Self-Hosted Control Plane (cloud-server)</h3>
           <p>Run your own control plane backend (<code>agent-saga cloud-server</code>) matching the <code>sagaops.dev</code> SaaS REST API for audit ingest, approvals, and fleet budget sync.</p>
@@ -460,7 +544,31 @@
           pip install agent-saga
         </div>
 
-        <h3 style="margin-top: 1.8rem;">2. OpenTelemetry & LangSmith Tracing Setup</h3>
+        <h3 style="margin-top: 1.8rem;">2. 30-second quickstart — the AgentKit SDK</h3>
+        <div class="docs-code">
+from agent_saga import AgentKit
+
+kit = AgentKit(name="my-agent")
+
+charge = kit.safe_tool(stripe_charge, semantics="COMPENSABLE",
+                       compensate=lambda r: {"handler": "refund", "kwargs": {"id": r["id"]}})
+
+async with kit.transaction():        # a saga boundary
+    await charge(amount=4200)        # gated, logged, and refunded on any failure
+    await ship_order(...)
+
+kit.guarantees()   # machine-readable: exactly what is enforced, versioned
+kit.status()       # live posture — fail-closed if a safety signal can't be read
+        </div>
+
+        <h3 style="margin-top: 1.8rem;">3. Prove it in CI — rollback-safety gate</h3>
+        <div class="docs-code">
+# fails the build (non-zero exit) if any committed effect was left stranded
+agent-saga verify  --wal ./agent-saga.wal   # the log was not altered/truncated
+agent-saga certify --wal ./agent-saga.wal   # every effect is accounted for
+        </div>
+
+        <h3 style="margin-top: 1.8rem;">4. OpenTelemetry & LangSmith Tracing Setup</h3>
         <div class="docs-code">
 from agent_saga.observability import setup_telemetry, link_llm_trace
 
@@ -471,7 +579,7 @@ setup_telemetry()
 link_llm_trace(saga_id="saga_123", trace_id="tr_9988", prompt_context="Refactor payment engine")
         </div>
 
-        <h3 style="margin-top: 1.8rem;">3. GitHub & Cloud Connector Safety</h3>
+        <h3 style="margin-top: 1.8rem;">5. GitHub & Cloud Connector Safety</h3>
         <div class="docs-code">
 from agent_saga.connectors import GitHubConnector, CloudConnector
 
@@ -497,7 +605,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 <footer>
   <div class="wrap foot-grid">
     <div>
-      <div class="brand">agent-saga <span class="seq">v0.2.4</span></div>
+      <div class="brand">agent-saga <span class="seq">v0.3.0</span></div>
       <p style="font-size: .88rem; color: var(--faint); margin-top: .4rem;">
         Licensed under Apache-2.0. Built for mission-critical enterprise AI agent reliability.
       </p>
@@ -505,7 +613,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
     <div style="margin-left: auto; display: flex; gap: 1.8rem; font-size: .95rem;">
       <a href="#install">Documentation</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">GitHub</a>
-      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.2.4</a>
+      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.3.0</a>
     </div>
   </div>
 </footer>
@@ -585,6 +693,134 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 
   /* Dynamic Feature Code Modals */
   var featurePayloads = {
+    agentkit_guarantees: {
+      title: "📜 AgentKit.guarantees() — a manifest an agent can read",
+      desc: "A versioned, JSON-serialisable statement of exactly what agent-saga enforces before an effect and guarantees after it — including, deliberately, what it does NOT claim.",
+      code: `from agent_saga import AgentKit
+
+AgentKit().guarantees()
+# {
+#   "manifest_version": 1,
+#   "library_version": "0.3.0",
+#   "semantics": {"REVERSIBLE": ..., "COMPENSABLE": ..., "IRREVERSIBLE": ...},
+#   "enforced_before_an_effect": [
+#     "an IRREVERSIBLE step is refused unless a human (or hardware sig) approves",
+#     "a spend/rate limit over its window refuses the call before it runs",
+#     "a tripped kill-switch or open circuit blocks the step", ...
+#   ],
+#   "guaranteed_after_the_fact": [
+#     "every intent is written to a tamper-evident WAL before its effect",
+#     "on failure, committed COMPENSABLE steps are undone LIFO",
+#     "the WAL is hash-chained; alteration or truncation is detectable", ...
+#   ],
+#   "not_claimed": [
+#     "that a tool labelled REVERSIBLE actually is — that is the developer's assertion",
+#     "durability beyond what the configured WAL backend provides", ...
+#   ]
+# }`
+    },
+    agentkit_status: {
+      title: "🚦 AgentKit.status() — fail-closed live posture",
+      desc: "Is the system able to keep its guarantees right now? Deliberately fails CLOSED: if a safety signal cannot be read, the answer is not-ready, never a silent green.",
+      code: `kit = AgentKit(name="research-agent")
+
+kit.status()
+# {"agent": "research-agent", "ready": True, "blockers": [], ...}
+
+# operator halts effects fleet-wide:
+kit.status()
+# {"ready": False,
+#  "blockers": ["kill-switch active: HALTED scope=* by=ops: pentest window"]}
+
+# the kill-switch store is unreachable — we cannot tell:
+kit.status()
+# {"ready": False,
+#  "blockers": ["kill-switch state is unknown (RuntimeError); treating as not-ready"]}`
+    },
+    agentkit_passthrough: {
+      title: "🔌 Zero-ceremony pass-through",
+      desc: "A tool wrapped by safe_tool() is gated and compensable inside a transaction, and an ordinary function everywhere else — so the same code runs in a script, a notebook, or a test unchanged.",
+      code: `kit = AgentKit()
+read = kit.safe_tool(read_db, semantics="REVERSIBLE")
+
+# outside a transaction: just runs, no saga overhead
+rows = await read()                    # -> {"rows": 3}
+
+# inside one: same call, now gated + logged + part of the rollback set
+async with kit.transaction():
+    rows = await read()`
+    },
+    certify: {
+      title: "✅ Rollback-Safety Certificates",
+      desc: "Machine-checkable proof that every committed effect in a log was accounted for. Returns non-zero in CI, so a release that could strand an uncompensated charge cannot ship.",
+      code: `$ agent-saga certify --wal ./agent-saga.wal
+# SAFE — 2 sagas audited, every committed effect accounted for
+# merkle_root: 7b2c…  (binds the certificate to this exact log)
+
+# or in code:
+from agent_saga import certify_rollback_safety
+cert = certify_rollback_safety(records)
+if not cert.safe:
+    for f in cert.critical:            # names the exact stranded step
+        print(f.tool, f.issue)`
+    },
+    provenance: {
+      title: "🌳 Selective-Disclosure Audit Proofs",
+      desc: "Prove one saga happened, and happened correctly, to an auditor — without revealing any other saga in the log. A Merkle tree with domain-separated leaves gives a compact inclusion proof.",
+      code: `from agent_saga import audit_root, build_disclosure, verify_disclosure
+
+root = audit_root(all_records)                 # publish this once
+proof = build_disclosure(all_records, saga_id="checkout_402")
+
+# the auditor sees ONLY saga checkout_402 + a proof it's under the root
+verify_disclosure(proof, root)                 # -> DisclosureResult(valid=True)
+# every other customer's saga stays private`
+    },
+    predictive: {
+      title: "⚡ Predictive Pre-Execution",
+      desc: "Speculatively run REVERSIBLE-only steps ahead of confirmation to hide latency, behind an HMAC lease bound to (intent, tool, expiry). A stale, forged, expired, or cross-intent speculation can never be redeemed.",
+      code: `from agent_saga.predictive import PredictiveExecutor
+
+px = PredictiveExecutor(ttl=60, secret=SECRET)
+await px.speculate("search", run_search, intent=user_intent)   # REVERSIBLE only
+
+# later, when the intent is confirmed:
+hit = px.confirm(user_intent)      # returns the result iff lease is valid & fresh
+# COMPENSABLE / IRREVERSIBLE steps are refused — never speculated`
+    },
+    passkey: {
+      title: "🔐 Passkey / Hardware Approvals",
+      desc: "An IRREVERSIBLE step can require a hardware-bound Ed25519 signature over a digest of the exact action (tool + semantics + kwargs), so an approval can't be replayed onto a different call.",
+      code: `from agent_saga.hardware import HardwareApprovalProvider, action_digest
+
+provider = HardwareApprovalProvider(verifier=ed25519_verifier)
+gate = PreFlightGate(approval_provider=provider)
+
+# the human signs THIS action's digest on their device;
+# a signature for one action cannot approve another.
+digest = action_digest(ctx)        # binds tool + semantics + kwargs`
+    },
+    mesh: {
+      title: "🕸️ Offline Mesh Sagas (CRDT merge)",
+      desc: "Agents running offline on separate devices each keep a local WAL; when they reconnect, the logs merge with a commutative, idempotent, associative G-Set CRDT — any order of syncing converges to the same history.",
+      code: `from agent_saga.mesh import merge_wals, verify_merged
+
+# device A and device B acted independently, offline
+merged = merge_wals([wal_a, wal_b])       # order-independent, no duplicates
+report = verify_merged(merged)            # hash-chain intact across the merge`
+    },
+    async_sink: {
+      title: "🛰️ Edge / Async Storage Sink",
+      desc: "The safety engine is separable from disk: point the WAL at any async store (proven, not asserted) so the same guarantees run at the edge or in a WASM sandbox.",
+      code: `from agent_saga.wal.async_sink import AsyncSinkWAL, AsyncStorageSink
+
+class MyEdgeSink(AsyncStorageSink):
+    async def append(self, batch): ...     # your KV / object store
+    async def scan(self): ...
+    async def truncate(self): ...
+
+wal = AsyncSinkWAL(MyEdgeSink())           # full engine, no local filesystem`
+    },
     cloud_server: {
       title: "☁️ Self-Hosted Control Plane Server (cloud-server)",
       desc: "Run a self-hosted control plane backend matching the sagaops.dev REST API for audit log ingestion, cross-fleet budget tracking, and approvals.",
@@ -699,7 +935,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
 
     if (protectionActive) {
       label.textContent = "PROTECTION: ON (+ agent-saga)";
-      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.2.3 Active Protection)</span>';
+      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.3.0 Active Protection)</span>';
     } else {
       label.textContent = "PROTECTION: OFF (Raw AI Agent)";
       banner.innerHTML = '<span style="color: var(--irreversible);">● MODE: BEFORE (Raw AI Agent - Unprotected Failure Mode)</span>';
@@ -810,7 +1046,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var drug = document.getElementById('inputDrug').value;
       var dosage = parseFloat(document.getElementById('inputDosage').value) || 0;
 
-      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>patient.read_records</b> &nbsp;Selected ${drug}`, 'read-only');
@@ -823,12 +1059,12 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
           verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI hallucinated a <b>${dosage}mg</b> dosage of ${drug} (Max safe limit: 50mg) and dispatched order to pharmacy without pre-flight verification!</span>`;
           verdict.hidden = false;
         } else {
-          logRow('fail', '✗', `<b>RealityAnchor</b> &nbsp;${dosage}mg exceeds safe boundary (0.1mg - 50.0mg)`, 'PRE-FLIGHT INTERCEPTED');
+          logRow('fail', '✗', `<b>PreFlightGate</b> &nbsp;${dosage}mg exceeds policy boundary (0.1mg - 50.0mg)`, 'BLOCKED PRE-FLIGHT');
           await wait(350);
-          logRow('undo', '↺', `<b>SelfCorrectingLoop</b> &nbsp;Auto-corrected prescription to safe 15.0mg`, 'auto-re-ground');
-          logRow('ok', '✓', `<b>pharmacy.dispense</b> &nbsp;DISPATCHED 15.0mg ${drug}`, 'VERIFIED SAFE');
+          logRow('undo', '↺', `<b>pharmacy.dispense</b> &nbsp;never called — no dose dispatched`, 'effect withheld');
+          logRow('note', '⏸', `<b>approval.request</b> &nbsp;escalated to licensed clinician for review`, 'REQUIRE_APPROVAL');
           verdict.className = 'verdict good';
-          verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga 99.999% SAFE)</span><span><b>agent-saga</b> intercepted the ${dosage}mg overdose pre-flight! Reality Anchor auto-corrected prescription for ${patient} to safe 15.0mg clinical dosage.</span>`;
+          verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga BLOCKED)</span><span><b>agent-saga</b> blocked the ${dosage}mg order pre-flight against the configured policy and escalated to a human. <b>agent-saga does not calculate or substitute a dose</b> — it refuses the out-of-policy action and hands the decision to a licensed clinician.</span>`;
           verdict.hidden = false;
         }
       } else {
@@ -843,7 +1079,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var iban = document.getElementById('inputIban').value;
       var amount = parseFloat(document.getElementById('inputAmount').value) || 0;
 
-      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (!protectionActive) {
@@ -869,7 +1105,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var prTitle = document.getElementById('inputPR').value;
       var testRes = document.getElementById('inputTestResult').value;
 
-      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>github.create_pr</b> &nbsp;PR #101 (${prTitle}) created`, 'inverse: close_pr');
@@ -900,7 +1136,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var channel = document.getElementById('inputChannel').value;
       var msgText = document.getElementById('inputMsg').value;
 
-      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>slack.post_message</b> &nbsp;"${msgText}"`, 'inverse: delete_message');
@@ -922,7 +1158,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var robot = document.getElementById('inputRobot').value;
       var angle = parseFloat(document.getElementById('inputAngle').value) || 0;
 
-      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.2.3 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (angle > 180.0) {
@@ -932,12 +1168,11 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
           verdict.innerHTML = `<span class="chip">BEFORE (RAW AI FAILURE)</span><span>Raw AI commanded ${angle}° rotation (Max limit: 180°), causing physical servo gear strip & motor burnout!</span>`;
           verdict.hidden = false;
         } else {
-          logRow('fail', '✗', `<b>PreFlightGate</b> &nbsp;${angle}° exceeds mechanical joint boundary (0 - 180°)`, 'INTERCEPTED PRE-FLIGHT');
+          logRow('fail', '✗', `<b>PreFlightGate</b> &nbsp;${angle}° exceeds mechanical joint boundary (0 - 180°)`, 'BLOCKED PRE-FLIGHT');
           await wait(350);
-          logRow('undo', '↺', `<b>SafetyBoundary</b> &nbsp;Command clamped to safe 90.0° resting angle`, 'auto-clamped');
-          logRow('ok', '✓', `<b>servo.set_angle</b> &nbsp;Set angle to 90.0°`, 'HARDWARE PROTECTED');
+          logRow('undo', '↺', `<b>servo.set_angle</b> &nbsp;never called — servo did not move`, 'effect withheld');
           verdict.className = 'verdict good';
-          verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga SAFE)</span><span><b>agent-saga</b> intercepted illegal ${angle}° joint angle pre-flight! Servo gear burnout prevented.</span>`;
+          verdict.innerHTML = `<span class="chip">AFTER (+ agent-saga SAFE)</span><span><b>agent-saga</b> blocked the out-of-range ${angle}° command pre-flight — the servo was never driven past its 180° limit, so no gear strip or burnout. The gate refuses the unsafe call; it does not silently pick a different angle.</span>`;
           verdict.hidden = false;
         }
       } else {
