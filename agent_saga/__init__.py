@@ -170,6 +170,7 @@ from .healing import HealingPath, SelfHealedProposal, SelfHealingGraph
 from .approvals import UIConfirmationArtifact
 from .dag import DAGNode, DAGSaga
 from .durable_memory import DurableSagaMemory
+from .universal import EnhancedAIResponse, UniversalAgentEngine, enhance, patch_all
 from .predictive import (
     PredictiveExecutor,
     Speculation,
