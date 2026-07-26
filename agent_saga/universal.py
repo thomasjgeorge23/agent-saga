@@ -60,6 +60,20 @@ class EnhancedAIResponse:
         return "\n".join(parts)
 
 
+def _audit_signature(content: str, executed_steps: List[str]) -> str:
+    """A reproducible SHA-256 over the response and the steps it caused.
+
+    Uses the same canonical JSON encoding as the WAL's hash chain, so a third
+    party can recompute this from the recorded fields alone.
+    """
+    import hashlib
+
+    payload = json.dumps(
+        {"content": content, "executed_steps": list(executed_steps)},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 class UniversalAgentEngine:
     """Global engine that converts raw LLM outputs into proactive, self-healing, transactional executions."""
 
@@ -125,8 +139,13 @@ class UniversalAgentEngine:
                             status_label = "BLOCKED"
                             raise exc
 
-        # 3. Generate Audit Signature
-        audit_hash = f"sha256_{hash(llm_response_text + str(executed_steps)) & 0xffffffff:08x}"
+        # 3. Generate Audit Signature.
+        # Real SHA-256 over canonical bytes. The previous implementation used
+        # Python's builtin hash(), which is randomised per process (PYTHONHASHSEED)
+        # -- so the same response produced a different "signature" on every run,
+        # while being labelled sha256_. A signature that cannot be reproduced by
+        # anyone else proves nothing.
+        audit_hash = _audit_signature(llm_response_text, executed_steps)
 
         return EnhancedAIResponse(
             original_content=llm_response_text,
@@ -143,24 +162,165 @@ class UniversalAgentEngine:
 _global_engine = UniversalAgentEngine()
 
 
+async def aenhance(
+    llm_response_text: str,
+    tool_calls: Optional[List[Dict[str, Any]]] = None,
+    preview_checks: Optional[List[Callable[[], Any]]] = None,
+) -> EnhancedAIResponse:
+    """Enhance an LLM response from inside async code. This is the form agents
+    actually want, since an agent loop is already running an event loop."""
+    return await _global_engine.execute_enhanced(
+        llm_response_text, tool_calls, preview_checks)
+
+
 def enhance(
     llm_response_text: str,
     tool_calls: Optional[List[Dict[str, Any]]] = None,
     preview_checks: Optional[List[Callable[[], Any]]] = None,
 ) -> EnhancedAIResponse:
-    """Synchronous / Async wrapper to universally enhance any LLM response."""
+    """Enhance an LLM response from synchronous code.
+
+    Must not be called while an event loop is running in this thread -- blocking
+    a running loop is impossible, not merely discouraged. The previous version
+    tried ``loop.run_until_complete()`` on the *running* loop and then fell back
+    to ``asyncio.run()``; both raise inside async code, so it failed in exactly
+    the place agents live. From async code, ``await aenhance(...)`` instead.
+    """
     try:
-        loop = asyncio.get_running_loop()
-        # If running inside event loop, create task or execute
-        return loop.run_until_complete(_global_engine.execute_enhanced(llm_response_text, tool_calls, preview_checks))
+        asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(_global_engine.execute_enhanced(llm_response_text, tool_calls, preview_checks))
+        return asyncio.run(_global_engine.execute_enhanced(
+            llm_response_text, tool_calls, preview_checks))
+
+    raise RuntimeError(
+        "enhance() was called from inside a running event loop, where it cannot "
+        "block. Use `await aenhance(...)` instead.")
 
 
-def patch_all() -> dict[str, bool]:
-    """Monkey-patch standard LLM SDKs (OpenAI, Anthropic, Gemini) for seamless automatic enhancement."""
-    logger.info("agent-saga: Universal LLM patch_all() active. All LLM responses will automatically be enhanced.")
-    return {"openai": True, "anthropic": True, "gemini": True, "ollama": True}
+# -- SDK interception ---------------------------------------------------------
+# Each entry: key -> (module path, dotted attribute of the method to wrap).
+_PATCH_TARGETS: Dict[str, tuple[str, str]] = {
+    "openai": ("openai.resources.chat.completions", "Completions.create"),
+    "anthropic": ("anthropic.resources.messages", "Messages.create"),
+    "gemini": ("google.generativeai", "GenerativeModel.generate_content"),
+    "ollama": ("ollama", "chat"),
+}
+
+# key -> (owner_object, attribute_name, original_callable). Enables unpatch_all().
+_PATCHED: Dict[str, tuple[Any, str, Any]] = {}
 
 
-__all__ = ["UniversalAgentEngine", "EnhancedAIResponse", "enhance", "patch_all"]
+def _resolve(module_path: str, dotted_attr: str) -> tuple[Any, str]:
+    """Import module_path and walk dotted_attr, returning (owner, final_attr)."""
+    import importlib
+
+    obj = importlib.import_module(module_path)
+    parts = dotted_attr.split(".")
+    for part in parts[:-1]:
+        obj = getattr(obj, part)
+    return obj, parts[-1]
+
+
+def patch_all(*, record: Optional[Callable[[str, Any], None]] = None) -> Dict[str, str]:
+    """Wrap the completion method of every LLM SDK that is actually installed.
+
+    Returns a truthful per-SDK report. Values are one of:
+
+    ``"patched"``           the method really was wrapped
+    ``"not_installed"``     the SDK is not importable in this environment
+    ``"already_patched"``   a previous call already wrapped it
+    ``"failed: <reason>"``  the SDK is present but its shape did not match
+
+    This does *not* make a model smarter -- it routes calls through agent-saga so
+    they are recorded and inspectable. Monkey-patching third-party SDKs is
+    global and version-fragile by nature, so it is opt-in, reversible via
+    :func:`unpatch_all`, and never reports success it did not achieve. A safety
+    layer that overstates its own coverage is worse than none, because the user
+    stops looking.
+    """
+    report: Dict[str, str] = {}
+
+    for key, (module_path, dotted_attr) in _PATCH_TARGETS.items():
+        if key in _PATCHED:
+            report[key] = "already_patched"
+            continue
+        try:
+            owner, attr = _resolve(module_path, dotted_attr)
+        except ImportError:
+            report[key] = "not_installed"
+            continue
+        except AttributeError as exc:
+            report[key] = f"failed: {exc}"
+            continue
+
+        original = getattr(owner, attr, None)
+        if not callable(original):
+            report[key] = f"failed: {module_path}.{dotted_attr} is not callable"
+            continue
+
+        setattr(owner, attr, _wrap_sdk_call(key, original, record))
+        _PATCHED[key] = (owner, attr, original)
+        report[key] = "patched"
+
+    patched = [k for k, v in report.items() if v == "patched"]
+    if patched:
+        logger.info("agent-saga: intercepting LLM calls for %s", ", ".join(sorted(patched)))
+    else:
+        logger.warning(
+            "agent-saga: patch_all() patched nothing -- no supported LLM SDK is "
+            "installed. Report: %s", report)
+    return report
+
+
+def _wrap_sdk_call(provider: str, original: Callable[..., Any],
+                   record: Optional[Callable[[str, Any], None]]) -> Callable[..., Any]:
+    """Wrap one SDK method so its call is observed. The wrapper is deliberately
+    transparent: it never alters the response, and an error in our own bookkeeping
+    must never break the user's LLM call."""
+    import functools
+
+    def _observe(result: Any) -> None:
+        if record is None:
+            return
+        try:
+            record(provider, result)
+        except Exception:                     # our bookkeeping, never their call
+            logger.exception("agent-saga: record hook failed for %s", provider)
+
+    if asyncio.iscoroutinefunction(original):
+        @functools.wraps(original)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+            result = await original(*args, **kwargs)
+            _observe(result)
+            return result
+        async_wrapper.__agent_saga_patched__ = True
+        return async_wrapper
+
+    @functools.wraps(original)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        result = original(*args, **kwargs)
+        _observe(result)
+        return result
+    wrapper.__agent_saga_patched__ = True
+    return wrapper
+
+
+def unpatch_all() -> Dict[str, str]:
+    """Restore every SDK method :func:`patch_all` replaced. Global patching that
+    cannot be undone is a trap in tests and notebooks."""
+    report: Dict[str, str] = {}
+    for key, (owner, attr, original) in list(_PATCHED.items()):
+        setattr(owner, attr, original)
+        del _PATCHED[key]
+        report[key] = "restored"
+    return report
+
+
+__all__ = [
+    "UniversalAgentEngine",
+    "EnhancedAIResponse",
+    "enhance",
+    "aenhance",
+    "patch_all",
+    "unpatch_all",
+]
