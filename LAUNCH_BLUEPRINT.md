@@ -8,6 +8,15 @@ not a compliance tax on the marketing — it *is* the marketing. See §1.
 
 ## 1. Positioning: sell the wedge, not the aura
 
+> **v0.4 update — identity vs. wedge.** As of 0.4.0 the product is broader than
+> the wedge: five subsystems (transactional execution, receipted context,
+> truthful routing, the budgeted loop, codemod-as-transaction) under one rule —
+> *every layer can prove what it did*. The **identity** is therefore "the
+> accountable agent runtime" (see README and docs/AGENT_RUNTIME.md). The
+> **launch wedge** below stays the undo story, deliberately: it is the sharpest
+> demo, the clearest pain, and the door through which the rest of the runtime
+> gets discovered. Identity is what we are; the wedge is how we enter the room.
+
 ### What we sell
 
 **Agent-Saga is the undo button for AI agents.** One sentence deeper: when an

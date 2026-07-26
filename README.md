@@ -1,21 +1,39 @@
 # agent-saga
 
-**The undo button for AI agents.** Transactional boundaries, typed compensation
-semantics, and a pre-flight safety gate for autonomous agents that provision
-infrastructure, write to vector stores, open tickets and PRs, message people —
-and, yes, move money.
+**The accountable agent runtime.** Five layers, one rule — every layer can
+prove what it did:
 
-When an agent hallucinates halfway through a multi-step task, the side effects
-it already caused are still real. `agent-saga` wraps each tool call, records a
-runtime-derived inverse action, and unwinds the whole transaction — in-process
-on failure, or from a separate recovery daemon if the process itself dies.
+| Layer | What it proves | How |
+|---|---|---|
+| **Execution** | *What did the agent do — and can we take it back?* | Transactional tools: typed semantics (`REVERSIBLE`/`COMPENSABLE`/`IRREVERSIBLE`), runtime-derived undo, crash-safe WAL recovery, human gates before the irreversible |
+| **Context** | *What exactly did the model see?* | HOT/WARM/COLD tiers where every summary carries SHA-256 receipts into its sources; a drifted source is evicted, never served (`ContextBroker`) |
+| **Routing** | *Why this model — and why not the others?* | One IR over any host, local 7B to frontier API; every decision and every refusal names every candidate and reason (`Router`) |
+| **The loop** | *Why did it act, and why did it stop?* | A harness with deadlines, token budgets, and stall detection; an unfinished goal unwinds its side effects (`AgentLoop`) |
+| **Code changes** | *What did it change — and does it still compile?* | Repo edits as transactions: shadow-verified, snapshot-restored, `kill -9`-recoverable (`codemod`) |
+
+One hash-chained write-ahead log ties them together: an agent run is
+reconstructable from the log alone — decision by decision, each pinned to the
+exact context that produced it.
+
+**The original wedge still leads.** When an agent fails halfway through a
+multi-step task, the side effects it already caused are still real. `agent-saga`
+wraps each tool call, records a runtime-derived inverse action, and unwinds the
+whole transaction — in-process on failure, or from a separate recovery daemon
+if the process itself dies. Infrastructure, vector stores, tickets, PRs,
+messages — and, yes, money.
 
 ```bash
-python examples/multi_domain.py   # 5 systems, 1 transaction, no network needed
-python examples/chaos_demo.py     # optimistic vs. transactional, side by side
+python examples/multi_domain.py         # 5 systems, 1 transaction, no network needed
+python examples/chaos_demo.py           # optimistic vs. transactional, side by side
+python examples/small_model_big_docs.py # a 2k-token host works a 440k-char document
 ```
 
-## The 30-second version — Universal Agent Engine & `AgentKit` (v0.3.1)
+What agent-saga does **not** claim: it does not make any model smarter. It makes
+whatever model you have budgeted, audited, repaired once when it emits malformed
+actions, stopped when it thrashes, and rolled back when it fails. 📖 The runtime
+reference: [docs/AGENT_RUNTIME.md](docs/AGENT_RUNTIME.md).
+
+## The 30-second version — Universal Agent Engine & `AgentKit` (v0.4.0)
 
 The whole engine behind one object. Wrap a tool once, run work in a transaction,
 and — the part that's new — let the agent *read what it's guaranteed*.
@@ -46,29 +64,26 @@ works and why, CLI and configuration, deployment checklists, and troubleshooting
 
 ---
 
-## 🏛️ Core Design Philosophy: The 5 Fundamental Principles
+## Core Principles & System Architecture
 
-1. **🎯 "The rollback engine is the demo. Auditable consistency is the contract."**
-   > *“A bank does not buy a post-disaster cleanup script — it buys a control that refuses to enter an uncompensable boundary without a human on the hook.”*  
-   `agent-saga` isn’t just an undo library; it’s an audit and safety boundary designed to prevent unrecoverable side effects in autonomous AI agents.
+### 1. Auditable Consistency Over Post-Hoc Cleanup
+> *“A bank does not buy a post-disaster cleanup script — it implements a control that refuses to cross an uncompensable boundary without a human on the hook.”*
 
-2. **⚡ Runtime-Derived Compensations (The "Temporal Wedge")**
-   - In traditional orchestrators (like Temporal), compensating steps are statically declared at authoring time.
-   - With **AI Agents**, forward tools are chosen dynamically at runtime.
-   - **The Core Rule**: The inverse action can only be known *after* the forward step executes and returns concrete state parameters (e.g., specific row IDs, charge IDs, or message timestamps).
+`agent-saga` is not an optimistic undo utility; it is an auditable transactional safety boundary designed to prevent unrecoverable side effects when autonomous systems execute real-world operations.
 
-3. **🔍 Honest Rollbacks (`clean` vs `partial`)**
-   - Swallowing partial rollback failures is the single biggest failure mode in transactional software.
-   - Callers and compliance operators must always be able to distinguish a **100% clean rollback** from a **partial/dirty failure** that requires human intervention (`RollbackReport.clean`).
+### 2. Runtime-Derived Compensations (The Temporal Wedge)
+In traditional orchestrators like Temporal, compensating steps are statically declared at authoring time. But when autonomous agents select tools dynamically at runtime, the inverse operation cannot be statically assumed up front.
 
-4. **🛑 Pre-Flight Gates over Post-Disaster Cleanup**
-   - High-risk or non-compensable actions (e.g., sending emails, executing wire transfers above thresholds) should trigger policy gates **before** any database row or API side-effect is modified.
+**The Invariant Rule**: The compensating action can only be derived *after* the forward step completes and returns concrete runtime state parameters (e.g., specific row IDs, charge tokens, or message handles).
 
-5. **💥 Fail Loud, Never Silent**
-   - Systems handling Write-Ahead Logging (WAL) must **never** silently swallow unreadable or corrupted records (e.g., missing encryption keys).
-   - If a background recovery daemon cannot parse a log entry, it must halt and alert rather than assuming "there is no work to do."
+### 3. Strict Rollback Transparency (`clean` vs. `partial`)
+Swallowing partial rollback failures is the leading cause of silent data corruption in transactional software. Callers and compliance operators must always be able to distinguish a 100% clean state restoration (`RollbackReport.clean == True`) from a partial/dirty failure that demands human intervention.
 
-> 💡 **Developer Takeaway**: *If your AI agent has write permissions, every tool must declare its exact semantics (`COMPENSABLE` vs `IRREVERSIBLE`). Never assume an undo succeeded—log it in a crash-resilient WAL, verify state integrity, and demand strict human-in-the-loop gates for uncompensable actions.*
+### 4. Pre-Flight Enforcement Over Post-Disaster Recovery
+High-risk or non-compensable actions (e.g., sending emails, executing wire transfers above thresholds, or permanent disk operations) evaluate policy gates *before* any local database row or external API side-effect is modified.
+
+### 5. Deterministic Fail-Closed Invariants
+Systems processing Write-Ahead Logs (WAL) must never swallow corrupted records or unreadable state. If a background recovery daemon encounters an unparseable log entry or missing decryption key, it halts immediately and alerts — preventing silent state drift.
 
 ---
 
