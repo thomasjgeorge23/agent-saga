@@ -483,3 +483,56 @@ __all__ = [
     "TripleRedundantVerifier",
     "patch_all",
 ]
+
+# -- v0.4 core: IR, routing, context, and the agent loop ------------------------
+from .ir import (
+    Capabilities,
+    ChatRequest,
+    ChatResponse,
+    CostClass,
+    HostAdapter,
+    Message,
+    ToolCall,
+    ToolSpec,
+    Usage,
+)
+from .router import (
+    AllHostsFailed,
+    HostTimeout,
+    NoCapableHost,
+    Router,
+    RoutingDecision,
+    RoutingPolicy,
+    ValidationExhausted,
+)
+from .context_broker import (
+    ColdStore,
+    ContextBroker,
+    FileColdStore,
+    MemoryColdStore,
+    PackedContext,
+    ProvenanceError,
+    Span,
+)
+from .agent_loop import (
+    AgentLoop,
+    AgentLoopError,
+    LoopBudgetExceeded,
+    LoopDeadlineExceeded,
+    LoopExhausted,
+    LoopResult,
+    LoopStalled,
+    LoopTool,
+)
+from .codemod import AstTransaction, CodemodResult, ShadowTree
+
+__all__ += [
+    "AgentLoop", "AgentLoopError", "AllHostsFailed", "AstTransaction",
+    "Capabilities", "ChatRequest", "ChatResponse", "CodemodResult", "ColdStore",
+    "ContextBroker", "CostClass", "FileColdStore", "HostAdapter", "HostTimeout",
+    "LoopBudgetExceeded", "LoopDeadlineExceeded", "LoopExhausted", "LoopResult",
+    "LoopStalled", "LoopTool", "MemoryColdStore", "Message", "NoCapableHost",
+    "PackedContext", "ProvenanceError", "Router", "RoutingDecision",
+    "RoutingPolicy", "ShadowTree", "Span", "ToolCall", "ToolSpec", "Usage",
+    "ValidationExhausted",
+]
