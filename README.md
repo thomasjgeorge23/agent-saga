@@ -1,6 +1,6 @@
 # agent-saga
 
-**The accountable agent runtime.** Five layers, one rule — every layer can
+**The accountable agent runtime.** Six layers, one rule — every layer can
 prove what it did:
 
 | Layer | What it proves | How |
@@ -10,6 +10,7 @@ prove what it did:
 | **Routing** | *Why this model — and why not the others?* | One IR over any host, local 7B to frontier API; every decision and every refusal names every candidate and reason (`Router`) |
 | **The loop** | *Why did it act, and why did it stop?* | A harness with deadlines, token budgets, and stall detection; an unfinished goal unwinds its side effects (`AgentLoop`) |
 | **Code changes** | *What did it change — and does it still compile?* | Repo edits as transactions: shadow-verified, snapshot-restored, `kill -9`-recoverable (`codemod`) |
+| **Answers** | *Can the answer prove itself?* | Every claim is classified against the receipts it cites — `VERIFIED`, or labeled `UNCITED` / `BROKEN_CITATION` / `BROKEN_QUOTE`; a hallucination cannot pose as a sourced fact (`grounding`) |
 
 One hash-chained write-ahead log ties them together: an agent run is
 reconstructable from the log alone — decision by decision, each pinned to the
@@ -32,6 +33,44 @@ What agent-saga does **not** claim: it does not make any model smarter. It makes
 whatever model you have budgeted, audited, repaired once when it emits malformed
 actions, stopped when it thrashes, and rolled back when it fails. 📖 The runtime
 reference: [docs/AGENT_RUNTIME.md](docs/AGENT_RUNTIME.md).
+
+## Grounded answers (v0.4.2) — a hallucination cannot pose as a sourced fact
+
+The enterprise problem with LLM chat is not that models are insufficiently
+brilliant — it is that a wrong answer and a right answer arrive in the same
+confident voice. No middleware makes a model hallucinate less. What agent-saga
+does, mechanically, is make every claim in an answer **wear its evidence or
+wear a label**:
+
+```python
+from agent_saga import ContextBroker, ground
+
+broker = ContextBroker()
+spans = broker.add_document("runbook", open("runbook.txt").read())
+sid = broker.admit_summary("the pressure limit is 4200 kPa", spans)  # receipts verified
+
+answer = f"The limit is 4200 kPa [{sid}]. It was installed in 2019, I believe."
+report = ground(answer, broker)
+
+report.claims[0].status    # "VERIFIED"  — citation resolves right now, hashes match
+report.claims[1].status    # "UNCITED"   — the model's own assertion, labeled as such
+report.fully_grounded      # False — one unlabeled claim spoils it, by design
+print(report.format_annotated())   # the answer wearing its labels, for a reviewer
+```
+
+Statuses are exact: `VERIFIED` (cites a live summary whose SHA-256 receipts
+resolve *right now*, and every direct quote appears in those sources),
+`UNCITED` (unevidenced assertion), `BROKEN_CITATION` (cites something never
+admitted, evicted — the eviction reason travels into the verdict — or whose
+receipts stopped resolving), `BROKEN_QUOTE` (an invented quote can't hide
+behind a valid citation), `UNSUPPORTED` (your optional entailment hook — an
+LLM judge through the `Router`, an NLI model — rejected the claim). The verdict
+lands in the WAL as `ANSWER_GROUNDED`, so the audit chain runs end to end:
+what the model saw, why it acted, what its answer could and could not prove.
+
+Your policy decides what unlabeled claims may touch: block `UNCITED` numbers
+in financial reports, require `VERIFIED`-only in clinical summaries, page a
+human on anything `BROKEN_*`.
 
 ## The 30-second version — Universal Agent Engine & `AgentKit` (v0.4.0)
 

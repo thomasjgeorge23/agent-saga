@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v0.3.0 — Transactional Safety for Autonomous AI Agents</title>
-<meta name="description" content="One-call AgentKit SDK, machine-checkable rollback-safety certificates, selective-disclosure audit proofs, hash-chained tamper-evident WAL, passkey/hardware approvals, predictive pre-execution, and offline mesh sagas — the transaction layer for AI agents that act on the real world." />
+<title>agent-saga v0.4.2 — The Accountable Agent Runtime: Transactional Safety for Autonomous AI Agents</title>
+<meta name="description" content="Grounded answers where a hallucination cannot pose as a sourced fact, one-call AgentKit SDK, machine-checkable rollback-safety certificates, selective-disclosure audit proofs, hash-chained tamper-evident WAL, passkey/hardware approvals, and offline mesh sagas — the accountable agent runtime for AI that acts on the real world." />
 <style>
   :root {
     --bg: #070c16; --panel: #0f172a; --elev: #1e293b;
@@ -224,7 +224,7 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top">agent-saga <span class="seq">v0.3.0</span></a>
+    <a class="brand" href="#top">agent-saga <span class="seq">v0.4.2</span></a>
     <nav class="nav-links">
       <a href="#sdk">Agent SDK</a>
       <a href="#categories">Industries</a>
@@ -242,10 +242,10 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">⚡ Enterprise Autonomous Agent OS · PyPI v0.4.1</p>
+        <p class="eyebrow">⚡ Enterprise Autonomous Agent OS · PyPI v0.4.2</p>
         <h1>Give any LLM the <span class="amber">Transactional Agent Loop & Verifiable Context OS</span>.</h1>
         <p class="lede">
-          <b>agent-saga v0.4.1</b> introduces the <b>Transactional Agent Loop</b> (goal-oriented execution with stall detection & token budgeting), <b>ContextBroker</b> (HOT/WARM/COLD verifiable receipts), <b>Codemod-as-Transaction</b> (`kill -9` recoverable restores), and production hardening across multi-model setups.
+          <b>agent-saga v0.4.2</b> adds <b>Grounded Answers</b> — a hallucination cannot pose as a sourced fact: every claim in an answer is VERIFIED against SHA-256 receipts or explicitly labeled. Joins the <b>Transactional Agent Loop</b> (stall detection & token budgeting), <b>ContextBroker</b> (HOT/WARM/COLD verifiable receipts), and <b>Codemod-as-Transaction</b> (`kill -9` recoverable restores).
         </p>
         <div class="install">
           <span class="prompt">$</span><code>pip install agent-saga</code>
@@ -279,7 +279,7 @@
   <!-- AGENT SDK — THE NEW ONE-CALL SURFACE -->
   <section id="sdk">
     <div class="wrap">
-      <p class="eyebrow">New in v0.3.0 · AgentKit</p>
+      <p class="eyebrow">AgentKit SDK</p>
       <h2>One object. Three verbs. A safety net an agent can <span class="amber">read</span>.</h2>
       <p class="lede">The whole engine — the gate, typed compensation, the tamper-evident log, the audit proofs — behind one import. An agent wraps a tool once, runs work inside a transaction, and (the genuinely new part) can ask the system what it is <i>guaranteed</i> and whether it is safe to act right now.</p>
 
@@ -425,7 +425,7 @@ async with kit.transaction():
         <!-- MODE BANNER -->
         <div class="mode-banner">
           <div class="mode-banner-text" id="bannerText">
-            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.3.0 Active Protection)</span>
+            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.4.2 Active Protection)</span>
           </div>
           <div style="color: var(--dim); font-size: .8rem;">Toggle OFF to test Raw AI Failure Mode</div>
         </div>
@@ -454,7 +454,7 @@ async with kit.transaction():
           <!-- Real-Time Output Console -->
           <div class="output-console">
             <div class="console-header">
-              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.3.0)</span>
+              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.4.2)</span>
               <span id="consoleStatus">READY</span>
             </div>
             <div id="consoleBody" style="display: flex; flex-direction: column; gap: .65rem;">
@@ -473,9 +473,15 @@ async with kit.transaction():
     <div class="wrap">
       <p class="eyebrow">Core Capabilities</p>
       <h2>Click any capability to inspect its real code & architecture.</h2>
-      <p class="lede">Every card below maps to shipping, tested code in the package — not a roadmap. The suite is 2007 tests green.</p>
+      <p class="lede">Every card below maps to shipping, tested code in the package — not a roadmap. The suite is 2,103 tests green.</p>
 
       <div class="feat-grid">
+        <div class="feat-card" onclick="openFeatureModal('grounding')">
+          <h3>🧾 Grounded Answers</h3>
+          <p>A hallucination cannot pose as a sourced fact. Every claim in an answer is <code>VERIFIED</code> against live SHA-256 receipts — or wears a label: <code>UNCITED</code>, <code>BROKEN_CITATION</code>, <code>BROKEN_QUOTE</code>. Your policy decides what unlabeled claims may touch.</p>
+          <span class="feat-inspect-hint">Click to inspect code →</span>
+        </div>
+
         <div class="feat-card" onclick="openFeatureModal('certify')">
           <h3>✅ Rollback-Safety Certificates</h3>
           <p>Machine-checkable proof that every committed effect was accounted for. <code>agent-saga certify</code> returns non-zero in CI, so a release that could strand an uncompensated charge can't ship.</p>
@@ -643,7 +649,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 <footer>
   <div class="wrap foot-grid">
     <div>
-      <div class="brand">agent-saga <span class="seq">v0.3.0</span></div>
+      <div class="brand">agent-saga <span class="seq">v0.4.2</span></div>
       <p style="font-size: .88rem; color: var(--faint); margin-top: .4rem;">
         Licensed under Apache-2.0. Built for mission-critical enterprise AI agent reliability.
       </p>
@@ -651,7 +657,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
     <div style="margin-left: auto; display: flex; gap: 1.8rem; font-size: .95rem;">
       <a href="#install">Documentation</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">GitHub</a>
-      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.3.0</a>
+      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.4.2</a>
     </div>
   </div>
 </footer>
@@ -739,7 +745,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 AgentKit().guarantees()
 # {
 #   "manifest_version": 1,
-#   "library_version": "0.3.0",
+#   "library_version": "0.4.2",
 #   "semantics": {"REVERSIBLE": ..., "COMPENSABLE": ..., "IRREVERSIBLE": ...},
 #   "enforced_before_an_effect": [
 #     "an IRREVERSIBLE step is refused unless a human (or hardware sig) approves",
@@ -787,6 +793,23 @@ rows = await read()                    # -> {"rows": 3}
 # inside one: same call, now gated + logged + part of the rollback set
 async with kit.transaction():
     rows = await read()`
+    },
+    grounding: {
+      title: "🧾 Grounded Answers (v0.4.2)",
+      desc: "No middleware makes a model hallucinate less. What agent-saga does, mechanically, is make every claim in an answer wear its evidence or wear a label — so policy can act on it: block UNCITED numbers in financial reports, require VERIFIED-only in clinical summaries, page a human on anything BROKEN.",
+      code: `from agent_saga import ContextBroker, ground
+
+broker = ContextBroker()
+spans = broker.add_document("runbook", runbook_text)
+sid = broker.admit_summary("pressure limit is 4200 kPa", spans)
+
+report = ground(f"Limit is 4200 kPa [{sid}]. Installed in 2019.", broker)
+report.claims[0].status   # "VERIFIED" - receipts resolve right now
+report.claims[1].status   # "UNCITED"  - the model's own assertion, labeled
+report.fully_grounded     # strict: one unlabeled claim spoils it
+
+# WAL event ANSWER_GROUNDED completes the audit chain:
+# what it saw -> why it acted -> what its answer could prove`
     },
     certify: {
       title: "✅ Rollback-Safety Certificates",
@@ -973,7 +996,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
 
     if (protectionActive) {
       label.textContent = "PROTECTION: ON (+ agent-saga)";
-      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.3.0 Active Protection)</span>';
+      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.4.2 Active Protection)</span>';
     } else {
       label.textContent = "PROTECTION: OFF (Raw AI Agent)";
       banner.innerHTML = '<span style="color: var(--irreversible);">● MODE: BEFORE (Raw AI Agent - Unprotected Failure Mode)</span>';
