@@ -5,7 +5,41 @@ All notable changes to `agent-saga` are documented here. The format follows
 0.4.0. One rule governs every entry: a line names a mechanism a user can go
 run, or it does not appear.
 
-## [0.4.0] - Unreleased
+## [0.4.2] - 2026-07-26
+
+### Added
+
+- **`agent_saga.grounding`** — grounded answers: a hallucination cannot pose
+  as a sourced fact. `ground(answer, broker)` classifies every claim in a
+  model's answer against the broker's receipts: `VERIFIED` (citation resolves
+  now, quotes appear in the sources), `UNCITED` (the model's own assertion,
+  explicitly labeled), `BROKEN_CITATION` (never admitted / evicted, with the
+  eviction reason / receipts no longer resolve), `BROKEN_QUOTE` (quoted text
+  in none of the cited sources), and `UNSUPPORTED` (a caller-supplied
+  entailment hook rejected the claim). `GroundedAnswer.fully_grounded` is
+  strict — one unlabeled claim spoils it — and the verdict lands in the WAL
+  as `ANSWER_GROUNDED`, completing the audit chain: what the model saw, why
+  it acted, what its answer could and could not prove.
+- `ContextBroker.receipts()` and `ContextBroker.loss_reason()` — public
+  accessors the grounding layer resolves citations through.
+
+### Changed
+
+- Test hygiene: the version test asserts semver shape instead of a pinned
+  number (cross-package lockstep is enforced separately), and a
+  timing assertion no longer depends on Windows monotonic-clock granularity.
+
+## [0.4.1] - 2026-07-26
+
+### Changed
+
+- Claim audit completed: `ai_engine` and `mission_critical` docstrings state
+  mechanism instead of magnitude; README core-principles section reworked;
+  the README identity updated to the accountable agent runtime (five layers,
+  one rule: every layer can prove what it did) with the transaction wedge
+  leading; `pyproject` description now names only shipped mechanisms.
+
+## [0.4.0] - 2026-07-26
 
 The v0.4 core: a provider-neutral agent runtime built on the existing saga
 engine, plus an honesty fix in the universal layer. Everything below ships
