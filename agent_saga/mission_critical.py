@@ -1,7 +1,20 @@
-"""Mission-Critical 99.999% Reliability Engine.
+"""Invariant gate + N-of-M consensus verification for high-stakes tool payloads.
 
-Built for Medical Examination, Banking & High-Value Financial Settlement, and Aerospace Control.
-Provides Triple Redundant Verification (3/3 Consensus) and Dual-Phase Invariant Gates.
+Two fail-closed veto points that run before a side effect is dispatched:
+
+`MissionCriticalGate` evaluates a caller-supplied list of `InvariantRule`
+predicates against the payload and raises `MissionCriticalViolation` on the
+first rule that fails -- or that throws. A rule that errors is treated as a
+failed rule, not a skipped one, because an invariant that never ran provides
+no evidence the payload is safe.
+
+`TripleRedundantVerifier` runs three independent checks (structural, boundary
+range, ledger consistency) and authorizes only on unanimous 3/3 consensus. A
+checker that raises counts as a dissenting vote, for the same reason.
+
+Both are veto mechanisms, nothing more: they can only block payloads the
+supplied rules and checkers actually catch, and they make no reliability
+guarantee about the system around them.
 """
 
 from __future__ import annotations

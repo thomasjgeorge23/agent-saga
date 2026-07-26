@@ -1,10 +1,23 @@
-"""AI Engine Synergy & Failure-Proof Agent Integration Module.
+"""Detectors and filters for recurring failure modes in LLM tool-calling loops.
 
-Solves the core pain points AI model engines encounter during coding and tool execution:
-1. Semantic Output Verification (detecting soft errors and schema drift in tool returns)
-2. Context Sanitization & Pruning (preventing failed retry pollution in LLM context windows)
-3. Loop Entropy & Infinite Cycle Detection (stopping repetitive tool call token drain)
-4. Universal Provider Tool Parameter Normalization (ensuring seamless Multi-Model handoffs)
+Four independent mechanisms; each flags or filters one specific pattern, and
+none claims to eliminate it:
+
+`SemanticOutputVerifier` inspects tool return values for soft errors -- an
+`{"error": ...}` key, a failed/error status field -- and runs caller-supplied
+semantic validators, so a call that succeeded at the transport level but
+failed in substance is reported as invalid instead of passed along.
+
+`ContextSanitizer` keeps only committed, compensated, or fallback-completed
+events when rebuilding prompt history, so failed retry attempts do not
+accumulate in the context window.
+
+`LoopEntropyDetector` flags a tool call repeated with identical arguments N
+times in a row (default 3): the cheapest reliable signal of a stuck loop.
+
+`UniversalToolAdapter` re-parses argument values that arrive as JSON-encoded
+strings, a common artifact of provider handoffs where one model serializes
+nested parameters that the next expects as objects.
 """
 
 from __future__ import annotations
