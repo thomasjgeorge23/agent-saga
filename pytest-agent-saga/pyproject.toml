@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pytest-agent-saga"
-version = "0.4.0"
+version = "0.4.1"
 description = "Pytest plugin for agent-saga: deterministic replay verification, chaos injection, and WAL fixtures."
 readme = "README.md"
 requires-python = ">=3.9"

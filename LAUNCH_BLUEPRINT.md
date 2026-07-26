@@ -210,7 +210,7 @@ backend in an afternoon" contributor funnel.
 
 | Where | Current claim | Action |
 |---|---|---|
-| `pyproject.toml` description | "ultimate… empowering any LLM… total peace of mind" | Replace with §2 short description |
+| `pyproject.toml` description | ~~"ultimate… empowering any LLM… total peace of mind"~~ | **Done (v0.4):** now "The accountable agent runtime: receipted context, truthful multi-model routing, transactional tool execution with crash-safe rollback, and one audit log that reconstructs every decision." |
 | `universal.py` module docstring | "Transforms any raw LLM response … into a next-level … transaction" | Reword to match what `execute_enhanced` does: preview, transactional tool execution, healing proposal, reproducible audit signature |
 | `speculative.py` docstring | "sub-microsecond … arbitrary AI tool calls" | Keep only with a `bench/` reproduction path; otherwise state mechanism, not magnitude |
 | `hallucination.py` docstring | "Prevents … hallucinated parameters" | "Pre-flight state verification that *rejects* tool calls whose parameters fail reality checks" — reject/verify language, never prevent/eliminate |
