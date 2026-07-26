@@ -300,6 +300,17 @@ class ContextBroker:
             self._hot = self._hot[-self._max_hot:]
         return entry_id
 
+    def receipts(self, summary_id: str) -> Optional[Tuple[Span, ...]]:
+        """The span receipts behind one live WARM summary, or None if it is not
+        (or no longer) admitted. The grounding layer resolves citations here."""
+        entry = self._warm.get(summary_id)
+        return entry.spans if entry is not None else None
+
+    def loss_reason(self, summary_id: str) -> Optional[str]:
+        """Why a summary is gone, if it is: the provenance eviction or capacity
+        displacement reason -- so a broken citation can say WHAT broke."""
+        return self._evictions.get(summary_id) or self.displaced.get(summary_id)
+
     # -- introspection -----------------------------------------------------------
 
     def stats(self) -> dict:

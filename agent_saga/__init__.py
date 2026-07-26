@@ -536,3 +536,8 @@ __all__ += [
     "RoutingPolicy", "ShadowTree", "Span", "ToolCall", "ToolSpec", "Usage",
     "ValidationExhausted",
 ]
+
+# -- grounded answers: a hallucination cannot pose as a sourced fact -------------
+from .grounding import Claim, GroundedAnswer, ground
+
+__all__ += ["Claim", "GroundedAnswer", "ground"]

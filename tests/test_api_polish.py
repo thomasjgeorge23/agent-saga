@@ -136,5 +136,8 @@ def test_the_package_declares_its_types():
     assert (Path(agent_saga.__file__).parent / "py.typed").exists()
 
 
-def test_version_is_0_4_0():
-    assert agent_saga.__version__ == "0.4.0"
+def test_version_is_plain_semver():
+    """Shape, not a pinned number -- releases bump faster than tests should.
+    Cross-package lockstep is enforced separately in test_pytest_plugin.py."""
+    import re
+    assert re.fullmatch(r"\d+\.\d+\.\d+", agent_saga.__version__)
