@@ -9,6 +9,29 @@ run, or it does not appear.
 
 ### Added
 
+- **`agent_saga.codemod.index`** and **`agent_saga.codemod.plan`** — the three
+  codemod stages `DESIGN_SPEC` promised and only stage 4 had delivered.
+  `SymbolIndex.build()` produces a **scope-correct** symbol and reference
+  graph: a `Name` resolves to a module-level symbol only when no enclosing
+  function scope binds it, `global`/`nonlocal` are honoured, class bodies are
+  not enclosing scopes for their methods, comprehensions and lambdas get their
+  own scopes, and cross-module references resolve through the import graph
+  (bare name, dotted attribute, and the name inside `from x import y`).
+  Anything it cannot prove — star imports, `getattr`/`globals()` access — is
+  recorded as `Unresolved` and widens the blast radius rather than being
+  silently missed. `rename_symbol()` and `remove_unused_imports()` produce a
+  `Plan`: exact character-span rewrites, a computed blast radius, a unified
+  diff, and `requires_review` — which is `gate.py`'s doctrine applied to
+  source code. Plans flow into the existing transaction via `plan_transform`,
+  so a failed verification restores the tree.
+- **`agent-saga refactor`** CLI — `rename` and `unused-imports`. Dry-run by
+  default (the diff is the product); `--apply` writes through the codemod
+  transaction, and a plan flagged for review additionally requires `--yes`.
+- Renames splice identifier spans only, so comments, blank lines, odd spacing,
+  and file encodings survive byte-for-byte. Validated against agent-saga's own
+  106-module codebase: 86 unused-import edits across 50 files, every rewritten
+  file compiling and the patched copy importing cleanly.
+
 - **`agent_saga.scaffold`** and **`agent-saga new <name>`** — generates a
   runnable enterprise agent app: a FastAPI service whose `/readyz` probe fails
   closed so a misconfigured replica never joins the load balancer, tools that

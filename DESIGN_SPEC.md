@@ -119,6 +119,15 @@ actually trust with write access.
 New subpackage; note `propagation.py` is *distributed saga propagation* and is
 unrelated — the codemod engine gets its own namespace.
 
+> **Status: all four stages shipped.** `index.py` (stage 1), `plan.py`
+> (stages 2–3), `ast_transaction.py` (stage 4). One deliberate departure from
+> the plan below: **no `libcst`**. The pipeline never unparses — it splices
+> exact identifier spans — so comments and formatting survive byte-for-byte by
+> construction, and the package keeps its zero required dependencies. Column
+> offsets are converted from ast's UTF-8 byte columns to character offsets, so
+> non-ASCII lines are handled correctly. Multi-language `tree-sitter` frontends
+> remain future work; Python is complete.
+
 **Pipeline (four stages, each a saga step):**
 
 1. **Index.** Parse the repo into per-file ASTs — Python via `libcst` (lossless,

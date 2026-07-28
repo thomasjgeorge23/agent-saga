@@ -171,6 +171,7 @@ backend needs.
 | **Testing tools** — a `pytest-agent-saga` plugin and chaos harness | [pytest_plugin.py](agent_saga/pytest_plugin.py) | core |
 | **Project scaffold** — `agent-saga new <name>` emits a runnable enterprise app: FastAPI service, fail-closed `/readyz`, registered compensators, Docker, and a passing rollback test | [scaffold.py](agent_saga/scaffold.py) | core |
 | **Production readiness audit** — `agent-saga doctor` names the postures that silently lose effects; exit 1 on blockers, `--strict` for CI | [readiness.py](agent_saga/readiness.py) | core |
+| **Scope-correct refactoring** — `agent-saga refactor rename` builds a symbol/reference graph, computes the blast radius, shows a diff, and applies it as a transaction. Locals, strings, class attributes, and aliased imports are never mis-renamed | [codemod/index.py](agent_saga/codemod/index.py), [codemod/plan.py](agent_saga/codemod/plan.py) | core |
 
 Draw what actually happened, straight from a log:
 
