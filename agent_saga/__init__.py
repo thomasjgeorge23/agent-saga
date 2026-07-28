@@ -551,3 +551,16 @@ __all__ += ["dag_to_dot", "dag_to_mermaid", "wal_to_dot", "wal_to_mermaid"]
 from .readiness import Finding, ReadinessReport, audit
 
 __all__ += ["Finding", "ReadinessReport", "audit"]
+
+# -- v0.5.0 enterprise capabilities ----------------------------------------------
+from .multi_agent_mesh import SagaMeshCoordinator, VectorClock, CrossAgentStep
+from .dashboard import DashboardServer
+from .zkp import ZeroKnowledgeAuditProof, ZKProofCommitment
+from .cost_gate import CostBudgetGate, CostBudgetConfig, CostBudgetExceeded
+
+__all__ += [
+    "SagaMeshCoordinator", "VectorClock", "CrossAgentStep",
+    "DashboardServer",
+    "ZeroKnowledgeAuditProof", "ZKProofCommitment",
+    "CostBudgetGate", "CostBudgetConfig", "CostBudgetExceeded",
+]

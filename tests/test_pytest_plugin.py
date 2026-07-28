@@ -49,12 +49,14 @@ def test_plugin_registers_saga_chaos_marker(pytestconfig):
 
 def test_standalone_pytest_agent_saga_package():
     import sys
+    import importlib
     from pathlib import Path
     pkg_dir = str(Path(__file__).parent.parent / "pytest-agent-saga")
     if pkg_dir not in sys.path:
         sys.path.insert(0, pkg_dir)
     import agent_saga
     import pytest_agent_saga
+    importlib.reload(pytest_agent_saga)
     import pytest_agent_saga.plugin
     # The companion package ships in lockstep with agent-saga, so a release bump
     # can't leave them disagreeing (single source of truth, same as the CLI).

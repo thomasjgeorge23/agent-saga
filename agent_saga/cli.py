@@ -652,6 +652,23 @@ def build_parser() -> argparse.ArgumentParser:
                              "enabled, instead of reporting them as unchained")
     verify.set_defaults(func=_cmd_verify)
 
+    refactor = sub.add_parser(
+        "refactor",
+        help="index a codebase and apply a scope-correct refactor as a transaction")
+    refactor.add_argument("refactor", choices=["rename", "unused-imports"],
+                          help="which transform to plan")
+    refactor.add_argument("--symbol", default=None,
+                          help="dotted symbol to rename, e.g. pkg.util.helper")
+    refactor.add_argument("--to", default=None, help="the new name")
+    refactor.add_argument("--root", default=".", help="project root (default: .)")
+    refactor.add_argument("--apply", action="store_true",
+                          help="write the change (default: show the diff only)")
+    refactor.add_argument("--yes", action="store_true",
+                          help="apply even when the plan is flagged for review")
+    refactor.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
+                          help="WAL for the codemod transaction")
+    refactor.set_defaults(func=_cmd_refactor)
+
     new = sub.add_parser(
         "new", help="scaffold a runnable enterprise agent app")
     new.add_argument("name", help="project name (letters, digits, - and _)")
@@ -990,6 +1007,80 @@ def _cmd_prove(args: argparse.Namespace) -> int:
           file=sys.stderr)
     print(f"  root      : {bundle['merkle_root']}", file=sys.stderr)
     return 0
+
+
+def _cmd_refactor(args: argparse.Namespace) -> int:
+    """Index a codebase, build a plan, show it -- and only write it when asked.
+
+    Dry-run is the default because a plan is data before it is an action: the
+    diff is the product, and applying is a separate decision. `--apply` routes
+    the write through the codemod transaction, so a failed verification leaves
+    the tree byte-identical.
+    """
+    import asyncio as _asyncio
+
+    from .codemod.index import IndexError_, SymbolIndex
+    from .codemod.plan import PlanError, plan_transform, remove_unused_imports, rename_symbol
+
+    root = Path(args.root).resolve()
+    if args.refactor == "rename" and not (args.symbol and args.to):
+        print("rename needs --symbol pkg.mod.name and --to newname")
+        return 1
+    try:
+        index = SymbolIndex.build(root)
+        if args.refactor == "rename":
+            plan = rename_symbol(index, args.symbol, args.to)
+        else:
+            plan = remove_unused_imports(index)
+    except (IndexError_, PlanError) as exc:
+        print(exc)
+        return 1
+
+    print(plan.format_text())
+    if plan.is_empty:
+        print("\nNothing to do.")
+        return 0
+
+    print()
+    print(plan.to_diff())
+
+    if not args.apply:
+        print("Dry run. Re-run with --apply to write it.")
+        return 0
+
+    if plan.requires_review and not args.yes:
+        print("\nThis plan needs review (public symbol, more than one module, or "
+              "an unresolved reference). Re-run with --yes once you have read "
+              "the diff above.")
+        return 1
+
+    async def _apply() -> int:
+        from .codemod.ast_transaction import AstTransaction
+        from .decorator import saga_scope
+        from .wal.file_wal import FileWAL
+
+        wal = FileWAL(args.wal_path)
+        await wal.start()
+        try:
+            transaction = AstTransaction(root)
+            tree = transaction.shadow(plan.paths)
+            tree.apply(plan_transform(plan))
+            async with saga_scope(wal=wal, name="codemod") as ctx:
+                result = await transaction.commit(ctx, tree)
+            print(f"\napplied to {len(result.files)} file(s). Snapshot: "
+                  f"{result.manifest}")
+            print("Roll back with: agent-saga recover --wal "
+                  f"{args.wal_path}, or restore the snapshot directly.")
+            return 0
+        finally:
+            await wal.close()
+
+    try:
+        return _asyncio.run(_apply())
+    except Exception as exc:                  # noqa: BLE001 - report, never traceback
+        print(f"\napply failed: {exc!r}")
+        print("The codemod transaction restored the tree; no file was left changed.")
+        return 1
 
 
 def _cmd_new(args: argparse.Namespace) -> int:
