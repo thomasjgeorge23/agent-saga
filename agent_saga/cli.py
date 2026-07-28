@@ -652,6 +652,27 @@ def build_parser() -> argparse.ArgumentParser:
                              "enabled, instead of reporting them as unchained")
     verify.set_defaults(func=_cmd_verify)
 
+    new = sub.add_parser(
+        "new", help="scaffold a runnable enterprise agent app")
+    new.add_argument("name", help="project name (letters, digits, - and _)")
+    new.add_argument("--directory", "-d", default=None,
+                     help="where to write it (default: ./<name>)")
+    new.add_argument("--force", action="store_true",
+                     help="overwrite existing files")
+    new.set_defaults(func=_cmd_new)
+
+    doctor = sub.add_parser(
+        "doctor",
+        help="audit production posture: the settings that silently lose effects")
+    doctor.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
+                        help="WAL to inspect, if it exists (default: ./agent-saga.wal)")
+    doctor.add_argument("--replicas", type=int, default=None,
+                        help="how many processes serve this app; >1 promotes the "
+                             "process-local WAL finding from risk to blocker")
+    doctor.add_argument("--strict", action="store_true",
+                        help="exit non-zero on risks as well as blockers (CI gate)")
+    doctor.set_defaults(func=_cmd_doctor)
+
     graph = sub.add_parser(
         "graph",
         help="draw a saga's forward path and rollback fork as Mermaid or Graphviz DOT")
@@ -968,6 +989,50 @@ def _cmd_prove(args: argparse.Namespace) -> int:
     print(f"  disclosed : {bundle['disclosed']} of {bundle['log_size']} record(s)",
           file=sys.stderr)
     print(f"  root      : {bundle['merkle_root']}", file=sys.stderr)
+    return 0
+
+
+def _cmd_new(args: argparse.Namespace) -> int:
+    """Generate a runnable enterprise agent app."""
+    from .scaffold import write_project
+
+    target = Path(args.directory) if args.directory else Path(args.name)
+    try:
+        written = write_project(args.name, target, __version__, force=args.force)
+    except (FileExistsError, ValueError) as exc:
+        print(exc)
+        return 1
+
+    print(f"created {len(written)} files in {target}/\n")
+    for path in written:
+        print(f"  {path}")
+    print(f"\nNext:\n"
+          f"  cd {target}\n"
+          f"  pip install -r requirements.txt\n"
+          f"  pytest                      # proves the rollback actually runs\n"
+          f"  agent-saga doctor           # posture before you ship\n")
+    return 0
+
+
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    """Audit production posture. Exit 1 on blockers; --strict fails on risks
+    too, which is the form you want in CI."""
+    from .readiness import audit
+
+    wal = None
+    if args.wal_path and Path(args.wal_path).exists():
+        # Inspect the real log's configuration, not a fresh default.
+        from .wal.file_wal import FileWAL
+        wal = FileWAL(args.wal_path)
+
+    report = audit(wal=wal, replicas=args.replicas)
+    print(report.format_text())
+
+    if report.blockers:
+        return 1
+    if args.strict and report.risks:
+        print("\n--strict: failing on risks.")
+        return 1
     return 0
 
 

@@ -546,3 +546,8 @@ __all__ += ["Claim", "GroundedAnswer", "ground"]
 from .graph import dag_to_dot, dag_to_mermaid, wal_to_dot, wal_to_mermaid
 
 __all__ += ["dag_to_dot", "dag_to_mermaid", "wal_to_dot", "wal_to_mermaid"]
+
+# -- production readiness and project scaffold -----------------------------------
+from .readiness import Finding, ReadinessReport, audit
+
+__all__ += ["Finding", "ReadinessReport", "audit"]
