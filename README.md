@@ -34,6 +34,75 @@ whatever model you have budgeted, audited, repaired once when it emits malformed
 actions, stopped when it thrashes, and rolled back when it fails. 📖 The runtime
 reference: [docs/AGENT_RUNTIME.md](docs/AGENT_RUNTIME.md).
 
+## Build an enterprise agent app in one command
+
+Every part of a production agent app ships here. What used to be missing was the
+**assembly** — and assembly is where the expensive mistakes live, because the
+dangerous choices aren't errors, they're laptop defaults that stay silent in
+production.
+
+```bash
+agent-saga new myagent && cd myagent
+pytest                                  # a rollback test that passes on day one
+agent-saga doctor --replicas 3          # posture check; exit 1 on blockers
+```
+
+The scaffold is ~10 files you can read in one sitting: a FastAPI service with a
+`/readyz` probe that **fails closed** so a misconfigured replica never joins the
+load balancer, tools that declare their semantics and register their inverses by
+name, env-driven WAL selection, a Dockerfile and compose file, and a test that
+proves the rollback actually runs. Anything the template can't decide for you is
+left as a `TODO` rather than a plausible default — a plausible default in a
+safety boundary is how a team ends up trusting a control nobody chose.
+
+`agent-saga doctor` audits the three postures that silently lose effects:
+
+| Finding | Why it costs money |
+|---|---|
+| `wal-shared` | A file WAL behind a load balancer: pod A's log isn't on pod B's disk, so a dead pod's orphans have no daemon that can see them. A **risk** at one replica, a **blocker** at more — that's arithmetic, not opinion |
+| `compensations-recoverable` | `compensate=lambda: refund(id)` rolls back beautifully until the process dies and the closure dies with it. Only a registry-named handler with JSON kwargs survives |
+| `wal-backpressure` / `wal-dropped` | Under `DROP_SILENT`, a record that never lands is a side effect that can never be recovered — the engine's one unrecoverable failure mode, chosen by a config flag |
+
+## Do you actually need this?
+
+**If your agent calls two or three tools that touch nothing durable — no money,
+no infrastructure, no messages to real people — a plain `try/except` is enough,
+and this library is overhead.** That's a real answer, not false modesty.
+
+What a `try/except` stack cannot do is survive the process dying. It holds
+compensations in memory, so `kill -9` takes them with it and the charge stays
+charged. It also has no notion of an `UNKNOWN` outcome (a timed-out charge may
+well have landed), no idempotency key when a compensation is retried, no way to
+distinguish a clean unwind from a partial one that needs a human, and no gate
+that refuses an irreversible action *before* it happens. Reach for agent-saga at
+the point where a failure halfway through leaves something real behind that
+someone would otherwise clean up by hand.
+
+## Use it *with* LangGraph, not instead of it
+
+A checkpoint restores your **agent's** state. It does not un-send the wire
+transfer. LangGraph's time-travel rewinds the graph so you can re-run a node;
+agent-saga calls the refund. They compose — and there's an adapter for exactly
+that:
+
+```python
+from agent_saga.adapters.langgraph import wrap_tool, saga_run
+from agent_saga import ActionSemantics, Compensation
+
+charge = wrap_tool(stripe_charge_tool,          # same name, description, schema
+                   semantics=ActionSemantics.COMPENSABLE,
+                   compensate=lambda r: Compensation(
+                       fn=refund, handler="stripe.refund",
+                       kwargs={"charge_id": r["id"]}))
+
+result = await saga_run(graph, {"input": "..."})   # graph raises -> LIFO unwind
+```
+
+The wrapped tool is a drop-in: the model and the graph see no difference, and
+outside a saga it calls straight through, so the same object works in a script
+or a unit test. Adapters also ship for CrewAI, AutoGen, LlamaIndex, OpenAI
+Agents, and MCP.
+
 ## Grounded answers (v0.4.2) — a hallucination cannot pose as a sourced fact
 
 The enterprise problem with LLM chat is not that models are insufficiently
@@ -100,6 +169,8 @@ backend needs.
 | **Observability** — OpenTelemetry spans, OTLP export, LangChain callbacks | [observability/](agent_saga/observability) | `[otel]` |
 | **Encryption at rest** — keyring-based WAL encryption | [encryption.py](agent_saga/encryption.py) | `[encryption]` |
 | **Testing tools** — a `pytest-agent-saga` plugin and chaos harness | [pytest_plugin.py](agent_saga/pytest_plugin.py) | core |
+| **Project scaffold** — `agent-saga new <name>` emits a runnable enterprise app: FastAPI service, fail-closed `/readyz`, registered compensators, Docker, and a passing rollback test | [scaffold.py](agent_saga/scaffold.py) | core |
+| **Production readiness audit** — `agent-saga doctor` names the postures that silently lose effects; exit 1 on blockers, `--strict` for CI | [readiness.py](agent_saga/readiness.py) | core |
 
 Draw what actually happened, straight from a log:
 

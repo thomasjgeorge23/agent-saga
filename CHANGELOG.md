@@ -9,6 +9,24 @@ run, or it does not appear.
 
 ### Added
 
+- **`agent_saga.scaffold`** and **`agent-saga new <name>`** — generates a
+  runnable enterprise agent app: a FastAPI service whose `/readyz` probe fails
+  closed so a misconfigured replica never joins the load balancer, tools that
+  declare their semantics and register their inverses by name (so recovery
+  works across processes), env-driven WAL backend selection, Dockerfile and
+  compose file, an ops checklist, and a test proving the rollback actually
+  runs. Refuses to overwrite edited files without `--force`. The generated
+  project's own tests are executed by this package's suite, so "correct on the
+  first run" is a tested claim.
+- **`agent_saga.readiness`** and **`agent-saga doctor`** — audits production
+  posture from live runtime state: a process-local WAL (a risk alone, a
+  **blocker** once `--replicas` makes it arithmetic), `DROP_SILENT`
+  backpressure and already-dropped records, in-process-only compensations,
+  unchained logs, unbounded durability fences, missing encryption or
+  telemetry. Exit 1 on blockers, `--strict` to fail on risks in CI. A clean
+  report lists every check that ran, so it is evidence of work rather than of
+  a checker that skipped everything.
+
 - **`agent_saga.graph`** — graph export for saga execution and DAG plans.
   `wal_to_mermaid` / `wal_to_dot` draw the forward path *and the rollback
   fork*, rendering the three undo outcomes as visually distinct states:
