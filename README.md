@@ -72,6 +72,46 @@ Your policy decides what unlabeled claims may touch: block `UNCITED` numbers
 in financial reports, require `VERIFIED`-only in clinical summaries, page a
 human on anything `BROKEN_*`.
 
+## Does it have X? — the capability matrix
+
+Everything below is shipping, tested code with a module you can open. The core
+has **zero required dependencies**; the Install column shows what an optional
+backend needs.
+
+| Capability | Where | Install |
+|---|---|---|
+| **Async-native execution** — `saga_scope`, `ctx.execute`, every WAL backend, the recovery daemon. Sync tools are auto-offloaded to a bounded thread pool so a blocking client can't stall the loop | [context.py](agent_saga/context.py), [executors.py](agent_saga/executors.py) | core |
+| **Auto-compensating fallbacks** — alternate tool paths, parameter repair, and adaptive retries *before* any rollback; a step that recovers is marked `COMPLETED_VIA_FALLBACK` | [healing.py](agent_saga/healing.py), [retry.py](agent_saga/retry.py) | core |
+| **Pivot instead of unwind** — `fallback_action` on `ctx.execute`: if the hotel fails, book a different hotel and keep the flight | [context.py](agent_saga/context.py) | core |
+| **Tentative state** — a resource touched mid-saga is visibly `PENDING` until it resolves exactly once to `COMMITTED` or `ROLLED_BACK` | [patterns/tentative.py](agent_saga/patterns/tentative.py) | core |
+| **Durable state persistence** — four WAL backends: file, memory-mapped, Postgres, Redis | [wal/](agent_saga/wal) | `[postgres]`, `[redis]` |
+| **Distributed locks** — cross-process semantic locks with heartbeat leases and deadlock timeouts | [locks.py](agent_saga/locks.py) | `[redis]` |
+| **Distributed limits & approvals** — rate/spend caps and M-of-N multi-sig human gates, shared across processes | [limits.py](agent_saga/limits.py), [approvals.py](agent_saga/approvals.py) | `[redis]`, `[postgres]` |
+| **Crash recovery daemon** — replays the WAL after `kill -9`; expired leases (not PIDs) prove the owner is gone; deterministic tokens make double-compensation structurally impossible | [recovery.py](agent_saga/recovery.py) | core |
+| **Visual debugging** — `agent-saga ui` time-travel debugger over a WAL | [ui/](agent_saga/ui) | core |
+| **Graph export** — `agent-saga graph` renders the forward path *and the rollback fork* as Mermaid or Graphviz DOT | [graph.py](agent_saga/graph.py) | core |
+| **BPMN 2.0 import/export** — round-trip to visual workflow tooling | [bpmn.py](agent_saga/bpmn.py) | core |
+| **MCP integration** — a saga proxy in front of any MCP server, with policy, `inputSchema` tool declarations, and MCP-dispatched compensations | [mcp/](agent_saga/mcp) | core |
+| **Framework adapters** — LangGraph, CrewAI, AutoGen, LlamaIndex, OpenAI Agents, SQLAlchemy, Supabase | [adapters/](agent_saga/adapters) | per-framework |
+| **Multi-model routing** — one IR over any host (local 7B → frontier API); every decision and refusal names every candidate and reason | [ir.py](agent_saga/ir.py), [router.py](agent_saga/router.py) | core |
+| **Dry-run / simulation** — `PREVIEW` semantics, speculative pre-flight plans, `--dry-run` recovery sweeps, and chaos fault injection | [preview.py](agent_saga/preview.py), [chaos.py](agent_saga/chaos.py), [testing.py](agent_saga/testing.py) | core |
+| **Tamper-evident audit** — hash-chained WAL, `agent-saga verify`, WORM export, selective-disclosure Merkle proofs | [integrity.py](agent_saga/integrity.py), [provenance.py](agent_saga/provenance.py), [vault.py](agent_saga/vault.py) | core |
+| **Multi-tenancy** — tenant-scoped WALs, limits, approvals, and snapshots via contextvars | [tenant.py](agent_saga/tenant.py) | core |
+| **Observability** — OpenTelemetry spans, OTLP export, LangChain callbacks | [observability/](agent_saga/observability) | `[otel]` |
+| **Encryption at rest** — keyring-based WAL encryption | [encryption.py](agent_saga/encryption.py) | `[encryption]` |
+| **Testing tools** — a `pytest-agent-saga` plugin and chaos harness | [pytest_plugin.py](agent_saga/pytest_plugin.py) | core |
+
+Draw what actually happened, straight from a log:
+
+```bash
+agent-saga graph --wal ./agent-saga.wal            # Mermaid, pastes into markdown
+agent-saga graph --wal ./agent-saga.wal --format dot | dot -Tpng -o saga.png
+```
+
+The rollback fork is the point: `compensated` (clean), `COMPENSATION FAILED —
+needs a human`, and `ORPHANED — no undo exists` render as three visually
+distinct outcomes. A partial rollback can never draw like a clean one.
+
 ## The 30-second version — Universal Agent Engine & `AgentKit` (v0.4.0)
 
 The whole engine behind one object. Wrap a tool once, run work in a transaction,

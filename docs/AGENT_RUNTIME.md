@@ -66,6 +66,27 @@ Three WAL event families make an agent run reconstructable from the log alone:
 These sit alongside the engine's own `STEP_INTENT` / `STEP_COMMITTED` /
 `ROLLBACK_START` / `COMPENSATED` records, all on one hash-chained log.
 
+## Seeing it: `agent-saga graph`
+
+A forward path reads fine as log lines. A rollback does not — it runs LIFO,
+branches per step, and its three outcomes carry completely different
+consequences. So draw it:
+
+```bash
+agent-saga graph --wal ./agent-saga.wal                        # Mermaid
+agent-saga graph --wal ./agent-saga.wal --format dot | dot -Tpng -o saga.png
+```
+
+| Outcome | Meaning | Drawn as |
+|---|---|---|
+| `compensated` | the inverse ran and succeeded | calm blue, off the step it undid |
+| `COMPENSATION FAILED - needs a human` | the inverse ran and failed, with the error | alarm red |
+| `ORPHANED - no undo exists` | the effect was irreversible | alarm red |
+
+The mapping is deliberate and load-bearing: a partial rollback must never
+render like a clean one. From Python, `wal_to_mermaid(records)` and
+`dag_to_mermaid(dag)` (plus `*_to_dot`) do the same thing in-process.
+
 ## Honest boundaries (read before quoting any of this in a pitch)
 
 - **Nothing here makes a model smarter.** The broker lets a small-context

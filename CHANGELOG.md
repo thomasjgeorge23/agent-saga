@@ -5,6 +5,34 @@ All notable changes to `agent-saga` are documented here. The format follows
 0.4.0. One rule governs every entry: a line names a mechanism a user can go
 run, or it does not appear.
 
+## [Unreleased]
+
+### Added
+
+- **`agent_saga.graph`** — graph export for saga execution and DAG plans.
+  `wal_to_mermaid` / `wal_to_dot` draw the forward path *and the rollback
+  fork*, rendering the three undo outcomes as visually distinct states:
+  `compensated` (clean), `COMPENSATION FAILED - needs a human`, and
+  `ORPHANED - no undo exists`. A partial rollback can never draw like a clean
+  one — `RollbackReport.clean` doctrine, expressed in pixels.
+  `dag_to_mermaid` / `dag_to_dot` render `DAGSaga` plans with live node
+  status, and a dependency on an unregistered node is drawn as `MISSING`
+  rather than silently dropped. Reconstruction is total (malformed, hostile,
+  and truncated logs render rather than raise), user data never becomes
+  diagram syntax, and output is deterministic so a diagram can be committed
+  and diffed.
+- **`agent-saga graph`** CLI: `--format mermaid|dot`, `--saga <id>`, `--all`,
+  `-o <file>`. Defaults to the most recent saga in the log and says so when
+  the log holds more; records carrying no saga id are kept and reported,
+  because absence of an id is not evidence of belonging elsewhere.
+
+### Changed
+
+- README: added a **capability matrix** mapping every shipped capability to
+  its module and install extra. Prompted by an external review that concluded
+  eight shipped subsystems were missing — a discoverability failure, not a
+  code one.
+
 ## [0.4.2] - 2026-07-26
 
 ### Added
