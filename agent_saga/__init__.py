@@ -541,3 +541,8 @@ __all__ += [
 from .grounding import Claim, GroundedAnswer, ground
 
 __all__ += ["Claim", "GroundedAnswer", "ground"]
+
+# -- graph export: the rollback fork, drawn --------------------------------------
+from .graph import dag_to_dot, dag_to_mermaid, wal_to_dot, wal_to_mermaid
+
+__all__ += ["dag_to_dot", "dag_to_mermaid", "wal_to_dot", "wal_to_mermaid"]

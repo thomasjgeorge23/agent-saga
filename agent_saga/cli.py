@@ -652,6 +652,22 @@ def build_parser() -> argparse.ArgumentParser:
                              "enabled, instead of reporting them as unchained")
     verify.set_defaults(func=_cmd_verify)
 
+    graph = sub.add_parser(
+        "graph",
+        help="draw a saga's forward path and rollback fork as Mermaid or Graphviz DOT")
+    graph.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
+                       help="path to the WAL file (default: ./agent-saga.wal)")
+    graph.add_argument("--format", default="mermaid", choices=["mermaid", "dot"],
+                       help="mermaid pastes into markdown; dot feeds Graphviz "
+                            "(default: mermaid)")
+    graph.add_argument("--saga", default=None,
+                       help="saga id to draw (default: the most recent in the log)")
+    graph.add_argument("--all", action="store_true",
+                       help="draw every saga in the log on one diagram")
+    graph.add_argument("--output", "-o", default=None,
+                       help="write the diagram here (default: stdout)")
+    graph.set_defaults(func=_cmd_graph)
+
     export = sub.add_parser(
         "export",
         help="export the WAL: a verified WORM bundle (--out) or flat CSV/JSON (--format)")
@@ -952,6 +968,64 @@ def _cmd_prove(args: argparse.Namespace) -> int:
     print(f"  disclosed : {bundle['disclosed']} of {bundle['log_size']} record(s)",
           file=sys.stderr)
     print(f"  root      : {bundle['merkle_root']}", file=sys.stderr)
+    return 0
+
+
+def _cmd_graph(args: argparse.Namespace) -> int:
+    """Draw a saga's execution -- forward path plus the rollback fork.
+
+    A WAL usually holds many sagas, and overlaying them in one flowchart is
+    unreadable, so the default is the most recent saga and the others are
+    listed. Rendering the wrong saga silently would be its own small lie.
+    """
+    from .graph import wal_to_dot, wal_to_mermaid
+
+    try:
+        records = _read_wal(args.wal_path)
+    except OSError as exc:
+        print(f"cannot read {args.wal_path}: {exc}")
+        return 2
+
+    saga_ids: list = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        saga_id = record.get("saga_id")
+        if isinstance(saga_id, str) and saga_id and saga_id not in saga_ids:
+            saga_ids.append(saga_id)
+
+    selected = args.saga
+    if not args.all and saga_ids:
+        if selected is None:
+            selected = saga_ids[-1]
+        elif selected not in saga_ids:
+            print(f"no saga {selected!r} in {args.wal_path}. Present: "
+                  f"{', '.join(saga_ids[:20]) or '(none)'}")
+            return 1
+        # Exclude on evidence of mismatch, never on absence of evidence: a
+        # record carrying no saga_id (an older log, a damaged write) cannot be
+        # proven to belong elsewhere, so it stays. Dropping it would render an
+        # empty diagram for a log that plainly has steps in it -- the one
+        # outcome this exporter promises not to produce.
+        unattributed = sum(1 for r in records
+                           if isinstance(r, dict) and not r.get("saga_id"))
+        records = [r for r in records if isinstance(r, dict)
+                   and r.get("saga_id") in (selected, None, "")]
+        if len(saga_ids) > 1:
+            print(f"# {args.wal_path}: {len(saga_ids)} sagas; drawing {selected}. "
+                  f"Use --saga <id> or --all.", file=sys.stderr)
+        if unattributed:
+            print(f"# {unattributed} record(s) carry no saga id and are included "
+                  f"in every drawing.", file=sys.stderr)
+
+    render = wal_to_dot if args.format == "dot" else wal_to_mermaid
+    diagram = render(records)
+
+    if args.output:
+        Path(args.output).write_text(diagram + "\n", encoding="utf-8")
+        print(f"wrote {args.output}")
+    else:
+        print(diagram)
     return 0
 
 
