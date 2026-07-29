@@ -564,3 +564,17 @@ __all__ += [
     "ZeroKnowledgeAuditProof", "ZKProofCommitment",
     "CostBudgetGate", "CostBudgetConfig", "CostBudgetExceeded",
 ]
+
+# -- declarative inverses: say what undoes a tool once ---------------------------
+from .inverses import (
+    InverseError,
+    auto_compensation,
+    call_with,
+    delete_by,
+    has_inverse,
+    inverse_of,
+    map_result,
+)
+
+__all__ += ["InverseError", "auto_compensation", "call_with", "delete_by",
+            "has_inverse", "inverse_of", "map_result"]

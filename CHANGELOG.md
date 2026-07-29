@@ -59,6 +59,22 @@ use any of them, upgrade.
 
 ### Added
 
+- **`agent_saga.inverses`** — declare what undoes a tool once, next to the
+  function that does it, instead of writing a compensation factory at every
+  call site. `@inverse_of(forward, maps={...})` pairs an inverse with its
+  forward action; `AgentKit.safe_tool` then finds it when no `compensate=` is
+  given. `delete_by()` covers the created-something-returned-its-id shape,
+  `call_with()` covers inverses whose target is known before the forward call
+  (and therefore stay valid on an `UNKNOWN` outcome), and `map_result()` is
+  the general form. Addresses the most-cited friction in the library without
+  trading anything away: semantics are still author-declared and never
+  inferred, pairing an inverse that is not registered with `@compensator`
+  raises at import (a closure cannot be run by `saga-recoveryd` after a
+  crash), a forward result missing the field an inverse needs raises naming
+  both what it wanted and what it saw, and an explicit `compensate=` always
+  wins. Falling back to a declared inverse can only improve an outcome — the
+  step would otherwise have been reported `ORPHANED`.
+
 - **`agent_saga.codemod.index`** and **`agent_saga.codemod.plan`** — the three
   codemod stages `DESIGN_SPEC` promised and only stage 4 had delivered.
   `SymbolIndex.build()` produces a **scope-correct** symbol and reference

@@ -174,6 +174,15 @@ class AgentKit:
         if compensate is not None:
             def comp_factory(result: Any):     # noqa: E731 - small adapter
                 return _lift_compensation(result, compensate(result))
+        else:
+            # No explicit compensation: fall back to one declared with
+            # @inverse_of next to the function that undoes this tool. This can
+            # only improve the outcome -- without it the step would be reported
+            # ORPHANED on rollback -- and an explicit compensate= always wins,
+            # so a call site can still override the declaration.
+            from .inverses import auto_compensation
+
+            comp_factory = auto_compensation(fn)
 
         async def call(**kwargs: Any) -> Any:
             from .decorator import current_saga

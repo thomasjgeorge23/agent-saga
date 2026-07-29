@@ -63,6 +63,58 @@ safety boundary is how a team ends up trusting a control nobody chose.
 | `compensations-recoverable` | `compensate=lambda: refund(id)` rolls back beautifully until the process dies and the closure dies with it. Only a registry-named handler with JSON kwargs survives |
 | `wal-backpressure` / `wal-dropped` | Under `DROP_SILENT`, a record that never lands is a side effect that can never be recovered — the engine's one unrecoverable failure mode, chosen by a config flag |
 
+## The boilerplate, and what it costs now
+
+Writing a compensation factory for every tool was the most-cited friction with
+this library, and it was fair. Declaring **semantics** is load-bearing and
+stays — the engine will not guess whether an effect is reversible. Declaring
+the *inverse* was ceremony, and mostly the same shape every time:
+
+```python
+# before — repeated at every call site
+charge = kit.safe_tool(
+    stripe_charge, semantics="COMPENSABLE",
+    compensate=lambda r: Compensation(fn=refund_charge, handler="stripe.refund",
+                                      kwargs={"charge_id": r["id"]},
+                                      description=f"refund {r['id']}"))
+
+# after — declared once, next to the function that does the undoing
+@inverse_of(stripe_charge, maps={"charge_id": "id"})
+@compensator("stripe.refund")
+def refund_charge(charge_id: str): ...
+
+charge = kit.safe_tool(stripe_charge, semantics="COMPENSABLE")   # pairing found
+```
+
+`delete_by(fn)` covers the commonest shape (created something, returned its id),
+and `call_with(fn, **kwargs)` covers inverses whose target is known before the
+forward call — which stays correct even on an `UNKNOWN` outcome.
+
+Three things the shorthand refuses to trade away: it never infers semantics; it
+raises at import if the inverse isn't registered with `@compensator` (a closure
+can't be run by the recovery daemon after a crash); and if the forward result
+lacks the field the inverse needs, it raises naming both what it wanted and what
+it saw, rather than compensating with `None`. An explicit `compensate=` always
+wins.
+
+## State across a rollback — the honest trade-off
+
+A saga has no isolation. That is the deal it makes in exchange for not holding
+a database transaction open across an LLM's thinking time: each step commits as
+it goes, so intermediate state is briefly visible to other readers. No library
+removes that; what agent-saga does is make it *legible*.
+
+| Kind of state | Use | Why |
+|---|---|---|
+| Private to the saga (a dict, a scratch object) | `reversible()` in [snapshot.py](agent_saga/snapshot.py) | Captures a deep copy before the mutation; the inverse is derived for you and stays correct even on an `UNKNOWN` outcome |
+| Durable and shared (a row, a charge, a file) | `@compensator` + `@inverse_of` | Survives `kill -9`, so `saga-recoveryd` can finish the unwind from another process |
+| Visible mid-flight to other readers | [patterns/tentative.py](agent_saga/patterns/tentative.py) | Marks the resource `PENDING` until it resolves exactly once to `COMMITTED` or `ROLLED_BACK` |
+| Spanning days or chat sessions | [durable_memory.py](agent_saga/durable_memory.py) | Long-lived transaction state an agent can query across sessions |
+
+The one architectural decision worth making up front is which of those four a
+piece of state is. Get that right and the rest follows; get it wrong and you'll
+find out at rollback, which is the expensive time to find out.
+
 ## Do you actually need this?
 
 **If your agent calls two or three tools that touch nothing durable — no money,
