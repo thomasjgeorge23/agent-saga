@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v0.4.2 — The Accountable Agent Runtime: Transactional Safety for Autonomous AI Agents</title>
+<title>agent-saga v0.5.1 — Kill the process mid-transaction. The charge still gets refunded.</title>
 <meta name="description" content="Grounded answers where a hallucination cannot pose as a sourced fact, one-call AgentKit SDK, machine-checkable rollback-safety certificates, selective-disclosure audit proofs, hash-chained tamper-evident WAL, passkey/hardware approvals, and offline mesh sagas — the accountable agent runtime for AI that acts on the real world." />
 <style>
   :root {
@@ -226,7 +226,8 @@
   <div class="wrap nav-in">
     <a class="brand" href="#top">agent-saga <span class="seq">v0.4.2</span></a>
     <nav class="nav-links">
-      <a href="#sdk">Agent SDK</a>
+      <a href="#demo">Live Demo</a>
+          <a href="#sdk">Agent SDK</a>
       <a href="#categories">Industries</a>
       <a href="#sandbox">Live Sandbox</a>
       <a href="#features">Capabilities</a>
@@ -242,13 +243,19 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">⚡ SAGAOPS Enterprise Autonomous Agent OS · PyPI v0.5.1</p>
-        <h1>Give any LLM the <span class="amber">Multi-Agent Mesh & Verifiable Safety OS</span>.</h1>
+        <p class="eyebrow">⚡ SAGAOPS Enterprise Autonomous Agent OS · PyPI v0.5.2</p>
+        <h1>Give any LLM the <span class="amber">Rollback-Proving Engine & Safety Fleet OS</span>.</h1>
         <p class="lede">
-          <b>agent-saga v0.5.1 (SAGAOPS)</b> introduces <b>Declarative Inverses</b> (zero-boilerplate <code>@inverse_of</code> pairing), <b>SagaMeshCoordinator</b> (distributed 2PC across multi-agent processes), <b>ZeroKnowledgeAuditProof</b> (privacy-preserving compliance proofs), <b>CostBudgetGate</b> (real-time financial caps), <b>DashboardServer</b> (embedded visual telemetry console), and one-line framework wrappers for LangChain, CrewAI, AutoGen & Swarm.
+          <b>agent-saga v0.5.2 (SAGAOPS)</b> introduces <b>prove_rollback()</b> (proves workflows unwind cleanly at every failure point before production), <b>SagaFleet</b> (cross-framework thread-safe orchestration), <b>RepairSession</b> (surgical step repair without full rollback), and the interactive <b>agent-saga demo</b>.
+        </p>
+        <p class="lede">
+          Your agent will fail at step 4 of 5 — and one day it will fail by <em>dying</em>. A <code>try/except</code> keeps its cleanup in memory and dies with it. A checkpoint restores your <em>agent's</em> state; it cannot un-send a wire transfer. <b>agent-saga</b> writes the intent to a hash-chained log <em>before</em> the effect fires, so a <b>separate process</b> can finish the rollback the dead one couldn't.
+        </p>
+        <p class="lede" style="color:#f59e0b;">
+          Don't take our word for it — watch it happen in 5 seconds. No API keys, no network, no configuration.
         </p>
         <div class="install">
-          <span class="prompt">$</span><code>pip install agent-saga</code>
+          <span class="prompt">$</span><code>pip install agent-saga && agent-saga demo</code>
           <button id="copyBtn">copy</button>
         </div>
         <div style="margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -277,6 +284,60 @@
   </section>
 
   <!-- AGENT SDK — THE NEW ONE-CALL SURFACE -->
+  <section id="demo">
+    <div class="wrap">
+      <p class="eyebrow">The 5-second proof</p>
+      <h2>Three acts. Nothing simulated.</h2>
+      <p class="lede"><code>agent-saga demo</code> runs the real engine against a real
+      write-ahead log, with a real gate, real compensations, and a real killed
+      process. No network, no API keys, no configuration. The "world" is a JSON
+      file, so damage caused by a process that dies is still there for the next
+      process to find.</p>
+
+      <div class="feat-grid">
+        <div class="feat-card">
+          <h3>Act I &middot; No transaction</h3>
+          <p>An ordinary agent charges a card, launches a server, then step&nbsp;3 fails.</p>
+          <p><b>Left behind:</b> <code>charges: ['ch_1']</code>, <code>servers: ['i-1']</code>.
+          Money taken, server running, and nobody is coming to clean it up &mdash;
+          someone has to find it by hand, and first they have to know it happened.</p>
+        </div>
+
+        <div class="feat-card">
+          <h3>Act II &middot; The same calls, in a saga</h3>
+          <p>Identical tools, wrapped rather than rewritten. Step&nbsp;3 fails exactly
+          as before.</p>
+          <p><b>Left behind:</b> nothing. The boundary unwinds LIFO and reports
+          <code>clean</code> &mdash; a value read from <code>RollbackReport</code>,
+          so it can never say clean when the engine says partial.</p>
+        </div>
+
+        <div class="feat-card">
+          <h3>Act III &middot; The process is killed</h3>
+          <p>The saga charges $99, fsyncs the intent, then calls <code>os._exit()</code>
+          &mdash; skipping <code>finally</code>, <code>atexit</code>, and loop shutdown.
+          Nothing gets a chance to roll back.</p>
+          <p><b>Then a different process reads the log and refunds it.</b> This is the
+          case a <code>try/except</code> cannot answer: its cleanup lived in the memory
+          that just died.</p>
+        </div>
+      </div>
+
+      <p class="lede" style="margin-top:1.5rem;">Two details in Act III are worth
+      pausing on. The intent is durable <em>before</em> the effect fires, so recovery
+      never depends on the process that caused the mess still being alive. And the
+      recovery daemon waits for the dead worker's <b>lease</b> to expire rather than
+      checking a PID &mdash; PIDs are reused within minutes, and only an expired lease
+      actually proves an owner is gone.</p>
+
+      <p class="lede">Afterwards, draw what you watched:
+      <code>agent-saga graph --wal ./agent-saga.wal</code> renders the forward path and
+      the rollback fork as Mermaid, where <code>compensated</code>,
+      <code>COMPENSATION FAILED</code>, and <code>ORPHANED</code> are three visually
+      distinct outcomes. A partial rollback can never be drawn as a clean one.</p>
+    </div>
+  </section>
+
   <section id="sdk">
     <div class="wrap">
       <p class="eyebrow">AgentKit SDK</p>

@@ -652,6 +652,17 @@ def build_parser() -> argparse.ArgumentParser:
                              "enabled, instead of reporting them as unchained")
     verify.set_defaults(func=_cmd_verify)
 
+    demo = sub.add_parser(
+        "demo",
+        help="watch a failure, a rollback, and a killed process get cleaned up")
+    demo.add_argument("--no-color", action="store_true",
+                      help="plain output for CI or piping")
+    demo.add_argument("--fast", action="store_true",
+                      help="skip the pacing pauses")
+    demo.add_argument("--logs", action="store_true",
+                      help="also show the engine's own trace")
+    demo.set_defaults(func=_cmd_demo)
+
     refactor = sub.add_parser(
         "refactor",
         help="index a codebase and apply a scope-correct refactor as a transaction")
@@ -1007,6 +1018,15 @@ def _cmd_prove(args: argparse.Namespace) -> int:
           file=sys.stderr)
     print(f"  root      : {bundle['merkle_root']}", file=sys.stderr)
     return 0
+
+
+def _cmd_demo(args: argparse.Namespace) -> int:
+    """Three acts: an unprotected failure, the same failure inside a boundary,
+    and a process killed mid-transaction that a second process cleans up."""
+    from .demo import run_demo
+
+    return run_demo(color=not args.no_color, pace=0.0 if args.fast else 0.28,
+                    logs=args.logs)
 
 
 def _cmd_refactor(args: argparse.Namespace) -> int:

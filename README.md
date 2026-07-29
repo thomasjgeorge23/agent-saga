@@ -23,6 +23,91 @@ whole transaction — in-process on failure, or from a separate recovery daemon
 if the process itself dies. Infrastructure, vector stores, tickets, PRs,
 messages — and, yes, money.
 
+## The 30-step problem
+
+A step that succeeds 98% of the time is a good step. Chain thirty of them and
+the workflow completes **54.5%** of the time — that's just `0.98 ** 30`, and
+you can check it in a REPL.
+
+No safety layer changes that arithmetic. What a transaction boundary changes is
+what the other **45.5%** leaves behind: a charge with no order, a server with no
+owner, a half-written record nobody knows about. The question isn't whether your
+agent will fail partway — at thirty steps it's a coin flip — it's whether the
+failure is *recoverable* or an incident.
+
+Almost nobody verifies that, because verifying it means deliberately breaking
+your own workflow at every step and inspecting the world afterwards. So:
+
+```python
+from agent_saga import prove_rollback
+
+proof = await prove_rollback(scenario, snapshot=read_world, reset=clear_world)
+assert proof.proven      # every failure point unwinds to a clean world
+```
+
+It runs your workflow once per step, failing at a different step each time, in
+both shapes — the step never ran, and the step ran *then* failed (the `UNKNOWN`
+case, where a timed-out call may well have landed). After each run it compares
+the actual world to its starting state.
+
+The part that matters: **it checks the world, not the engine's opinion of it.**
+A compensation that runs, returns successfully, and undoes nothing produces a
+`RollbackReport` saying `clean` and a world that isn't. That's reported as
+`ENGINE_DISAGREES`, and it's the only check in the package that catches a
+compensation which lies:
+
+```
+rollback proof: 6 probe(s) across 3 step(s)
+  ok   step 1 stripe.charge [fail before]
+  LIES step 1 stripe.charge [fail after]
+         left behind: charges: [] -> ['ch_1']
+```
+
+In CI, via the pytest plugin:
+
+```python
+async def test_onboarding_is_safe(assert_rollback_proven):
+    await assert_rollback_proven(scenario, snapshot=world.snapshot, reset=world.reset)
+```
+
+## See it in 5 seconds
+
+```bash
+pip install agent-saga && agent-saga demo
+```
+
+Three acts, no network, no configuration, no API keys. Everything in it is the
+real engine — a real write-ahead log, a real gate, real compensations, a real
+killed process.
+
+| | What happens | What you're left with |
+|---|---|---|
+| **Act I** | An ordinary agent charges a card, launches a server, then step 3 fails | `charges: ['ch_1']`, `servers: ['i-1']` — **money taken, server running, nobody coming to clean up** |
+| **Act II** | The *same three calls* inside `saga_scope`. Same failure | `charges: none`, `servers: none` — unwound LIFO, and the report says `clean` (read from `RollbackReport`, not hardcoded) |
+| **Act III** | The same saga, but the process is **killed mid-transaction** — `os._exit()`, skipping `finally`, `atexit`, and loop shutdown | The charge is refunded anyway, **by a different process**, from the log alone |
+
+Act III is the one worth watching twice. A `try/except` stack keeps its
+compensations in memory and dies with the process. A LangGraph checkpoint
+restores your *agent's* state — it cannot un-charge a card. Here the intent was
+fsynced **before** the effect fired, so recovery never depended on the process
+that caused the mess still being alive. The daemon also waits for the dead
+worker's **lease** to expire rather than checking a PID, because PIDs are reused
+within minutes and an expired lease is the only thing that actually proves an
+owner is gone.
+
+```bash
+agent-saga demo --logs      # same run, with the engine's own trace
+agent-saga demo --no-color  # plain text for CI or piping
+```
+
+Then draw what you just watched:
+
+```bash
+agent-saga graph --wal ./agent-saga.wal   # the rollback fork, as Mermaid
+```
+
+More worked examples:
+
 ```bash
 python examples/multi_domain.py         # 5 systems, 1 transaction, no network needed
 python examples/chaos_demo.py           # optimistic vs. transactional, side by side
@@ -115,6 +200,49 @@ The one architectural decision worth making up front is which of those four a
 piece of state is. Get that right and the rest follows; get it wrong and you'll
 find out at rollback, which is the expensive time to find out.
 
+## Surgical repair — fix one step, keep the rest
+
+All-or-nothing is the right default and the wrong only option. A six-step
+onboarding that fails at step four because the model produced a malformed
+postcode does not need the payment reversed and the account deleted. It needs
+the postcode fixed and steps five and six run.
+
+```python
+from agent_saga import RepairSession
+
+session = RepairSession.open(records, saga_id,
+                             operator="ops@example.com",
+                             reason="malformed postcode from the model")
+print(session.format_text())          # what's kept, what failed, any blockers
+session.amend(postcode="SW1A 1AA")    # recorded, with the old value
+await session.resume(continuation, wal=wal)
+```
+
+Three things make this an escape hatch rather than a hole in the guarantee:
+
+**It refuses unless the retained steps could still be undone.** Resuming keeps
+the effects of steps 1..k-1. If the resumed part then fails, those steps must
+still be reversible — otherwise repairing has *manufactured* the orphan the
+engine exists to prevent. So a session blocks unless every retained step has a
+registry-backed compensation (a handler name and JSON kwargs any process can
+run), and it names each offending step rather than degrading into a warning.
+
+**Resume inherits the past.** The continuation runs in a fresh saga whose stack
+is pre-loaded with the retained steps, compensations rebuilt from the log. A
+failure after the repair unwinds the *whole* transaction — there's a test
+asserting `crm.create_account` and `stripe.charge` both roll back when the
+resumed step fails.
+
+**The hatch is audited, because an unaudited hatch voids the audit.** `operator`
+and `reason` are required, not defaulted. Amendments record the *before* value —
+"changed the postcode" and "changed the amount from 50 to 5000" are different
+events, and only one is routine. `REPAIR_OPENED`, `REPAIR_RESUMED`, and
+`REPAIR_ABANDONED` land on the same hash-chained log as everything else.
+
+The two realistic entry points are a saga whose process died (no terminal
+record, effects still standing) and `agent-saga quarantine`, which freezes a
+saga deliberately without unwinding it.
+
 ## Do you actually need this?
 
 **If your agent calls two or three tools that touch nothing durable — no money,
@@ -129,6 +257,88 @@ distinguish a clean unwind from a partial one that needs a human, and no gate
 that refuses an irreversible action *before* it happens. Reach for agent-saga at
 the point where a failure halfway through leaves something real behind that
 someone would otherwise clean up by hand.
+
+## One saga across frameworks that never heard of each other
+
+A CrewAI researcher reserves budget. A LangGraph writer publishes the draft. An
+AutoGen reviewer sends the notification — and the notification fails. Which
+framework un-publishes the draft?
+
+None of them. They can't: each knows only its own graph, so the cleanup falls to
+whoever is on call with three dashboards and a guess.
+
+```bash
+python examples/cross_framework.py
+```
+
+```
+    [CrewAI]    reserved budget    -> res_1
+    [LangChain] published draft    -> doc_1
+    [AutoGen]   FAILED: notification service unreachable
+
+  One boundary unwinds all three, last in first out:
+    <- reviewer.notify
+    <- writer.publish_draft
+    <- research.reserve_budget
+  rollback reported: clean
+
+  The log proves it was one transaction, not three:
+    distinct saga ids : 1
+```
+
+**There is no bridge, no registry, and nothing to configure.** `saga_scope` sets
+a **contextvar**, and every adapter's runner ([`adapters/_common.py`](agent_saga/adapters/_common.py))
+checks `current_saga()` before doing anything. A wrapped tool joins whatever
+saga is already open, whichever framework called it — which is exactly why it
+works with frameworks that have never heard of each other.
+
+### For production: `SagaFleet`
+
+The contextvar has two silent failure modes, and both bite at scale. Measured,
+not assumed:
+
+```
+in the coroutine        : True
+asyncio.to_thread       : True      (copies the context)
+raw threading.Thread    : False
+ThreadPoolExecutor      : False
+```
+
+CrewAI and AutoGen dispatch tools through their own executors. When they do,
+`current_saga()` is `None` on that thread and the ordinary runner performs the
+side effect **with no WAL record and no compensation** — while every log line
+still says the tool is saga-aware. The second failure mode: register twelve
+tools, miss one, and nothing tells you until its effect needs undoing.
+
+[`SagaFleet`](agent_saga/fleet.py) closes both:
+
+```python
+fleet = SagaFleet("content-pipeline")
+reserve = fleet.register(crew_call, framework="crewai",    name="research.reserve",
+                         semantics=COMPENSABLE, compensate=release)
+publish = fleet.register(lc_call,   framework="langgraph", name="writer.publish",
+                         semantics=COMPENSABLE, compensate=unpublish)
+
+fleet.assert_fully_covered()          # CI gate: nothing unwindable was missed
+
+async with fleet.transaction(wal=wal):
+    await reserve(amount=5000)
+    await publish(title="Q3")         # same saga, different framework, any thread
+```
+
+- **Re-attaches** the active saga inside a framework's own thread, so the
+  boundary survives the executor
+- **Refuses** to run a registered tool outside a boundary (`BoundaryRequired`)
+  rather than performing an unprotected effect
+- **`coverage()`** — a machine-readable manifest of which tools are protected,
+  from which framework, and which have a recoverable inverse versus a closure
+  that dies with the process
+
+One honest limit, documented in the module: the fleet moves the saga's
+*identity* across threads, not the event loop that owns it. A coroutine
+touching the saga must be scheduled back with
+`asyncio.run_coroutine_threadsafe(coro, loop)`; starting a second loop with
+`asyncio.run()` on a worker stalls until the WAL barrier times out.
 
 ## Use it *with* LangGraph, not instead of it
 

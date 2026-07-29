@@ -59,6 +59,53 @@ use any of them, upgrade.
 
 ### Added
 
+- **`agent_saga.repair`** — surgical repair (edit-and-resume). A human can fix
+  the step that failed and finish the transaction instead of unwinding it,
+  which is what a malformed argument at step four of six actually calls for.
+  Built so it cannot become a hole in the guarantee it sits inside: a session
+  **refuses to resume unless every retained step has a registry-backed
+  compensation**, because keeping steps whose inverse is an in-process closure
+  would manufacture the orphan the engine exists to prevent; the resumed
+  continuation runs in a saga whose stack **inherits** those steps, so a later
+  failure unwinds the whole transaction rather than half of it; and `operator`
+  and `reason` are mandatory with every action (`REPAIR_OPENED`,
+  `REPAIR_RESUMED`, `REPAIR_ABANDONED`, amendments with their before-values)
+  written to the same hash-chained log — an unaudited escape hatch would void
+  the audit around it. Entry points are a crashed saga (no terminal record,
+  effects still standing) or `agent-saga quarantine`.
+
+
+- **`agent_saga.fleet`** — cross-framework orchestration with verifiable
+  coverage. One `saga_scope` already spanned CrewAI/LangGraph/AutoGen tools
+  (the boundary is a contextvar), but that mechanism had two silent failure
+  modes. `SagaFleet` closes both. **Thread propagation:** measured, the saga
+  contextvar survives `asyncio.to_thread` but *not* a raw `threading.Thread`
+  or `ThreadPoolExecutor` — and frameworks dispatch tools through their own
+  executors, at which point the ordinary runner performs the side effect with
+  no WAL record and no compensation while still logging as saga-aware. The
+  fleet re-attaches its active saga, and `bind_saga()` does the same for any
+  callable. **Silent gaps:** a registered tool called outside a boundary now
+  raises `BoundaryRequired` instead of running unprotected, and `coverage()`
+  publishes a machine-readable manifest — which tools, from which framework,
+  which have a recoverable inverse versus an in-process closure —
+  with `assert_fully_covered()` for a startup or CI gate.
+- `examples/cross_framework.py` — one saga across three frameworks, one
+  rollback, proven by the WAL showing a single saga id. The LangChain side is
+  a real `langchain_core` tool through the real adapter.
+
+- **`agent-saga demo`** — three acts, five seconds, no network or
+  configuration, showing the guarantee instead of describing it. Act I: an
+  ordinary agent fails halfway and leaves a charge and a running server
+  behind. Act II: the same calls inside a saga, same failure, world restored,
+  with the `clean` label read from `RollbackReport` rather than hardcoded.
+  Act III: the process is **killed** mid-transaction with `os._exit()`
+  (skipping `finally`, `atexit`, and loop shutdown) and a **separate process**
+  refunds the charge from the write-ahead log alone. Everything in it is the
+  real engine — real WAL, real gate, real compensations, a real killed
+  subprocess — and the world is a JSON file so damage outlives the process
+  that caused it. `--logs` shows the engine's own trace, `--no-color` for CI.
+  Output is ASCII-only and tested against a cp1252 console.
+
 - **`agent_saga.inverses`** — declare what undoes a tool once, next to the
   function that does it, instead of writing a compensation factory at every
   call site. `@inverse_of(forward, maps={...})` pairs an inverse with its

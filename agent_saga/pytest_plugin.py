@@ -87,3 +87,27 @@ def assert_saga_deterministic():
             )
 
     return _assert
+
+
+@pytest.fixture
+def assert_rollback_proven():
+    """Fail the test unless the workflow unwinds cleanly at EVERY failure point.
+
+        async def test_onboarding_is_safe(assert_rollback_proven):
+            await assert_rollback_proven(scenario, snapshot=world.snapshot,
+                                         reset=world.reset)
+
+    Most teams learn their rollbacks are broken in production. This breaks the
+    workflow once per step, in both failure shapes, and compares the world to
+    its starting state -- so a compensation that never worked fails CI instead
+    of an incident review.
+    """
+    from agent_saga.proving import prove_rollback
+
+    async def _assert(scenario, **kwargs):
+        proof = await prove_rollback(scenario, **kwargs)
+        if not proof.proven:
+            pytest.fail("rollback is not proven:\n" + proof.format_text())
+        return proof
+
+    return _assert

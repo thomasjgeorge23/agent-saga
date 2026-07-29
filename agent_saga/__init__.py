@@ -578,3 +578,19 @@ from .inverses import (
 
 __all__ += ["InverseError", "auto_compensation", "call_with", "delete_by",
             "has_inverse", "inverse_of", "map_result"]
+
+# -- prove the rollback works at every failure point -----------------------------
+from .proving import ProbeMode, RollbackProof, StepProbe, prove_rollback
+
+__all__ += ["ProbeMode", "RollbackProof", "StepProbe", "prove_rollback"]
+
+# -- cross-framework orchestration with verifiable coverage ----------------------
+from .fleet import BoundaryRequired, CoverageReport, SagaFleet, ToolCoverage, bind_saga
+
+__all__ += ["BoundaryRequired", "CoverageReport", "SagaFleet", "ToolCoverage",
+            "bind_saga"]
+
+# -- surgical repair: fix one step and resume, instead of undoing everything -----
+from .repair import RepairBlocked, RepairSession, RetainedStep
+
+__all__ += ["RepairBlocked", "RepairSession", "RetainedStep"]
