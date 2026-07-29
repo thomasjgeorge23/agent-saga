@@ -5,6 +5,56 @@ All notable changes to `agent-saga` are documented here. The format follows
 0.4.0. One rule governs every entry: a line names a mechanism a user can go
 run, or it does not appear.
 
+## [0.5.1] - 2026-07-29
+
+**Correctness and security fixes for three features introduced in 0.5.0.** All
+three were the same defect the `universal` engine was fixed for in 0.4.0: a
+safety layer reporting protection it did not provide. If you are on 0.5.0 and
+use any of them, upgrade.
+
+### Fixed
+
+- **`adapters.framework_wrappers` opened no transaction.** `wrap_crew`,
+  `wrap_langgraph`, `wrap_autogen`, `wrap_swarm`, and `wrap_llamaindex` logged
+  "inside agent-saga transaction boundary" and then called the original method
+  unchanged — the `AgentKit` they created was never used. A wrapped agent had
+  no boundary, no gate, and no rollback while appearing protected. The
+  wrappers now run the call inside a real saga transaction (sync and async),
+  are idempotent, raise instead of silently returning an unprotected object
+  when no wrappable method exists, refuse clearly when a sync method is called
+  inside a running event loop, and expose `is_saga_wrapped()` so the claim is
+  checkable rather than merely logged.
+- **`zkp` was neither zero-knowledge nor verifying.** Three separate breaks:
+  the HMAC key defaulted to a constant compiled into the published package
+  (so any installer could recover committed payloads by enumerating
+  low-entropy fields like amounts and emails); `merkle_path` held the tree
+  root instead of the sibling path; and verification asked whether the root
+  appeared in that field, so a fabricated commitment — or one lifted from a
+  different tree — verified true. Now: the key is required (minimum 16 bytes,
+  no default), inclusion proofs carry real sibling paths with RFC 6962 domain
+  separation, and `verify()` recomputes the root and compares it. Renamed to
+  `BlindAuditCommitments` to describe what it is; `ZeroKnowledgeAuditProof`
+  remains as a deprecated alias. **Breaking, deliberately:** the old default
+  key and the tautological verification could not be preserved without
+  preserving the vulnerability.
+- **`SagaMeshCoordinator.rollback_mesh_saga` reported dirty unwinds as
+  clean.** It logged "ROLLED BACK cleanly" and returned `state:
+  "ROLLED_BACK"` even when compensations raised, and counted steps with no
+  compensation at all as though they had been undone. The report now carries
+  `clean`, `failed_steps`, and `orphaned_steps`, and the state becomes
+  `ROLLED_BACK_PARTIAL` when either is non-empty — the `RollbackReport.clean`
+  doctrine the rest of the engine is built on.
+
+### Changed
+
+- `multi_agent_mesh` no longer describes itself as two-phase commit. It
+  executes each participant's step immediately, so there is no prepared state
+  and no vote: it is a distributed saga, and the docstring now says so along
+  with its two real limits (in-memory coordinator state, and compensations
+  called with forward arguments rather than derived from the result).
+- `dashboard` documents that it has no authentication and is safe only on
+  `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
+
 ## [Unreleased]
 
 ### Added

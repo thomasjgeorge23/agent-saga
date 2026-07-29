@@ -1,7 +1,17 @@
-"""Embedded Live Web Dashboard & Telemetry Console (`agent_saga.dashboard`).
+"""Embedded live web console (`agent_saga.dashboard`).
 
-Serves a zero-dependency, real-time web console displaying live DAG executions,
-WAL event streams via SSE, and Human-in-the-Loop approval queues.
+Serves a zero-dependency web console over an in-memory view of saga activity:
+DAG executions, an SSE event stream, and the approval queue.
+
+**No authentication.** This server has no token check, so anyone who can reach
+its port can read whatever it is showing. It binds `127.0.0.1` by default,
+which is the only configuration it is safe in; passing `host="0.0.0.0"`
+publishes saga data -- ids, amounts, tool arguments -- to the whole network.
+
+For anything beyond a local session use `agent-saga ui` (`ui/server.py`),
+which reads a real WAL and supports bearer-token auth. This module is the
+lightweight embedded view, and the difference is deliberate rather than an
+oversight to be discovered later.
 """
 
 from __future__ import annotations

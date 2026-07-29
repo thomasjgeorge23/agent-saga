@@ -1,7 +1,29 @@
-"""Multi-Agent Cross-Saga Distributed Consensus Engine (`SagaMeshCoordinator`).
+"""Cross-agent distributed saga coordination (`SagaMeshCoordinator`).
 
-Provides distributed two-phase commit (2PC) and cross-agent saga orchestration
-across distinct autonomous agent processes and microservice runtimes.
+Runs one logical transaction across several autonomous agent processes: each
+participant's step is executed and recorded with its compensation, and an
+abort unwinds them LIFO across every participant.
+
+**This is a distributed saga, not two-phase commit**, and the distinction is
+the one this package sells. 2PC holds a durable *prepared* state at each
+participant and takes no visible action until the coordinator's decision, so
+participants can honour a commit or abort after a crash. Here, a step's
+forward action runs immediately -- there is no vote and no prepared state to
+hold -- so an abort compensates effects that already happened. That is the
+saga trade-off, and calling it 2PC (as releases up to 0.5.0 did) promises an
+isolation property this code does not provide.
+
+Two limits worth knowing before you rely on it:
+
+  * **Coordinator state is in memory.** `active_mesh_sagas` does not survive
+    the coordinator process. For durability across a crash, run the
+    participants' own steps through `saga_scope`/`AgentKit` so each has its own
+    WAL and `saga-recoveryd` can resolve them; this coordinator sequences the
+    fleet, it is not their write-ahead log.
+  * **Compensations are called with the forward arguments**, not derived from
+    the forward result. Where the inverse depends on what the call returned (a
+    charge id, a row id), use `Compensation` factories via `ctx.execute`
+    instead -- see `semantics.py`.
 """
 
 from __future__ import annotations
@@ -131,30 +153,61 @@ class SagaMeshCoordinator:
         saga_rec = self.active_mesh_sagas[mesh_saga_id]
         saga_rec["state"] = "ABORTING"
         compensated_count = 0
+        failed: List[Dict[str, str]] = []
+        orphaned: List[Dict[str, str]] = []
 
         # Reverse LIFO compensation
         for step in reversed(saga_rec["steps"]):
-            if step.compensate_fn:
-                try:
-                    kwargs = step.payload.get("args", {})
-                    if asyncio.iscoroutinefunction(step.compensate_fn):
-                        await step.compensate_fn(**kwargs)
-                    else:
-                        step.compensate_fn(**kwargs)
-                    step.status = "ROLLED_BACK"
-                    compensated_count += 1
-                except Exception as exc:
-                    logger.error("Failed to compensate agent '%s' step '%s': %r", step.agent_id, step.step_name, exc)
-                    step.status = "DIRTY_FAILURE"
+            if not step.compensate_fn:
+                # An executed step with no inverse is not a step that needs no
+                # cleanup -- it is one nobody can clean up. Counting it as
+                # rolled back is how a dirty unwind gets reported as clean.
+                step.status = "ORPHANED"
+                orphaned.append({"agent_id": step.agent_id, "step": step.step_name})
+                logger.error(
+                    "ORPHANED: agent '%s' step '%s' executed with no compensation",
+                    step.agent_id, step.step_name)
+                continue
+            try:
+                kwargs = step.payload.get("args", {})
+                if asyncio.iscoroutinefunction(step.compensate_fn):
+                    await step.compensate_fn(**kwargs)
+                else:
+                    step.compensate_fn(**kwargs)
+                step.status = "ROLLED_BACK"
+                compensated_count += 1
+            except Exception as exc:
+                logger.error("Failed to compensate agent '%s' step '%s': %r",
+                             step.agent_id, step.step_name, exc)
+                step.status = "DIRTY_FAILURE"
+                failed.append({"agent_id": step.agent_id, "step": step.step_name,
+                               "error": repr(exc)})
 
-        saga_rec["state"] = "ROLLED_BACK"
+        clean = not failed and not orphaned
+        saga_rec["state"] = "ROLLED_BACK" if clean else "ROLLED_BACK_PARTIAL"
         self.vector_clock.tick()
-        logger.info("Mesh Saga '%s' ROLLED BACK cleanly (%d steps compensated)", mesh_saga_id, compensated_count)
+
+        # `clean` is the field a caller must branch on. The engine's central
+        # promise is that a partial rollback is distinguishable from a whole
+        # one -- a mesh abort that logged "cleanly" while steps were left dirty
+        # would break exactly the guarantee the rest of this package sells.
+        if clean:
+            logger.info("Mesh Saga '%s' rolled back cleanly (%d step(s) compensated)",
+                        mesh_saga_id, compensated_count)
+        else:
+            logger.error(
+                "Mesh Saga '%s' rollback INCOMPLETE -- %d compensated, %d FAILED, "
+                "%d ORPHANED. Human intervention required.",
+                mesh_saga_id, compensated_count, len(failed), len(orphaned))
+
         return {
             "mesh_saga_id": mesh_saga_id,
-            "state": "ROLLED_BACK",
+            "state": saga_rec["state"],
+            "clean": clean,
             "reason": reason,
             "compensated_steps": compensated_count,
+            "failed_steps": failed,
+            "orphaned_steps": orphaned,
         }
 
 
