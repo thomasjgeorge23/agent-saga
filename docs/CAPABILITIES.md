@@ -159,6 +159,7 @@ concurrent edit.
 | Write-ahead log | `wal/` | file, mmap, Postgres, Redis; hash-chained; `barrier()` durability fence |
 | Crash recovery | `recovery.py` | expired leases (not PIDs); deterministic tokens prevent double-compensation |
 | Context receipts | `context_broker.py` | HOT/WARM/COLD tiers; drifted summaries are evicted, never served |
+| Argument provenance | `provenance_gate.py` | refuses a side effect whose critical argument was model-invented; SOURCED is verified against the document, not accepted on the label |
 | Grounded answers | `grounding.py` | `VERIFIED` / `UNCITED` / `BROKEN_CITATION` / `BROKEN_QUOTE` / `UNSUPPORTED` |
 | Multi-model routing | `ir.py`, `router.py` | every decision and refusal names every candidate and reason |
 | Verification-gated cascade | `cascade.py` | cheapest tier that passes a real check; escalates on evidence carrying the rejection reason; every tier's cost reported |

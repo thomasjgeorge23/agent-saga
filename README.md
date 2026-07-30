@@ -1,5 +1,9 @@
 # agent-saga
 
+> **Founded & Lead Architected by [Thomas J George](https://github.com/thomasjgeorge23)**  
+> ✉️ **Direct Email / Founder Contact**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com)  
+> *For enterprise inquiries, reviews, user feedback, or feature recommendations, reach out directly.*
+
 **The accountable agent runtime.** Six layers, one rule — every layer can
 prove what it did:
 
@@ -22,6 +26,58 @@ wraps each tool call, records a runtime-derived inverse action, and unwinds the
 whole transaction — in-process on failure, or from a separate recovery daemon
 if the process itself dies. Infrastructure, vector stores, tickets, PRs,
 messages — and, yes, money.
+
+## The control nobody else has: argument provenance
+
+Here is a call that passes **every** safety control ever written for agents:
+
+```python
+stripe.charge(amount=4200)
+```
+
+Within budget. `COMPENSABLE`. Refund handler registered. Gated, logged,
+hash-chained, provable. And if the model hallucinated `4200` — misread a table,
+averaged two invoices, transposed a digit — every one of those controls works
+perfectly while the wrong amount leaves the building. The rollback is clean. The
+audit is intact. The customer is still wrong.
+
+None of them ask the only question that matters: **where did that number come
+from?**
+
+```python
+from agent_saga import ProvenancePolicy, Provenance, sourced, user_value
+
+policy = ProvenancePolicy()
+policy.require("stripe.charge", "amount", Provenance.SOURCED)
+policy.prohibit("wire.transfer", "this deployment never initiates wires")
+
+policy.check("stripe.charge", {"amount": sourced(4200, receipt)}, broker=broker)
+```
+
+Four levels, ordered: `SOURCED` (traceable to a receipt that resolves right
+now) > `USER` (verbatim in the human's request) > `DERIVED` (computed from
+sourced values, with the derivation stated) > `MODEL` (invented).
+
+Two properties do the work:
+
+- **Untagged means `MODEL`.** Absence of provenance is not evidence of
+  provenance. Defaulting the other way would mean the one argument someone
+  forgot to tag is exactly the one that sails through.
+- **`SOURCED` is verified, never accepted.** You cannot just *label* a value
+  sourced. The gate re-hydrates the receipt against the document and checks the
+  value actually appears in the span it claims. A document that drifted, or a
+  number that isn't in it, downgrades to `MODEL` and is refused like any other
+  invention.
+
+`policy.as_gate_rule()` plugs into `PreFlightGate`, so provenance is enforced on
+the same path as budgets and approvals rather than as a second thing everyone
+remembers separately.
+
+**On misuse, plainly:** `prohibit()` is an operator control, not a guarantee
+against a determined misuser — anyone who controls the process can edit the
+policy. What it provides is a declared, auditable boundary: a refusal recorded
+*before* the effect, and a log a reviewer can check afterwards. No library makes
+a person honest. This one makes what they did legible.
 
 ## Making a cheap model produce answers you can trust
 
@@ -1379,10 +1435,18 @@ Known-pending, tracked openly (see [SECURITY.md](https://github.com/thomasjgeorg
 distributed lock backend and async-native connectors. KMS/Vault key resolution
 is an intended Enterprise-tier feature, deliberately absent from this BYOK core.
 
+## Founder & Direct Contact
+
+`agent-saga` and the SAGAOPS OS are created, architected, and maintained by **Thomas J George**.
+
+- ✉️ **Email**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com)
+- 🐙 **GitHub**: [github.com/thomasjgeorge23](https://github.com/thomasjgeorge23)
+- 💬 **Feedback & Reviews**: Users, enterprise engineering teams, and reviewers can send feedback, issue reports, or feature requests directly via email.
+
 ## License
 
 Apache-2.0. See [LICENSE](https://github.com/thomasjgeorge23/agent-saga/blob/main/LICENSE) and [NOTICE](https://github.com/thomasjgeorge23/agent-saga/blob/main/NOTICE).
-Copyright 2026 SagaOps.
+Copyright 2026 Thomas J George (SAGAOPS).
 
 Permissive on purpose. This library is `import`ed directly into the process that
 moves your money, and a copyleft dependency on that path is something most legal

@@ -617,3 +617,27 @@ from .cascade import CascadeExhausted, CascadeResult, Rung, cascade, tools_must_
 
 __all__ += ["CascadeExhausted", "CascadeResult", "Rung", "cascade",
             "tools_must_exist"]
+
+# -- argument provenance: no side effect on an invented number -------------------
+from .provenance_gate import (
+    Provenance,
+    ProvenancePolicy,
+    ProvenanceViolation,
+    Tagged,
+    derived,
+    sourced,
+)
+from .provenance_gate import user as user_value
+
+__all__ += ["Provenance", "ProvenancePolicy", "ProvenanceViolation", "Tagged",
+            "derived", "sourced", "user_value"]
+
+# -- counterfactual replay: would the cheaper model have got it right? ------------
+from .counterfactual import (
+    Divergence,
+    RecordedStep,
+    ReplayVerdict,
+    counterfactual_replay,
+)
+
+__all__ += ["Divergence", "RecordedStep", "ReplayVerdict", "counterfactual_replay"]
