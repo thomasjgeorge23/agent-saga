@@ -59,6 +59,25 @@ use any of them, upgrade.
 
 ### Added
 
+- **`agent_saga.synthetic`** — learn the statistical shape of a real WAL and
+  generate any volume of traffic from it. Solves two problems at once: a WAL
+  cannot be shared (it holds amounts, addresses, customer ids), and recovery
+  cannot be load-tested on fifty sagas. `WALProfile.fit()` retains only
+  aggregates — tool frequencies, first-order transitions, saga lengths, outcome
+  rates, numeric ranges — so **the profile itself is shareable**: fit it where
+  the data is, ship the profile, synthesise anywhere. Output is structurally
+  valid and hash-chained, so `verify`, `certify`, `build_corpus`,
+  `wal_to_mermaid` and the recovery daemon accept it for the right reasons.
+  Every record carries `__synthetic__: true` and every saga id is prefixed
+  `synthetic-`, because an audit log indistinguishable from a real one is an
+  instrument for fabricating evidence rather than a test fixture;
+  `is_synthetic()` is strict about mixed logs for the same reason.
+  `value_synthesizer=` is the seam where a CTGAN sampler drops in — the default
+  keeps no dependency and never reproduces an observed value.
+  Numeric fields preserve magnitude, not values: ranges are widened at fit time
+  so a field observed with a single value cannot be reproduced exactly, and
+  `fit(redact=[...])` drops fields that are identifiers rather than magnitudes.
+
 - **`agent_saga.cascade`** — verification-gated cascade routing. The honest
   answer to "make a cheap model perform like an expensive one": you cannot, but
   you can stop trusting it and start checking it. `cascade(request,

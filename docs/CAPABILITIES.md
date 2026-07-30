@@ -40,7 +40,7 @@ Framework extras: `langgraph`, `crewai`, `autogen`, `llamaindex`,
 
 ---
 
-## CLI — all 25 commands
+## CLI — all 26 commands
 
 ### Start here
 
@@ -93,6 +93,7 @@ from risk to blocker) and `--strict` (exit 1 on risks too, for CI).
 | `agent-saga refactor` | index a codebase and apply a scope-correct refactor as a transaction | `--symbol`, `--to`, `--root`, `--apply`, `--yes` |
 | `agent-saga mcp` | run the saga proxy in front of an MCP server | `--policy`, `--observe`, `--emit-policy`, `--boundary` |
 | `agent-saga cloud-server` | run self-hosted cloud control plane server | `--host`, `--port` |
+| `agent-saga inquiries` | view physically stored user inquiries, reviews, and feedback | `--json` |
 
 ---
 
@@ -159,6 +160,7 @@ concurrent edit.
 | Write-ahead log | `wal/` | file, mmap, Postgres, Redis; hash-chained; `barrier()` durability fence |
 | Crash recovery | `recovery.py` | expired leases (not PIDs); deterministic tokens prevent double-compensation |
 | Context receipts | `context_broker.py` | HOT/WARM/COLD tiers; drifted summaries are evicted, never served |
+| Synthetic WALs | `synthetic.py` | learn a log's shape, generate any volume of it; carries no real values, and every record is marked `__synthetic__` so it can never be mistaken for evidence |
 | Training corpus from the log | `corpus.py` | labels every action by whether reality kept it; a step rolled back for a LATER failure is COLLATERAL, not a negative, so the dataset is not poisoned |
 | Counterfactual replay | `counterfactual.py` | evaluate a cheaper model against recorded history with zero side effects; a divergence is reported UNKNOWABLE rather than guessed |
 | Argument provenance | `provenance_gate.py` | refuses a side effect whose critical argument was model-invented; SOURCED is verified against the document, not accepted on the label |

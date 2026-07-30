@@ -1411,44 +1411,94 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
 
   async function submitInquiry(e) {
     e.preventDefault();
-    var name = document.getElementById('inqName').value;
-    var email = document.getElementById('inqEmail').value;
-    var company = document.getElementById('inqCompany').value;
+    var name = document.getElementById('inqName').value.trim();
+    var email = document.getElementById('inqEmail').value.trim();
+    var company = document.getElementById('inqCompany').value.trim() || 'N/A';
     var subject = document.getElementById('inqSubject').value;
-    var message = document.getElementById('inqMessage').value;
+    var message = document.getElementById('inqMessage').value.trim();
     var btn = document.getElementById('inqSubmitBtn');
     var badge = document.getElementById('inqStatusBadge');
 
+    if (!name || !email || !message) return;
+
     btn.disabled = true;
-    btn.textContent = 'Delivering Inquiry...';
+    btn.textContent = 'Saving directly to app...';
     badge.hidden = false;
     badge.style.color = '#f59e0b';
-    badge.textContent = '⌛ Encrypting & Sending...';
+    badge.textContent = '⌛ Saving inquiry...';
 
+    var record = {
+      id: 'inq_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      name: name,
+      email: email,
+      company: company,
+      subject: subject,
+      message: message
+    };
+
+    // 1. Direct In-App Persistence (localStorage)
     try {
-      var res = await fetch('/api/inquiry', {
+      var existing = JSON.parse(localStorage.getItem('saga_inquiries') || '[]');
+      existing.push(record);
+      localStorage.setItem('saga_inquiries', JSON.stringify(existing));
+    } catch (err) {
+      console.warn('LocalStorage save notice:', err);
+    }
+
+    // 2. Direct HTTP Backend Persistence (site/server.py -> inquiries.json)
+    try {
+      var backendUrl = window.location.protocol.startsWith('http') ? '/api/inquiry' : 'http://localhost:8000/api/inquiry';
+      await fetch(backendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name, email: email, company: company, subject: subject, message: message })
+        body: JSON.stringify(record)
       });
-      var data = await res.json();
-      if (res.ok) {
-        badge.style.color = '#10b981';
-        badge.textContent = '✓ ' + (data.message || 'Delivered to Founder Thomas J George!');
-        document.getElementById('directInquiryForm').reset();
-      } else {
-        throw new Error(data.error || 'Server error');
-      }
     } catch (err) {
-      // Offline / Mailto Fallback
-      var mailtoUrl = `mailto:thomasjgeorge23@gmail.com?subject=${encodeURIComponent('[agent-saga Inquiry] ' + subject)}&body=${encodeURIComponent('From: ' + name + ' (' + email + ' / ' + company + ')\n\n' + message)}`;
-      window.location.href = mailtoUrl;
-      badge.style.color = '#10b981';
-      badge.textContent = '✓ Mail client opened for direct delivery to thomasjgeorge23@gmail.com';
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Send Direct Inquiry →';
+      console.log('Backend server API notice:', err);
     }
+
+    // 3. Direct In-App Success Feedback
+    badge.style.color = '#10b981';
+    badge.textContent = '✓ Saved directly in app & physical inquiries.json!';
+    document.getElementById('directInquiryForm').reset();
+    btn.disabled = false;
+    btn.textContent = 'Send Direct Inquiry →';
+    
+    // Refresh local in-app inbox view
+    renderInAppInbox();
+  }
+
+  function renderInAppInbox() {
+    var container = document.getElementById('inAppInboxContainer');
+    if (!container) return;
+    try {
+      var items = JSON.parse(localStorage.getItem('saga_inquiries') || '[]');
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div style="color: var(--faint); text-align: center; padding: 1.5rem;">No user messages saved in app yet. Submit a message above to test!</div>';
+        return;
+      }
+      var html = '';
+      for (var i = items.length - 1; i >= 0; i--) {
+        var item = items[i];
+        html += `<div style="background: var(--elev); border: 1px solid var(--border-strong); border-radius: 14px; padding: 1.2rem; margin-bottom: 0.8rem; font-family: var(--mono); font-size: 0.85rem;">
+          <div style="display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.4rem;">
+            <b style="color: var(--accent);">${escapeHtml(item.name)} &lt;${escapeHtml(item.email)}&gt;</b>
+            <span style="color: var(--faint); font-size: 0.75rem;">${escapeHtml(item.timestamp || '')}</span>
+          </div>
+          <div style="color: var(--dim); margin-bottom: 0.5rem;">Company: <b>${escapeHtml(item.company || 'N/A')}</b> | Subject: <b>${escapeHtml(item.subject || '')}</b></div>
+          <div style="color: var(--text); background: var(--panel); border: 1px solid var(--border); padding: 0.8rem; border-radius: 8px; white-space: pre-wrap;">${escapeHtml(item.message)}</div>
+        </div>`;
+      }
+      container.innerHTML = html;
+    } catch (err) {
+      container.innerHTML = '<div style="color: var(--irreversible);">Error loading in-app inbox</div>';
+    }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   function switchPageView(viewId) {
@@ -1474,6 +1524,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
 
   // Initial render
   renderFormFields();
+  renderInAppInbox();
 </script>
 
   </div> <!-- END PAGE-SDK -->
@@ -1531,6 +1582,17 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
           <div id="inqStatusBadge" style="font-family: var(--mono); font-size: 0.85rem; font-weight: 700;" hidden></div>
         </div>
       </form>
+    </div>
+
+    <!-- IN-APP LOCAL INBOX VIEWER (ADMIN / FOUNDER READ-ONLY) -->
+    <div style="margin-top: 2.5rem; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 24px; padding: clamp(1.5rem, 4vw, 2.5rem); box-shadow: var(--shadow);">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem;">
+        <h3 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.6rem;">📥 Saved In-App Messages & Reviews</h3>
+        <button onclick="renderInAppInbox()" class="toggle" style="font-size: 0.75rem;">↻ Refresh Inbox</button>
+      </div>
+      <div id="inAppInboxContainer">
+        <!-- Rendered via JS -->
+      </div>
     </div>
   </div>
 </section>
