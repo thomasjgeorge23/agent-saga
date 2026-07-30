@@ -651,3 +651,20 @@ __all__ += ["Corpus", "Example", "Label", "build_corpus"]
 from .synthetic import SYNTHETIC_FIELD, WALProfile, is_synthetic, synthesize
 
 __all__ += ["SYNTHETIC_FIELD", "WALProfile", "is_synthetic", "synthesize"]
+
+# -- WAL-mined failure prediction: advisory, explainable, fenced in --------------
+from .risk import FailureModel, RiskAssessment, RiskFactor, require_review_above
+
+__all__ += ["FailureModel", "RiskAssessment", "RiskFactor", "require_review_above"]
+
+# -- bounded verification of the rollback invariants ------------------------------
+from .verification import (
+    INVARIANTS,
+    Interleaving,
+    InvariantViolation,
+    VerificationReport,
+    verify_rollback_invariants,
+)
+
+__all__ += ["INVARIANTS", "Interleaving", "InvariantViolation",
+            "VerificationReport", "verify_rollback_invariants"]

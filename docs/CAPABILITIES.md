@@ -160,6 +160,8 @@ concurrent edit.
 | Write-ahead log | `wal/` | file, mmap, Postgres, Redis; hash-chained; `barrier()` durability fence |
 | Crash recovery | `recovery.py` | expired leases (not PIDs); deterministic tokens prevent double-compensation |
 | Context receipts | `context_broker.py` | HOT/WARM/COLD tiers; drifted summaries are evicted, never served |
+| Bounded verification | `verification.py` | executes EVERY failure interleaving up to N steps against the real engine and checks 7 rollback invariants; states its bound rather than claiming unbounded proof |
+| Failure prediction | `risk.py` | learns from the log which call shapes had to be undone; reports lift over the base rate, declines to answer below its support threshold, and ships no silent blocking gate |
 | Synthetic WALs | `synthetic.py` | learn a log's shape, generate any volume of it; carries no real values, and every record is marked `__synthetic__` so it can never be mistaken for evidence |
 | Training corpus from the log | `corpus.py` | labels every action by whether reality kept it; a step rolled back for a LATER failure is COLLATERAL, not a negative, so the dataset is not poisoned |
 | Counterfactual replay | `counterfactual.py` | evaluate a cheaper model against recorded history with zero side effects; a divergence is reported UNKNOWABLE rather than guessed |

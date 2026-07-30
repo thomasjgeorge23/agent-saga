@@ -59,6 +59,37 @@ use any of them, upgrade.
 
 ### Added
 
+- **`agent_saga.verification`** — exhaustive bounded verification of the
+  rollback state machine, answering the fair criticism that "tests check the
+  cases somebody thought of". `verify_rollback_invariants(max_steps=6)`
+  enumerates **every** failure interleaving up to N steps (which step's forward
+  call raises x which subset of inverses then refuse x whether a committed step
+  has no inverse) and executes each against the real `saga_scope` and
+  `SagaContext` — not a model of them. 321 interleavings at N=6, seven
+  invariants: LIFO attempt order, no successful double compensation, bounded
+  retries, exactly one outcome bucket per step, `clean` never claimed over an
+  incomplete rollback, halt strands only earlier steps and reports them
+  UNRESOLVED, and an inverse-less committed step reported ORPHANED rather than
+  dropped. The report **states its bound**: this is bounded model checking of
+  the implementation, not a proof for unbounded N and not a claim about
+  concurrency or partitions, which `test_chaos.py`, the `crash_worker`
+  subprocesses and `test_mesh_fuzz.py` cover instead.
+
+- **`agent_saga.risk`** — failure prediction mined from the log. The one
+  statistical component in an otherwise deterministic architecture, and fenced
+  in accordingly: it **advises**, it does not decide. `FailureModel.fit()`
+  learns which call shapes had to be undone, reusing `corpus`'s labels so a step
+  rolled back because a *later* step failed is not counted as a failure of its
+  own — without that attribution the model learns "charging money is dangerous",
+  which is true and useless. Reports **lift over the base rate** rather than a
+  raw frequency, because "9 of 12 failed" is meaningless when three quarters of
+  everything fails. Below its support threshold it produces no number and says
+  plainly that silence is not a clean bill of health. Features are explainable
+  by design (tool, argument shape, numeric decile) so an operator can act on the
+  answer. Ships **no automatic blocking gate**: `require_review_above()` is an
+  explicit opt-in that raises `REQUIRE_APPROVAL`, not `BLOCK`, because a
+  resemblance warrants a human looking rather than a refusal.
+
 - **`agent_saga.synthetic`** — learn the statistical shape of a real WAL and
   generate any volume of traffic from it. Solves two problems at once: a WAL
   cannot be shared (it holds amounts, addresses, customer ids), and recovery
