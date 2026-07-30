@@ -646,3 +646,8 @@ __all__ += ["Divergence", "RecordedStep", "ReplayVerdict", "counterfactual_repla
 from .corpus import Corpus, Example, Label, build_corpus
 
 __all__ += ["Corpus", "Example", "Label", "build_corpus"]
+
+# -- synthetic WALs: the shape of your traffic, none of your customers' data ------
+from .synthetic import SYNTHETIC_FIELD, WALProfile, is_synthetic, synthesize
+
+__all__ += ["SYNTHETIC_FIELD", "WALProfile", "is_synthetic", "synthesize"]

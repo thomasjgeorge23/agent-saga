@@ -149,6 +149,60 @@ async def test_synthetic_strings_are_obviously_synthetic(tmp_path):
     assert charge["kwargs"]["customer_email"].startswith("synthetic_customer_email_")
 
 
+def test_a_single_valued_numeric_field_is_not_reproduced_exactly():
+    """The leak this module shipped with, now pinned.
+
+    A field observed with one value gave `low == high`, and sampling from that
+    interval returned the real number every time -- a certainty, not a chance.
+    The stored range is widened so the degenerate case stops being a guaranteed
+    disclosure.
+    """
+    records = [
+        {"saga_id": "s1", "event": "SAGA_START"},
+        {"saga_id": "s1", "event": "STEP_INTENT", "step_id": "a",
+         "tool": "pay.send", "semantics": "COMPENSABLE",
+         "kwargs": {"amount": 4242424}},
+        {"saga_id": "s1", "event": "STEP_COMMITTED", "step_id": "a",
+         "tool": "pay.send"},
+        {"saga_id": "s1", "event": "SAGA_COMPLETE"},
+    ]
+    profile = WALProfile.fit(records)
+    kind, low, high = profile.fields["pay.send\x1famount"]
+    assert low < 4242424 < high, "the range was not widened"
+
+    # across many draws the exact value must not dominate
+    values = set()
+    for seed in range(20):
+        generated = synthesize(profile, sagas=1, seed=seed, chain=False)
+        intent = next(r for r in generated if r["event"] == "STEP_INTENT")
+        values.add(intent["kwargs"]["amount"])
+    assert values != {4242424}
+
+
+def test_redact_at_fit_time_drops_identifier_fields_entirely():
+    """The honest answer for a numeric field that is an identifier rather than
+    a magnitude: a range models an amount and mismodels an account number, and
+    only the operator knows which is which."""
+    records = [
+        {"saga_id": "s1", "event": "SAGA_START"},
+        {"saga_id": "s1", "event": "STEP_INTENT", "step_id": "a",
+         "tool": "pay.send", "semantics": "COMPENSABLE",
+         "kwargs": {"amount": 100, "account_number": 90210}},
+        {"saga_id": "s1", "event": "STEP_COMMITTED", "step_id": "a",
+         "tool": "pay.send"},
+        {"saga_id": "s1", "event": "SAGA_COMPLETE"},
+    ]
+    profile = WALProfile.fit(records, redact=["account"])
+
+    assert "pay.send\x1famount" in profile.fields
+    assert "pay.send\x1faccount_number" not in profile.fields
+
+    generated = synthesize(profile, sagas=5, seed=1, chain=False)
+    blob = json.dumps(generated)
+    assert "90210" not in blob
+    assert "account_number" not in blob
+
+
 # -- 2. everything is marked -----------------------------------------------------------
 
 def test_every_generated_record_is_marked():

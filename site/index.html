@@ -213,6 +213,38 @@
   .docs-card { background: var(--panel); border: 1px solid var(--border-strong); border-radius: 20px; padding: 2.5rem; box-shadow: var(--shadow); margin-top: 2rem; }
   .docs-code { background: #050810; border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem; font-family: var(--mono); font-size: .88rem; color: var(--text); overflow-x: auto; margin-top: 1rem; }
 
+  /* Page View Controller & Multi-Page Sub-System */
+  .page-view { display: none; }
+  .page-view.active-view { display: block; animation: fadeInView 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+  @keyframes fadeInView { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Sub-Nav View Tabs */
+  .view-tab-bar { display: flex; align-items: center; gap: 0.5rem; background: var(--panel); border: 1px solid var(--border-strong); padding: 0.4rem 0.6rem; border-radius: 14px; margin-top: 1.5rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .view-tab-btn { font-family: var(--mono); font-size: 0.82rem; font-weight: 700; background: transparent; color: var(--dim); border: 1px solid transparent; border-radius: 8px; padding: 0.45rem 0.9rem; cursor: pointer; white-space: nowrap; transition: all 0.2s ease; }
+  .view-tab-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+  .view-tab-btn.active { color: #070c16; background: var(--accent); border-color: var(--accent); }
+
+  /* Mobile Bottom App Navigation Dock */
+  .mobile-bottom-dock {
+    display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 999;
+    background: color-mix(in srgb, var(--panel) 96%, transparent); backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-strong); padding: 0.4rem 0.2rem;
+    justify-content: space-around; align-items: center; box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+  }
+  .dock-item {
+    display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+    font-family: var(--mono); font-size: 0.62rem; font-weight: 800; color: var(--dim);
+    text-decoration: none; padding: 0.35rem 0.5rem; border-radius: 10px; transition: all 0.2s ease;
+    border: none; background: transparent; cursor: pointer;
+  }
+  .dock-item.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  .dock-item .dock-icon { font-size: 1.15rem; }
+
+  @media (max-width: 768px) {
+    .mobile-bottom-dock { display: flex; }
+    body { padding-bottom: 72px !important; }
+  }
+
   /* Responsive Mobile & Tablet Perfection */
   .mobile-menu-btn { display: none; background: var(--panel); border: 1px solid var(--border-strong); color: var(--text); padding: .4rem .7rem; border-radius: 8px; font-family: var(--mono); font-size: .82rem; cursor: pointer; }
   
@@ -257,22 +289,47 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top">agent-saga <span class="seq">v0.5.3</span></a>
+    <a class="brand" href="javascript:void(0)" onclick="switchPageView('page-overview')">agent-saga <span class="seq">v0.5.3</span></a>
     <button class="mobile-menu-btn" id="mobileNavBtn" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰ Menu</button>
     <nav class="nav-links">
-      <a href="#demo">Live Demo</a>
-      <a href="#sdk">Agent SDK</a>
-      <a href="#categories">Industries</a>
-      <a href="#sandbox">Live Sandbox</a>
-      <a href="#inquiry">Direct Inquiry</a>
-      <a href="#install">Docs</a>
+      <a href="javascript:void(0)" onclick="switchPageView('page-overview')" class="active">⚡ Overview</a>
+      <a href="javascript:void(0)" onclick="switchPageView('page-industries')">🏢 Industries</a>
+      <a href="javascript:void(0)" onclick="switchPageView('page-sandbox')">🧪 Sandbox</a>
+      <a href="javascript:void(0)" onclick="switchPageView('page-sdk')">🛠️ SDK & Docs</a>
+      <a href="javascript:void(0)" onclick="switchPageView('page-inquiry')">✉️ Founder Inquiry</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank" rel="noopener">GitHub</a>
       <button class="toggle" id="themeBtn">theme</button>
     </nav>
   </div>
 </header>
 
+<!-- Mobile Bottom Dock App Bar -->
+<div class="mobile-bottom-dock">
+  <button class="dock-item active" onclick="switchPageView('page-overview')">
+    <span class="dock-icon">⚡</span>
+    <span>Overview</span>
+  </button>
+  <button class="dock-item" onclick="switchPageView('page-industries')">
+    <span class="dock-icon">🏢</span>
+    <span>Industries</span>
+  </button>
+  <button class="dock-item" onclick="switchPageView('page-sandbox')">
+    <span class="dock-icon">🧪</span>
+    <span>Sandbox</span>
+  </button>
+  <button class="dock-item" onclick="switchPageView('page-sdk')">
+    <span class="dock-icon">🛠️</span>
+    <span>SDK & Docs</span>
+  </button>
+  <button class="dock-item" onclick="switchPageView('page-inquiry')">
+    <span class="dock-icon">✉️</span>
+    <span>Founder</span>
+  </button>
+</div>
+
 <main id="top">
+  <!-- PAGE 1: OVERVIEW & LIVE DEMO -->
+  <div id="page-overview" class="page-view active-view">
   <!-- HERO -->
   <section class="hero">
     <div class="wrap hero-grid">
@@ -293,8 +350,8 @@
           <button id="copyBtn">copy</button>
         </div>
         <div style="margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-          <a class="btn primary" href="#sandbox">Test Custom Input Sandbox →</a>
-          <a class="btn ghost" href="#install">View Documentation</a>
+          <button class="btn primary" onclick="switchPageView('page-sandbox')">Test Custom Sandbox →</button>
+          <button class="btn ghost" onclick="switchPageView('page-sdk')">View Documentation</button>
           <a class="btn ghost" href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">Star on GitHub</a>
         </div>
       </div>
@@ -371,8 +428,12 @@
       distinct outcomes. A partial rollback can never be drawn as a clean one.</p>
     </div>
   </section>
+  </div> <!-- END PAGE-OVERVIEW -->
 
-  <section id="sdk">
+  <!-- PAGE 2: INDUSTRIES & PRINCIPLES -->
+  <div id="page-industries" class="page-view">
+  <!-- CORE DESIGN PHILOSOPHY -->
+  <section style="background: var(--panel); border-bottom: 1px solid var(--border); padding: 4rem 0;">
     <div class="wrap">
       <p class="eyebrow">AgentKit SDK</p>
       <h2>One object. Three verbs. A safety net an agent can <span class="amber">read</span>.</h2>
@@ -508,7 +569,10 @@ async with kit.transaction():
       </div>
     </div>
   </section>
+  </div> <!-- END PAGE-INDUSTRIES -->
 
+  <!-- PAGE 3: LIVE SAFETY SANDBOX -->
+  <div id="page-sandbox" class="page-view">
   <!-- PRACTICAL CUSTOM INPUT SANDBOX CONSOLE WITH BEFORE/AFTER TOGGLE -->
   <section id="sandbox">
     <div class="wrap">
@@ -562,7 +626,10 @@ async with kit.transaction():
       </div>
     </div>
   </section>
+  </div> <!-- END PAGE-SANDBOX -->
 
+  <!-- PAGE 4: SDK & DOCS -->
+  <div id="page-sdk" class="page-view">
   <!-- WORLD-CLASS INNOVATIONS -->
   <section id="features">
     <div class="wrap">
@@ -1384,12 +1451,37 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
     }
   }
 
+  function switchPageView(viewId) {
+    var views = document.querySelectorAll('.page-view');
+    views.forEach(function(v) { v.classList.remove('active-view'); });
+    var target = document.getElementById(viewId);
+    if (target) { target.classList.add('active-view'); }
+
+    var links = document.querySelectorAll('.nav-links a, .dock-item');
+    links.forEach(function(l) {
+      if (l.getAttribute('onclick') && l.getAttribute('onclick').includes(viewId)) {
+        l.classList.add('active');
+      } else {
+        l.classList.remove('active');
+      }
+    });
+
+    var mobileNav = document.querySelector('.nav-links');
+    if (mobileNav) { mobileNav.classList.remove('open'); }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   // Initial render
   renderFormFields();
 </script>
 
-<!-- DIRECT FOUNDER INQUIRY & USER REVIEWS PORTAL -->
-<section id="inquiry" style="background: color-mix(in srgb, var(--panel) 50%, var(--bg)); border-top: 1px solid var(--border);">
+  </div> <!-- END PAGE-SDK -->
+
+  <!-- PAGE 5: DIRECT FOUNDER INQUIRY -->
+  <div id="page-inquiry" class="page-view">
+  <!-- DIRECT FOUNDER INQUIRY & USER REVIEWS PORTAL -->
+  <section id="inquiry" style="background: color-mix(in srgb, var(--panel) 50%, var(--bg)); border-top: 1px solid var(--border);">
   <div class="wrap" style="max-width: 860px;">
     <div style="text-align: center; margin-bottom: 2.5rem;">
       <span class="eyebrow">✉️ Direct Founder Contact & Review Portal</span>
@@ -1442,6 +1534,8 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
     </div>
   </div>
 </section>
+  </div> <!-- END PAGE-INQUIRY -->
+</main>
 
 <footer style="margin-top: 4rem; padding: 2.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); text-align: center; font-size: 0.95rem; color: #94a3b8;">
   <div class="wrap">
