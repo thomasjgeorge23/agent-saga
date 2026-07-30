@@ -594,3 +594,20 @@ __all__ += ["BoundaryRequired", "CoverageReport", "SagaFleet", "ToolCoverage",
 from .repair import RepairBlocked, RepairSession, RetainedStep
 
 __all__ += ["RepairBlocked", "RepairSession", "RetainedStep"]
+
+# -- cryptographic runtime integrity guard ----------------------------------------
+from ._integrity_guard import (
+    EngineTamperDetected,
+    SAGAOPS_ENGINE_SIGNATURE,
+    generate_wal_provenance_token,
+    verify_engine_integrity,
+    verify_wal_provenance_token,
+)
+
+__all__ += [
+    "EngineTamperDetected",
+    "SAGAOPS_ENGINE_SIGNATURE",
+    "generate_wal_provenance_token",
+    "verify_engine_integrity",
+    "verify_wal_provenance_token",
+]

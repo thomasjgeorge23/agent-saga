@@ -239,6 +239,12 @@ class AgentKit:
         blockers: list[str] = []
         warnings: list[str] = []
 
+        # 0. Engine integrity check. Fail-closed if core code is modified/tampered.
+        from ._integrity_guard import verify_engine_integrity
+        integrity = verify_engine_integrity()
+        if integrity["status"] != "VERIFIED":
+            blockers.append("engine integrity verification failed: tamper detected")
+
         # 1. The kill-switch. A global (empty-scope) switch that is not RUNNING
         # means side effects are being halted or drained right now.
         from .killswitch import get_kill_switch
