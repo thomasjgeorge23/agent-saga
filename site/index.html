@@ -213,8 +213,41 @@
   .docs-card { background: var(--panel); border: 1px solid var(--border-strong); border-radius: 20px; padding: 2.5rem; box-shadow: var(--shadow); margin-top: 2rem; }
   .docs-code { background: #050810; border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem; font-family: var(--mono); font-size: .88rem; color: var(--text); overflow-x: auto; margin-top: 1rem; }
 
-  footer { border-top: 1px solid var(--border); padding: 4.5rem 0; color: var(--dim); }
-  .foot-grid { display: flex; flex-wrap: wrap; gap: 2rem; align-items: center; }
+  /* Responsive Mobile & Tablet Perfection */
+  .mobile-menu-btn { display: none; background: var(--panel); border: 1px solid var(--border-strong); color: var(--text); padding: .4rem .7rem; border-radius: 8px; font-family: var(--mono); font-size: .82rem; cursor: pointer; }
+  
+  @media (max-width: 980px) {
+    .hero-grid { grid-template-columns: 1fr !important; gap: 2rem !important; }
+    .category-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important; }
+    .sandbox-grid { grid-template-columns: 1fr !important; }
+    .input-panel { border-right: 0 !important; border-bottom: 1px solid var(--border) !important; }
+  }
+
+  @media (max-width: 768px) {
+    header.nav { padding: 0 0.5rem; }
+    .nav-in { height: 64px; }
+    .brand { font-size: 1.15rem; }
+    .mobile-menu-btn { display: block; margin-left: auto; }
+    .nav-links {
+      display: none; width: 100%; flex-direction: column; position: absolute;
+      top: 64px; left: 0; right: 0; background: var(--panel); border-bottom: 1px solid var(--border-strong);
+      padding: 1.5rem; gap: 1rem; box-shadow: var(--shadow); z-index: 100;
+    }
+    .nav-links.open { display: flex; }
+    .install { width: 100%; max-width: 100%; font-size: 0.85rem; padding: 0.7rem 0.9rem; }
+    .logline { grid-template-columns: 2.8rem 1fr auto; font-size: 0.78rem; gap: 0.4rem; padding: 0.4rem 0.7rem; }
+  }
+
+  @media (max-width: 480px) {
+    .wrap { width: 94vw; }
+    h1 { font-size: 2.1rem !important; }
+    h2 { font-size: 1.7rem !important; }
+    .lede { font-size: 1rem !important; }
+    .btn { width: 100%; justify-content: center; padding: 0.75rem 1rem; }
+    .cat-card { padding: 1.2rem; }
+    .install { flex-direction: column; align-items: flex-start; }
+    .install button { width: 100%; text-align: center; }
+  }
 </style>
 </head>
 <body>
@@ -224,13 +257,14 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top">agent-saga <span class="seq">v0.4.2</span></a>
+    <a class="brand" href="#top">agent-saga <span class="seq">v0.5.3</span></a>
+    <button class="mobile-menu-btn" id="mobileNavBtn" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰ Menu</button>
     <nav class="nav-links">
       <a href="#demo">Live Demo</a>
-          <a href="#sdk">Agent SDK</a>
+      <a href="#sdk">Agent SDK</a>
       <a href="#categories">Industries</a>
       <a href="#sandbox">Live Sandbox</a>
-      <a href="#features">Capabilities</a>
+      <a href="#inquiry">Direct Inquiry</a>
       <a href="#install">Docs</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank" rel="noopener">GitHub</a>
       <button class="toggle" id="themeBtn">theme</button>
@@ -1308,9 +1342,107 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
     status.textContent = 'DONE';
   }
 
+  async function submitInquiry(e) {
+    e.preventDefault();
+    var name = document.getElementById('inqName').value;
+    var email = document.getElementById('inqEmail').value;
+    var company = document.getElementById('inqCompany').value;
+    var subject = document.getElementById('inqSubject').value;
+    var message = document.getElementById('inqMessage').value;
+    var btn = document.getElementById('inqSubmitBtn');
+    var badge = document.getElementById('inqStatusBadge');
+
+    btn.disabled = true;
+    btn.textContent = 'Delivering Inquiry...';
+    badge.hidden = false;
+    badge.style.color = '#f59e0b';
+    badge.textContent = '⌛ Encrypting & Sending...';
+
+    try {
+      var res = await fetch('/api/inquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, email: email, company: company, subject: subject, message: message })
+      });
+      var data = await res.json();
+      if (res.ok) {
+        badge.style.color = '#10b981';
+        badge.textContent = '✓ ' + (data.message || 'Delivered to Founder Thomas J George!');
+        document.getElementById('directInquiryForm').reset();
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err) {
+      // Offline / Mailto Fallback
+      var mailtoUrl = `mailto:thomasjgeorge23@gmail.com?subject=${encodeURIComponent('[agent-saga Inquiry] ' + subject)}&body=${encodeURIComponent('From: ' + name + ' (' + email + ' / ' + company + ')\n\n' + message)}`;
+      window.location.href = mailtoUrl;
+      badge.style.color = '#10b981';
+      badge.textContent = '✓ Mail client opened for direct delivery to thomasjgeorge23@gmail.com';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Send Direct Inquiry →';
+    }
+  }
+
   // Initial render
   renderFormFields();
 </script>
+
+<!-- DIRECT FOUNDER INQUIRY & USER REVIEWS PORTAL -->
+<section id="inquiry" style="background: color-mix(in srgb, var(--panel) 50%, var(--bg)); border-top: 1px solid var(--border);">
+  <div class="wrap" style="max-width: 860px;">
+    <div style="text-align: center; margin-bottom: 2.5rem;">
+      <span class="eyebrow">✉️ Direct Founder Contact & Review Portal</span>
+      <h2>Write Directly to Founder Thomas J George</h2>
+      <p class="lede" style="margin-inline: auto;">
+        Have an enterprise inquiry, integration requirement, bug report, or user review? Write directly below — all submissions are stored in our secure private admin store and alerted directly to <b>thomasjgeorge23@gmail.com</b>.
+      </p>
+    </div>
+
+    <div style="background: var(--panel); border: 1px solid var(--border-strong); border-radius: 24px; padding: clamp(1.5rem, 4vw, 2.5rem); box-shadow: var(--shadow);">
+      <form id="directInquiryForm" onsubmit="submitInquiry(event)">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.2rem; margin-bottom: 1.2rem;">
+          <div class="form-group">
+            <label for="inqName">Your Full Name *</label>
+            <input type="text" id="inqName" placeholder="e.g. Sarah Connor" required />
+          </div>
+          <div class="form-group">
+            <label for="inqEmail">Your Email Address *</label>
+            <input type="email" id="inqEmail" placeholder="e.g. sarah@enterprise.com" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.2rem; margin-bottom: 1.2rem;">
+          <div class="form-group">
+            <label for="inqCompany">Company / Organization</label>
+            <input type="text" id="inqCompany" placeholder="e.g. Enterprise AI / Independent" />
+          </div>
+          <div class="form-group">
+            <label for="inqSubject">Category / Subject</label>
+            <select id="inqSubject">
+              <option value="Enterprise Integration">Enterprise Integration</option>
+              <option value="User Review & Testimonial">User Review & Testimonial</option>
+              <option value="Feature Request">Feature Request</option>
+              <option value="Security / Audit Inquiry">Security / Audit Inquiry</option>
+              <option value="General Question">General Question</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label for="inqMessage">Your Message, Inquiry, or User Review *</label>
+          <textarea id="inqMessage" rows="5" placeholder="Write your message directly to Founder Thomas J George..." required></textarea>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+          <button type="submit" class="btn primary" id="inqSubmitBtn">Send Direct Inquiry →</button>
+          <div id="inqStatusBadge" style="font-family: var(--mono); font-size: 0.85rem; font-weight: 700;" hidden></div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
 <footer style="margin-top: 4rem; padding: 2.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); text-align: center; font-size: 0.95rem; color: #94a3b8;">
   <div class="wrap">
     <p style="margin-bottom: 0.5rem;"><b>agent-saga / SAGAOPS Enterprise</b> — Founded & Lead Architected by <a href="https://github.com/thomasjgeorge23" target="_blank" style="color: #60a5fa; text-decoration: none; font-weight: 600;">Thomas J George</a></p>

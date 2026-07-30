@@ -641,3 +641,8 @@ from .counterfactual import (
 )
 
 __all__ += ["Divergence", "RecordedStep", "ReplayVerdict", "counterfactual_replay"]
+
+# -- the WAL as a labelled training corpus ----------------------------------------
+from .corpus import Corpus, Example, Label, build_corpus
+
+__all__ += ["Corpus", "Example", "Label", "build_corpus"]

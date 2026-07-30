@@ -159,6 +159,8 @@ concurrent edit.
 | Write-ahead log | `wal/` | file, mmap, Postgres, Redis; hash-chained; `barrier()` durability fence |
 | Crash recovery | `recovery.py` | expired leases (not PIDs); deterministic tokens prevent double-compensation |
 | Context receipts | `context_broker.py` | HOT/WARM/COLD tiers; drifted summaries are evicted, never served |
+| Training corpus from the log | `corpus.py` | labels every action by whether reality kept it; a step rolled back for a LATER failure is COLLATERAL, not a negative, so the dataset is not poisoned |
+| Counterfactual replay | `counterfactual.py` | evaluate a cheaper model against recorded history with zero side effects; a divergence is reported UNKNOWABLE rather than guessed |
 | Argument provenance | `provenance_gate.py` | refuses a side effect whose critical argument was model-invented; SOURCED is verified against the document, not accepted on the label |
 | Grounded answers | `grounding.py` | `VERIFIED` / `UNCITED` / `BROKEN_CITATION` / `BROKEN_QUOTE` / `UNSUPPORTED` |
 | Multi-model routing | `ir.py`, `router.py` | every decision and refusal names every candidate and reason |
