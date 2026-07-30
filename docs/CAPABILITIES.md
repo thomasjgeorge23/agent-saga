@@ -40,7 +40,7 @@ Framework extras: `langgraph`, `crewai`, `autogen`, `llamaindex`,
 
 ---
 
-## CLI — all 24 commands
+## CLI — all 25 commands
 
 ### Start here
 
@@ -50,8 +50,12 @@ Framework extras: `langgraph`, `crewai`, `autogen`, `llamaindex`,
 | `agent-saga new <name>` | scaffold a runnable enterprise agent app |
 | `agent-saga doctor` | audit production posture: the settings that silently lose effects |
 | `agent-saga studio` | one-command local dev: dashboard + recovery daemon + WAL tail in one process |
+| `agent-saga adopt` | scan an existing agent project and generate its saga wrappers |
 
-`demo` takes `--no-color`, `--fast`, `--logs`. `new` takes `--directory/-d`,
+`adopt` takes `--root`, `--out`, `--force`; it never decides a tool's
+semantics, emitting `DECIDE` (a sentinel that raises) so the generated
+module cannot even be imported until a human has classified each side
+effect. `demo` takes `--no-color`, `--fast`, `--logs`. `new` takes `--directory/-d`,
 `--force`. `doctor` takes `--replicas N` (promotes the process-local-WAL finding
 from risk to blocker) and `--strict` (exit 1 on risks too, for CI).
 

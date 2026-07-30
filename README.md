@@ -23,6 +23,32 @@ whole transaction — in-process on failure, or from a separate recovery daemon
 if the process itself dies. Infrastructure, vector stores, tickets, PRs,
 messages — and, yes, money.
 
+## Already have an agent? Adopt it in one command
+
+```bash
+agent-saga adopt --out saga_tools.py
+```
+
+It indexes your project, detects which frameworks you're using, finds your
+tools, and writes the wrapping module for them. What it will **not** do is
+decide each tool's semantics — that judgement is what the whole engine rests
+on, and a plausible default there is the most expensive kind of wrong. An
+emailer quietly marked `COMPENSABLE` looks protected and isn't.
+
+So every tool comes out as `semantics=DECIDE`, and `DECIDE` is a sentinel that
+raises. **The generated module cannot even be imported until a human has
+classified each side effect.** That's deliberate friction in the one place
+friction pays.
+
+It does offer hints, clearly labelled as hints:
+
+```
+  app.tools.send_welcome_email  (decorated, line 9)
+      hint: the name contains 'send', which usually means no automated undo
+      exists -- consider IRREVERSIBLE, which is gated before it runs rather
+      than undone after. A hint, not a classification.
+```
+
 ## The 30-step problem
 
 A step that succeeds 98% of the time is a good step. Chain thirty of them and

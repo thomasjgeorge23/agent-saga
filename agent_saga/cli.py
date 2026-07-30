@@ -652,6 +652,16 @@ def build_parser() -> argparse.ArgumentParser:
                              "enabled, instead of reporting them as unchained")
     verify.set_defaults(func=_cmd_verify)
 
+    adopt = sub.add_parser(
+        "adopt",
+        help="scan an existing agent project and generate its saga wrappers")
+    adopt.add_argument("--root", default=".", help="project root (default: .)")
+    adopt.add_argument("--out", default=None,
+                       help="write the wrapping module here (default: report only)")
+    adopt.add_argument("--force", action="store_true",
+                       help="overwrite an existing --out file")
+    adopt.set_defaults(func=_cmd_adopt)
+
     demo = sub.add_parser(
         "demo",
         help="watch a failure, a rollback, and a killed process get cleaned up")
@@ -1017,6 +1027,33 @@ def _cmd_prove(args: argparse.Namespace) -> int:
     print(f"  disclosed : {bundle['disclosed']} of {bundle['log_size']} record(s)",
           file=sys.stderr)
     print(f"  root      : {bundle['merkle_root']}", file=sys.stderr)
+    return 0
+
+
+def _cmd_adopt(args: argparse.Namespace) -> int:
+    """Index an existing agent project and wire it up mechanically.
+
+    The judgement half -- what each side effect's semantics are -- is left to
+    a human on purpose, and the generated module refuses to run until they
+    have answered.
+    """
+    from .adopt import analyse
+
+    plan = analyse(args.root)
+    print(plan.format_text())
+
+    if args.out:
+        target = Path(args.out)
+        if target.exists() and not args.force:
+            print(f"\n{target} already exists; pass --force to overwrite.")
+            return 1
+        if not plan.candidates:
+            print("\nNothing to write.")
+            return 0
+        target.write_text(plan.render_module(), encoding="utf-8")
+        print(f"\nwrote {target} -- every tool has semantics=DECIDE, which "
+              f"raises until you replace it. Fill those in, then run "
+              f"`agent-saga doctor`.")
     return 0
 
 
