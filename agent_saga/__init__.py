@@ -611,3 +611,9 @@ __all__ += [
     "verify_engine_integrity",
     "verify_wal_provenance_token",
 ]
+
+# -- verification-gated cascade: the cheapest tier that can be proven right ------
+from .cascade import CascadeExhausted, CascadeResult, Rung, cascade, tools_must_exist
+
+__all__ += ["CascadeExhausted", "CascadeResult", "Rung", "cascade",
+            "tools_must_exist"]

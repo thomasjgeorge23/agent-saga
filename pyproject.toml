@@ -15,8 +15,8 @@ license = "Apache-2.0"
 # NOTICE is required downstream by Apache-2.0 section 4(d); TRADEMARKS.md states
 # the section 6 carve-out. Both travel with the wheel, not just the repo.
 license-files = ["LICENSE", "NOTICE", "TRADEMARKS.md"]
-authors = [{ name = "SagaOps" }]
-maintainers = [{ name = "SagaOps" }]
+authors = [{ name = "Thomas J George", email = "thomasjgeorge23@gmail.com" }]
+maintainers = [{ name = "Thomas J George", email = "thomasjgeorge23@gmail.com" }]
 keywords = ["ai-agents", "saga", "rollback", "compensation", "llm", "observability"]
 classifiers = [
     # No `License ::` classifier: PEP 639 deprecates it in favour of the SPDX
@@ -28,9 +28,12 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://sagaops.dev"
+Homepage = "https://github.com/thomasjgeorge23/agent-saga"
+Documentation = "https://github.com/thomasjgeorge23/agent-saga#readme"
 Repository = "https://github.com/thomasjgeorge23/agent-saga"
-Issues = "https://github.com/thomasjgeorge23/agent-saga/issues"
+"Source Code" = "https://github.com/thomasjgeorge23/agent-saga"
+"Bug Tracker" = "https://github.com/thomasjgeorge23/agent-saga/issues"
+"GitHub Profile" = "https://github.com/thomasjgeorge23"
 
 [project.optional-dependencies]
 # Everything the full test suite needs. CI installs exactly this, so a gate that

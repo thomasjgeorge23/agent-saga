@@ -59,6 +59,31 @@ use any of them, upgrade.
 
 ### Added
 
+- **`agent_saga.cascade`** — verification-gated cascade routing. The honest
+  answer to "make a cheap model perform like an expensive one": you cannot, but
+  you can stop trusting it and start checking it. `cascade(request,
+  ladder=[local, mid, frontier], verify=...)` runs the cheapest host first and
+  returns its answer **only if a check that can actually fail passed it** — a
+  schema, a grounding receipt, `tools_must_exist()`, an entailment judge. On
+  failure it re-asks the same host once with the precise rejection reason
+  (cheap correction), then escalates carrying that reason upward. Nothing
+  unverified is ever returned: exhaustion raises `CascadeExhausted` with the
+  full trace, because returning the last answer anyway would make the cascade
+  decorative. Escalation is evidence-driven rather than confidence-guessed —
+  "does this tool exist?" has one right answer where "are you sure?" does not.
+  Tokens from *rejected* tiers are counted too, since counting only the winner
+  would flatter the result, and the whole ladder lands in the WAL as
+  `CASCADE_RESOLVED`. Complements `router.complete()`, which deliberately
+  refuses to fall *down* the ladder on a validation failure.
+- **`agent-saga adopt`** — scan an existing agent project, detect its
+  frameworks, find its tools across three definition styles (`@tool`
+  decorators, `StructuredTool.from_function`, `BaseTool` subclasses), and
+  generate the wrapping module. It never decides a tool's semantics: every
+  entry is `semantics=DECIDE`, a sentinel that raises, so the generated module
+  **cannot even be imported** until a human has classified each side effect.
+  Name-based hints are offered and explicitly labelled as hints. Addresses the
+  project's real weakness — onboarding, not capability.
+
 - **`agent_saga.repair`** — surgical repair (edit-and-resume). A human can fix
   the step that failed and finish the transaction instead of unwinding it,
   which is what a malformed argument at step four of six actually calls for.

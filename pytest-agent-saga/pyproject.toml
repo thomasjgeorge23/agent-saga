@@ -4,14 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pytest-agent-saga"
-version = "0.5.2"
+version = "0.5.3"
 description = "Pytest plugin for agent-saga: deterministic replay verification, chaos injection, and WAL fixtures."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 keywords = ["pytest", "agent-saga", "saga", "ai-agents", "testing", "chaos-engineering"]
 authors = [
-    { name = "AgentSaga Team", email = "dev@agent-saga.io" }
+    { name = "Thomas J George", email = "thomasjgeorge23@gmail.com" }
+]
+maintainers = [
+    { name = "Thomas J George", email = "thomasjgeorge23@gmail.com" }
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -21,14 +24,19 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Software Development :: Testing",
 ]
+
 dependencies = [
     "pytest>=7.0.0",
     "agent-saga>=0.2.3",
 ]
 
-[project.entry-points.pytest11]
-pytest_agent_saga = "pytest_agent_saga.plugin"
-
 [project.urls]
 Homepage = "https://github.com/thomasjgeorge23/agent-saga"
+Documentation = "https://github.com/thomasjgeorge23/agent-saga#readme"
 Repository = "https://github.com/thomasjgeorge23/agent-saga"
+"Source Code" = "https://github.com/thomasjgeorge23/agent-saga"
+"Bug Tracker" = "https://github.com/thomasjgeorge23/agent-saga/issues"
+"GitHub Profile" = "https://github.com/thomasjgeorge23"
+
+[project.entry-points.pytest11]
+pytest_agent_saga = "pytest_agent_saga.plugin"

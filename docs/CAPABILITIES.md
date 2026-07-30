@@ -161,6 +161,7 @@ concurrent edit.
 | Context receipts | `context_broker.py` | HOT/WARM/COLD tiers; drifted summaries are evicted, never served |
 | Grounded answers | `grounding.py` | `VERIFIED` / `UNCITED` / `BROKEN_CITATION` / `BROKEN_QUOTE` / `UNSUPPORTED` |
 | Multi-model routing | `ir.py`, `router.py` | every decision and refusal names every candidate and reason |
+| Verification-gated cascade | `cascade.py` | cheapest tier that passes a real check; escalates on evidence carrying the rejection reason; every tier's cost reported |
 | Agent loop | `agent_loop.py` | deadlines, token budgets, stall detection; the goal is the transaction |
 | Codemod pipeline | `codemod/` | index → plan → gate → apply, all four stages |
 | Graph export | `graph.py` | rollback fork as Mermaid/DOT; a partial rollback can't draw as clean |

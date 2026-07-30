@@ -23,6 +23,53 @@ whole transaction — in-process on failure, or from a separate recovery daemon
 if the process itself dies. Infrastructure, vector stores, tickets, PRs,
 messages — and, yes, money.
 
+## Making a cheap model produce answers you can trust
+
+Nothing in software makes a 7B model smarter — that lives in the weights. What
+you can stop doing is *trusting* it, and start *checking* it, then escalating on
+the evidence when the check fails.
+
+```python
+from agent_saga import cascade, tools_must_exist
+
+result = await cascade(request,
+                       ladder=[local_7b, mid_tier, frontier],
+                       verify=tools_must_exist(my_tool_names))
+
+result.host                     # which tier produced the verified answer
+result.escalations              # how often the cheap one wasn't enough
+result.tokens_used              # across ALL tiers, including rejected ones
+print(result.format_text())
+```
+
+The 7B answers first. Its output goes through a check that can actually fail —
+a schema, a grounding receipt, the tool registry, an entailment judge. Pass, and
+you paid 7B prices for a verified answer. Fail, and the next tier up receives
+the request **plus the specific reason the last one was rejected**, which is the
+part that measurably helps rather than just costing more.
+
+```
+cascade resolved on frontier after 1 escalation(s)
+  ->  local-7b            110 tok  0.01s  rejected: called tool(s) that do not
+                                            exist: ['send_emial']
+  ok  frontier            550 tok  0.04s
+  total tokens across all tiers: 660
+```
+
+Three deliberate properties:
+
+- **Escalation is evidence-driven, not confidence-guessed.** Asking a model how
+  sure it is yields a number weakly correlated with being right. Asking "does
+  this tool exist?" yields a fact. Only facts escalate here.
+- **Nothing unverified is ever returned.** If no tier passes, it raises
+  `CascadeExhausted` with the full trace. Returning the last answer anyway would
+  make the cascade decorative.
+- **The saving is measured.** Rejected tiers' tokens are counted too — counting
+  only the winner would flatter the cascade. If it isn't saving you anything,
+  the report is where you find that out.
+
+The whole ladder, failures included, lands in the WAL as `CASCADE_RESOLVED`.
+
 ## Already have an agent? Adopt it in one command
 
 ```bash
