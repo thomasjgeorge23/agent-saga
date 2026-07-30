@@ -588,6 +588,15 @@ def _cmd_reconcile(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_inquiries(args: argparse.Namespace) -> int:
+    from .inquiry_store import format_inquiries_summary, load_all_inquiries
+    if getattr(args, "json", False):
+        print(json.dumps(load_all_inquiries(), indent=2))
+    else:
+        print(format_inquiries_summary())
+    return 0
+
+
 def _cmd_recover(args: argparse.Namespace) -> int:
     from .recovery import RecoveryDaemon
     daemon = RecoveryDaemon(args.wal_path, dry_run=args.dry_run)
@@ -606,6 +615,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--version", action="version", version=f"agent-saga {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
+
+    inq = sub.add_parser("inquiries", help="view physically stored user inquiries, reviews, and feedback")
+    inq.add_argument("--json", action="store_true", help="output as raw JSON")
+    inq.set_defaults(func=_cmd_inquiries)
 
     recov = sub.add_parser("recover", help="run recovery daemon sweep over orphaned sagas")
     recov.add_argument("--wal-path", "--wal", default="./agent-saga.wal", help="path to WAL file")

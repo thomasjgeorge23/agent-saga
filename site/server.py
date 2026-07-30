@@ -27,16 +27,18 @@ logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(m
 
 ROOT_DIR = Path(__file__).parent.parent
 SITE_DIR = Path(__file__).parent
-INQUIRIES_FILE = ROOT_DIR / ".saga_inquiries.json"
+INQUIRIES_FILE = ROOT_DIR / "inquiries.json"
+BACKUP_INQUIRIES_FILE = ROOT_DIR / ".saga_inquiries.json"
 FOUNDER_EMAIL = "thomasjgeorge23@gmail.com"
 ADMIN_KEY = os.environ.get("SAGAOPS_ADMIN_KEY", "sagaops-secret-admin-2026")
 
 
 def load_inquiries() -> List[Dict[str, Any]]:
-    if not INQUIRIES_FILE.exists():
+    target = INQUIRIES_FILE if INQUIRIES_FILE.exists() else BACKUP_INQUIRIES_FILE
+    if not target.exists():
         return []
     try:
-        return json.loads(INQUIRIES_FILE.read_text(encoding="utf-8"))
+        return json.loads(target.read_text(encoding="utf-8"))
     except Exception as exc:
         logger.error("Failed to read inquiries file: %s", exc)
         return []
@@ -45,7 +47,10 @@ def load_inquiries() -> List[Dict[str, Any]]:
 def save_inquiry(record: Dict[str, Any]) -> None:
     inquiries = load_inquiries()
     inquiries.append(record)
-    INQUIRIES_FILE.write_text(json.dumps(inquiries, indent=2), encoding="utf-8")
+    text = json.dumps(inquiries, indent=2)
+    INQUIRIES_FILE.write_text(text, encoding="utf-8")
+    BACKUP_INQUIRIES_FILE.write_text(text, encoding="utf-8")
+    logger.info("💾 PHYSICALLY SAVED INQUIRY #%s (%s) TO DISK AT %s", record["id"], record["name"], INQUIRIES_FILE)
 
 
 def notify_founder_email(inquiry: Dict[str, Any]) -> bool:
