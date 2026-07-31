@@ -59,6 +59,52 @@ use any of them, upgrade.
 
 ### Added
 
+- **Semantic Kernel and Vertex AI adapters** — the two frameworks the adapter
+  matrix was genuinely missing (13 modules now). Both follow the established
+  pattern: the routing core is the shared `_common.build_runner`, so joining the
+  active saga, passing arguments to the gate and LIFO rollback are proven by
+  tests that need no SDK, while the SDK-specific packaging has an integration
+  test that skips when the SDK is absent. Each docstring says which half is
+  which rather than implying both are equally verified.
+  `vertex_ai` additionally ships `dispatch_function_call()`, because Vertex does
+  not execute tools for you and the natural handling — `registry[call.name]` —
+  raises a bare `KeyError` deep in a response loop when the model hallucinates a
+  tool. It raises `UnknownFunctionCall` naming what was asked for and what
+  exists, or with `strict=False` returns a structured error to feed the model
+  back its own mistake. `wrap_tool` preserves `__name__`, `__doc__` and the
+  signature, so the schema Vertex generates by introspection is unchanged.
+- **`docs/BENCHMARKS.md`** — published numbers with methodology. What is
+  measured (the overhead the library adds, against a bare-await baseline) and
+  what is not; the fast path (~17 us) and durable path (~7.9 ms) reported
+  separately and never blended; group commit shown in both directions (31x
+  throughput from 1 to 256 concurrent sagas, 9.6x latency); and the WAL measured
+  against the device's own `fsync` floor so the marginal cost (0.97 ms, 27%) is
+  the figure that travels between machines. States plainly what the numbers do
+  not establish: scale beyond one node, your hardware, or correctness under
+  failure — that last one being `verification.py`'s job.
+
+- **OpenTelemetry GenAI semantic conventions** (`observability/genai.py`).
+  agent-saga has always emitted good spans — under `saga.*` names it invented,
+  which meant every observability backend received them and understood none of
+  them. Spans now also carry `gen_ai.system`, `gen_ai.operation.name`,
+  `gen_ai.request.model`, `gen_ai.usage.*`, `gen_ai.tool.name`,
+  `gen_ai.response.finish_reasons` and `error.type`, and follow the convention's
+  span naming (`chat {model}`, `execute_tool {name}`) — so Langfuse, Arize
+  Phoenix, Datadog LLM Observability, Grafana and Honeycomb render them in the
+  panels already built for them, with no configuration. Wired into both the
+  router's model calls and `SagaContext.execute`'s tool calls.
+  **Additive, never a rename:** `saga.semantics` and `saga.is_compensation` have
+  no equivalent in the conventions and are what make a rollback legible, so both
+  vocabularies are emitted and no existing dashboard breaks.
+  **Message content is off by default:** prompts and tool arguments carry
+  customer data and a tracing backend is usually a third party nobody classified
+  as a data store, so capture requires
+  `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` or an explicit
+  argument — and an explicit `False` always beats the environment.
+  Unknown token counts are omitted rather than written as zero, and `error.type`
+  records the exception class rather than a message that could carry an account
+  number.
+
 - **`agent_saga.verification`** — exhaustive bounded verification of the
   rollback state machine, answering the fair criticism that "tests check the
   cases somebody thought of". `verify_rollback_invariants(max_steps=6)`

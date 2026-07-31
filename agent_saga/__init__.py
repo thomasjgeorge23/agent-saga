@@ -548,9 +548,14 @@ from .graph import dag_to_dot, dag_to_mermaid, wal_to_dot, wal_to_mermaid
 __all__ += ["dag_to_dot", "dag_to_mermaid", "wal_to_dot", "wal_to_mermaid"]
 
 # -- production readiness and project scaffold -----------------------------------
-from .readiness import Finding, ReadinessReport, audit
+# `Finding` at top level already means reconcile.Finding, which was exported
+# first and is what callers import today. Readiness gets a qualified alias
+# rather than silently shadowing it -- matching how certify's finding is
+# exported as SafetyFinding. `readiness.Finding` still works unqualified.
+from .readiness import Finding as ReadinessFinding
+from .readiness import ReadinessReport, audit
 
-__all__ += ["Finding", "ReadinessReport", "audit"]
+__all__ += ["ReadinessFinding", "ReadinessReport", "audit"]
 
 # -- v0.5.0 enterprise capabilities ----------------------------------------------
 from .multi_agent_mesh import SagaMeshCoordinator, VectorClock, CrossAgentStep
@@ -668,3 +673,15 @@ from .verification import (
 
 __all__ += ["INVARIANTS", "Interleaving", "InvariantViolation",
             "VerificationReport", "verify_rollback_invariants"]
+
+# -- CLI-backed surfaces, also callable as library APIs ---------------------------
+# `demo` is deliberately NOT imported here. It registers @compensator handlers,
+# and `python -m agent_saga.demo` loads the module twice -- once as
+# `agent_saga.demo` via this package import, once as `__main__` -- so the second
+# registration trips the registry's duplicate guard and the crash worker dies
+# with the wrong exit code. Eagerly importing a demo on every `import
+# agent_saga` would be wrong regardless of that. Use `agent-saga demo`, or
+# `from agent_saga.demo import run_demo`.
+from .adopt import AdoptionPlan, ToolCandidate, analyse
+
+__all__ += ["AdoptionPlan", "ToolCandidate", "analyse"]

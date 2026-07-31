@@ -97,7 +97,7 @@ from risk to blocker) and `--strict` (exit 1 on risks too, for CI).
 
 ---
 
-## Framework adapters — 11 modules
+## Framework adapters — 13 modules
 
 The public API is **`wrap_tool`** in every framework adapter. There is no
 `crew_tool` or `llama_tool`.
@@ -110,6 +110,8 @@ The public API is **`wrap_tool`** in every framework adapter. There is no
 | `adapters.llamaindex` | `wrap_tool`, `saga_run` |
 | `adapters.openai_agents` | `wrap_tool`, `saga_run` |
 | `adapters.framework_wrappers` | `wrap_crew`, `wrap_langgraph`, `wrap_autogen`, `wrap_swarm`, `wrap_llamaindex`, `wrap_method`, `is_saga_wrapped` |
+| `adapters.semantic_kernel` | `wrap_tool`, `saga_run` |
+| `adapters.vertex_ai` | `wrap_tool`, `saga_run`, `dispatch_function_call` |
 | `adapters.temporal` | `saga_activity`, `SagaTemporalInterceptor` |
 | `adapters.camunda` | `camunda_job_handler`, `SagaCamundaWorker` |
 | `adapters.sqlalchemy` | `SQLAlchemyAdapter` |
@@ -157,9 +159,12 @@ concurrent edit.
 | Typed semantics | `semantics.py` | `REVERSIBLE` / `COMPENSABLE` / `IRREVERSIBLE`, author-declared, never inferred |
 | Declarative inverses | `inverses.py` | `@inverse_of`, `delete_by`, `call_with`, `map_result` |
 | Pre-flight gate, approvals | `gate.py`, `approvals.py` | M-of-N multi-sig; refusal before the effect |
+| OTel GenAI conventions | `observability/genai.py` | emits `gen_ai.*` alongside `saga.*`, so Langfuse / Phoenix / Datadog / Grafana render agent-saga spans with no config; prompt and argument capture is opt-in |
 | Write-ahead log | `wal/` | file, mmap, Postgres, Redis; hash-chained; `barrier()` durability fence |
 | Crash recovery | `recovery.py` | expired leases (not PIDs); deterministic tokens prevent double-compensation |
 | Context receipts | `context_broker.py` | HOT/WARM/COLD tiers; drifted summaries are evicted, never served |
+| Rollback proving | `proving.py` | breaks YOUR workflow at every step and compares the world to its start; catches a compensation that returns success and undoes nothing (`ENGINE_DISAGREES`) |
+| Cross-framework fleet | `fleet.py` | re-attaches the saga across thread boundaries the contextvar cannot cross, refuses unprotected calls, and publishes a coverage manifest |
 | Bounded verification | `verification.py` | executes EVERY failure interleaving up to N steps against the real engine and checks 7 rollback invariants; states its bound rather than claiming unbounded proof |
 | Failure prediction | `risk.py` | learns from the log which call shapes had to be undone; reports lift over the base rate, declines to answer below its support threshold, and ships no silent blocking gate |
 | Synthetic WALs | `synthetic.py` | learn a log's shape, generate any volume of it; carries no real values, and every record is marked `__synthetic__` so it can never be mistaken for evidence |
