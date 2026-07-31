@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agent-saga"
 dynamic = ["version"]
-description = "Kill the process mid-transaction and the charge still gets refunded. Run `agent-saga demo`. Crash-safe rollback for AI agents: a hash-chained write-ahead log, compensations derived at runtime from what the tool actually returned, and bounded model checking that proves your workflow unwinds at every failure point before you ship it. Plus receipted context, truthful multi-model routing, and one audit log that reconstructs every decision. Works with LangGraph, CrewAI, OpenAI Agents, AutoGen, LlamaIndex, Semantic Kernel and Vertex AI."
+description = "Kill the process mid-transaction and the charge still gets refunded. Run `agent-saga demo`. Transactional tool execution with crash-safe rollback, receipted context, truthful multi-model routing, and one audit log that reconstructs every decision."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
