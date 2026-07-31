@@ -18,8 +18,13 @@ import secrets
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from ._version import __version__
+
+# Duplicated from `animate.THEMES` so building the parser stays a cheap import.
+# `tests/test_animate.py` asserts the two never drift apart.
+_ANIMATE_THEMES = ("dark", "light")
 from .integrity import verify, export_worm
 
 
@@ -740,6 +745,29 @@ def build_parser() -> argparse.ArgumentParser:
                        help="write the diagram here (default: stdout)")
     graph.set_defaults(func=_cmd_graph)
 
+    animate = sub.add_parser(
+        "animate",
+        help="render a saga's rollback as a self-contained animated SVG")
+    animate.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
+                         help="path to the WAL file (default: ./agent-saga.wal)")
+    animate.add_argument("--saga", default=None,
+                         help="saga id to render (default: the most recent in the log)")
+    animate.add_argument("--output", "-o", default=None,
+                         help="write the SVG here (default: stdout)")
+    animate.add_argument("--title", default=None,
+                         help="heading text (default: the saga's name)")
+    animate.add_argument("--theme", default="dark", choices=sorted(_ANIMATE_THEMES),
+                         help="colour palette (default: dark)")
+    animate.add_argument("--width", type=int, default=900,
+                         help="SVG width in px (default: 900)")
+    animate.add_argument("--speed", type=float, default=1.0,
+                         help="duration multiplier; 2.0 plays twice as fast "
+                              "(default: 1.0)")
+    animate.add_argument("--no-loop", action="store_true",
+                         help="play once and hold the final frame, for slides "
+                              "and PDFs where a restart reads as a glitch")
+    animate.set_defaults(func=_cmd_animate)
+
     export = sub.add_parser(
         "export",
         help="export the WAL: a verified WORM bundle (--out) or flat CSV/JSON (--format)")
@@ -1197,6 +1225,50 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
+def _select_saga_records(records: list, wal_path: str, selected: Optional[str],
+                         *, draw_all: bool = False):
+    """Narrow a multi-saga WAL to the one saga a drawing should show.
+
+    Returns `(records, error_code)`; `error_code` is None on success. Shared by
+    `graph` and `animate` on purpose -- the "exclude on evidence of mismatch"
+    rule below is subtle enough that a second copy would drift away from it.
+    """
+    saga_ids: list = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        saga_id = record.get("saga_id")
+        if isinstance(saga_id, str) and saga_id and saga_id not in saga_ids:
+            saga_ids.append(saga_id)
+
+    if draw_all or not saga_ids:
+        return records, None
+
+    if selected is None:
+        selected = saga_ids[-1]
+    elif selected not in saga_ids:
+        print(f"no saga {selected!r} in {wal_path}. Present: "
+              f"{', '.join(saga_ids[:20]) or '(none)'}")
+        return records, 1
+
+    # Exclude on evidence of mismatch, never on absence of evidence: a record
+    # carrying no saga_id (an older log, a damaged write) cannot be proven to
+    # belong elsewhere, so it stays. Dropping it would render an empty diagram
+    # for a log that plainly has steps in it -- the one outcome these exporters
+    # promise not to produce.
+    unattributed = sum(1 for r in records
+                       if isinstance(r, dict) and not r.get("saga_id"))
+    kept = [r for r in records if isinstance(r, dict)
+            and r.get("saga_id") in (selected, None, "")]
+    if len(saga_ids) > 1:
+        print(f"# {wal_path}: {len(saga_ids)} sagas; drawing {selected}. "
+              f"Use --saga <id> or --all.", file=sys.stderr)
+    if unattributed:
+        print(f"# {unattributed} record(s) carry no saga id and are included "
+              f"in every drawing.", file=sys.stderr)
+    return kept, None
+
+
 def _cmd_graph(args: argparse.Namespace) -> int:
     """Draw a saga's execution -- forward path plus the rollback fork.
 
@@ -1212,37 +1284,10 @@ def _cmd_graph(args: argparse.Namespace) -> int:
         print(f"cannot read {args.wal_path}: {exc}")
         return 2
 
-    saga_ids: list = []
-    for record in records:
-        if not isinstance(record, dict):
-            continue
-        saga_id = record.get("saga_id")
-        if isinstance(saga_id, str) and saga_id and saga_id not in saga_ids:
-            saga_ids.append(saga_id)
-
-    selected = args.saga
-    if not args.all and saga_ids:
-        if selected is None:
-            selected = saga_ids[-1]
-        elif selected not in saga_ids:
-            print(f"no saga {selected!r} in {args.wal_path}. Present: "
-                  f"{', '.join(saga_ids[:20]) or '(none)'}")
-            return 1
-        # Exclude on evidence of mismatch, never on absence of evidence: a
-        # record carrying no saga_id (an older log, a damaged write) cannot be
-        # proven to belong elsewhere, so it stays. Dropping it would render an
-        # empty diagram for a log that plainly has steps in it -- the one
-        # outcome this exporter promises not to produce.
-        unattributed = sum(1 for r in records
-                           if isinstance(r, dict) and not r.get("saga_id"))
-        records = [r for r in records if isinstance(r, dict)
-                   and r.get("saga_id") in (selected, None, "")]
-        if len(saga_ids) > 1:
-            print(f"# {args.wal_path}: {len(saga_ids)} sagas; drawing {selected}. "
-                  f"Use --saga <id> or --all.", file=sys.stderr)
-        if unattributed:
-            print(f"# {unattributed} record(s) carry no saga id and are included "
-                  f"in every drawing.", file=sys.stderr)
+    records, err = _select_saga_records(records, args.wal_path, args.saga,
+                                        draw_all=args.all)
+    if err is not None:
+        return err
 
     render = wal_to_dot if args.format == "dot" else wal_to_mermaid
     diagram = render(records)
@@ -1252,6 +1297,37 @@ def _cmd_graph(args: argparse.Namespace) -> int:
         print(f"wrote {args.output}")
     else:
         print(diagram)
+    return 0
+
+
+def _cmd_animate(args: argparse.Namespace) -> int:
+    """Render a saga's rollback as a self-contained animated SVG.
+
+    The static `graph` export shows the shape of an unwind. This shows its
+    *order* -- that the undo runs backwards, after the forward path already
+    failed -- which is the part people do not believe until they watch it.
+    """
+    from .animate import wal_to_animated_svg
+
+    try:
+        records = _read_wal(args.wal_path)
+    except OSError as exc:
+        print(f"cannot read {args.wal_path}: {exc}")
+        return 2
+
+    records, err = _select_saga_records(records, args.wal_path, args.saga)
+    if err is not None:
+        return err
+
+    svg = wal_to_animated_svg(records, title=args.title, theme=args.theme,
+                              width=args.width, speed=args.speed,
+                              loop=not args.no_loop)
+
+    if args.output:
+        Path(args.output).write_text(svg + "\n", encoding="utf-8")
+        print(f"wrote {args.output} ({len(svg)} bytes, no scripts, no network)")
+    else:
+        print(svg)
     return 0
 
 

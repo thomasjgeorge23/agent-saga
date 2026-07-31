@@ -232,8 +232,33 @@ agent-saga demo --no-color  # plain text for CI or piping
 Then draw what you just watched:
 
 ```bash
-agent-saga graph --wal ./agent-saga.wal   # the rollback fork, as Mermaid
+agent-saga graph --wal ./agent-saga.wal     # the rollback fork, as Mermaid
+agent-saga animate --wal ./agent-saga.wal -o rollback.svg
 ```
+
+`graph` gives you the *shape* of the unwind. `animate` gives you its **order** —
+one self-contained SVG in which the forward path builds downward, then the
+compensations fire back up it in reverse, one step at a time, ending on a
+verdict banner. No JavaScript, no network, no dependencies: it renders inside
+`<img src=...>`, in a GitHub comment, in a PDF postmortem, and under a strict
+Content-Security-Policy. It carries its own `prefers-reduced-motion` block, so
+a viewer who asked their OS for less motion gets the final frame immediately
+instead of nothing.
+
+Both renderers consume the *same* reconstruction of the log, so a diagram and
+an animation of one WAL cannot disagree — and neither will draw a partial
+rollback as if it were clean. An orphaned effect gets its own colour, its own
+label, and a counted line in the verdict.
+
+```bash
+agent-saga animate --wal ./prod.wal --saga a1b2c3 --theme light --no-loop -o incident.svg
+```
+
+The two figures on [the project page](site/index.html) are generated exactly
+this way by [`site/build_assets.py`](site/build_assets.py), from real runs of
+the real engine, and [`tests/test_site_assets.py`](tests/test_site_assets.py)
+fails if the committed SVGs stop matching what the engine does today. The
+marketing page cannot drift away from the behaviour.
 
 More worked examples:
 
@@ -630,6 +655,7 @@ backend needs.
 | **Crash recovery daemon** — replays the WAL after `kill -9`; expired leases (not PIDs) prove the owner is gone; deterministic tokens make double-compensation structurally impossible | [recovery.py](agent_saga/recovery.py) | core |
 | **Visual debugging** — `agent-saga ui` time-travel debugger over a WAL | [ui/](agent_saga/ui) | core |
 | **Graph export** — `agent-saga graph` renders the forward path *and the rollback fork* as Mermaid or Graphviz DOT | [graph.py](agent_saga/graph.py) | core |
+| **Animated export** — `agent-saga animate` renders the unwind as a self-contained animated SVG: no JS, no network, CSP-safe, `prefers-reduced-motion` aware, deterministic bytes | [animate.py](agent_saga/animate.py) | core |
 | **BPMN 2.0 import/export** — round-trip to visual workflow tooling | [bpmn.py](agent_saga/bpmn.py) | core |
 | **MCP integration** — a saga proxy in front of any MCP server, with policy, `inputSchema` tool declarations, and MCP-dispatched compensations | [mcp/](agent_saga/mcp) | core |
 | **Framework adapters** — LangGraph, CrewAI, AutoGen, LlamaIndex, OpenAI Agents, SQLAlchemy, Supabase | [adapters/](agent_saga/adapters) | per-framework |

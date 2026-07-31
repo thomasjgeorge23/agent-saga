@@ -92,6 +92,12 @@
   /* Hero */
   .hero { padding-top: clamp(3.5rem, 7vw, 6rem); }
   .hero-grid { display: grid; gap: clamp(2.5rem, 5vw, 4rem); grid-template-columns: 1fr; }
+  /* A grid item's default `min-width: auto` is its min-content width, so one
+     unbreakable token (the install command, a long identifier) sets the track
+     wider than the container and silently clips the column on a phone.
+     `min-width: 0` lets the track shrink; the code line then scrolls inside
+     its own box, which is what `.install { overflow-x: auto }` is for. */
+  .hero-grid > * { min-width: 0; }
   @media (min-width: 980px) { .hero-grid { grid-template-columns: 1.05fr .95fr; align-items: center; } }
   .hero .amber { background: linear-gradient(135deg, #fbbf24, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   .install {
@@ -289,9 +295,130 @@
   pre.code-block code { white-space: pre; }
   .install { overflow-x: auto; }
   .feat-card code { overflow-wrap: anywhere; }
+
+  /* ============================================================
+     MOTION LAYER
+     Everything below is decoration, and decoration is not allowed
+     to be load-bearing. The hidden state of a scroll reveal lives
+     INSIDE `prefers-reduced-motion: no-preference`, so a visitor
+     who asked their OS for less motion never has an element set to
+     opacity:0 in the first place. That is deliberate: if the
+     reveal were opt-out via JS, a script error would leave the
+     page permanently blank for exactly the people least able to
+     work around it. No JS, no motion, all content.
+     ============================================================ */
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-reveal] {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity .75s cubic-bezier(.16,1,.3,1),
+                  transform .75s cubic-bezier(.16,1,.3,1);
+      transition-delay: var(--reveal-delay, 0ms);
+    }
+    /* Horizontal reveals are for narrow content only. On a full-width block
+       the pre-reveal offset sticks out past the viewport and widens the page
+       until it animates in -- so `main` clips (see below) and wide figures use
+       the vertical variants. */
+    [data-reveal="left"]  { transform: translateX(-28px); }
+    [data-reveal="right"] { transform: translateX(28px); }
+    [data-reveal="scale"] { transform: scale(.94); }
+    [data-reveal="blur"]  { filter: blur(8px); transition: opacity .75s cubic-bezier(.16,1,.3,1),
+                              transform .75s cubic-bezier(.16,1,.3,1), filter .75s ease; }
+    [data-reveal].is-in {
+      opacity: 1; transform: none; filter: none;
+    }
+    .marquee-track { animation: marquee 38s linear infinite; }
+    .marquee:hover .marquee-track { animation-play-state: paused; }
+    @keyframes marquee { from { transform: translateX(0); }
+                         to   { transform: translateX(-50%); } }
+    .pulse-dot { animation: pulseDot 2.4s ease-in-out infinite; }
+    @keyframes pulseDot { 0%,100% { opacity:.3; transform: scale(.85); }
+                          50%     { opacity:1;  transform: scale(1); } }
+  }
+
+  /* `clip` rather than `hidden`: it contains the transient sideways overhang
+     of a reveal without turning main into a scroll container, which would
+     break `position: sticky` on the nav and swallow scroll anchoring. */
+  main { overflow-x: clip; }
+
+  /* Scroll progress. Sits above the sticky nav; 3px of honest position. */
+  #scrollProgress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 100%;
+    transform: scaleX(0); transform-origin: 0 50%;
+    background: linear-gradient(90deg, var(--accent), var(--reversible));
+    z-index: 100; pointer-events: none;
+  }
+
+  /* Cursor spotlight on cards. Pure CSS gradient positioned by a
+     CSS custom property the pointer handler writes -- no layout,
+     no reflow, compositor only. */
+  .feat-card, .cat-card { position: relative; isolation: isolate; }
+  .feat-card::after, .cat-card::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    z-index: -1; opacity: 0; transition: opacity .35s ease;
+    background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 50%),
+      color-mix(in srgb, var(--accent) 16%, transparent), transparent 62%);
+  }
+  @media (hover: hover) {
+    .feat-card:hover::after, .cat-card:hover::after { opacity: 1; }
+    .feat-card:hover, .cat-card:hover {
+      transform: translateY(-5px);
+      border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    }
+  }
+
+  /* The generated rollback animations. They arrive as inline <svg>
+     with intrinsic width/height so they also work as <img>; here we
+     let them scale to the column instead. */
+  .saga-anim {
+    background: #0b0f19; border: 1px solid var(--border);
+    border-radius: 20px; overflow: hidden; box-shadow: var(--shadow);
+  }
+  /* Grid and flex items default to `min-width: auto`, so the SVG's intrinsic
+     880px width sets the track's minimum and pushes the page sideways on a
+     phone. `min-width: 0` lets it actually shrink to the column. */
+  .saga-anim { min-width: 0; }
+  .anim-grid > * { min-width: 0; }
+  .saga-anim svg { width: 100%; max-width: 100%; height: auto; display: block; }
+  .saga-anim figcaption {
+    font-family: var(--mono); font-size: .78rem; color: var(--dim);
+    padding: .75rem 1.1rem; border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--panel) 60%, transparent);
+  }
+  .anim-grid { display: grid; gap: 1.5rem; grid-template-columns: 1fr; }
+  @media (min-width: 1080px) { .anim-grid { grid-template-columns: 1fr 1fr; } }
+
+  /* Stat counters */
+  .stat-row { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .stat { background: var(--panel); border: 1px solid var(--border);
+          border-radius: 16px; padding: 1.3rem 1.4rem; }
+  .stat b { display: block; font-family: var(--mono); font-size: clamp(1.6rem, 3vw, 2.2rem);
+            font-weight: 800; color: var(--accent); line-height: 1.1;
+            font-variant-numeric: tabular-nums; }
+  .stat span { font-size: .82rem; color: var(--dim); display: block;
+               overflow-wrap: anywhere; }
+  .stat span code { font-size: .74rem; }
+
+  /* Adapter marquee */
+  .marquee { overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+  .marquee-track { display: flex; gap: .8rem; width: max-content; }
+  .marquee-track span {
+    font-family: var(--mono); font-size: .82rem; white-space: nowrap;
+    padding: .5rem 1rem; border-radius: 999px;
+    border: 1px solid var(--border-strong); color: var(--dim);
+    background: var(--panel);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .marquee { mask-image: none; overflow: visible; }
+    .marquee-track { flex-wrap: wrap; width: auto; }
+    .marquee-track > span:nth-child(n+14) { display: none; }  /* hide the duplicate half */
+  }
 </style>
 </head>
 <body>
+
+<div id="scrollProgress"></div>
 
 <!-- Animated Canvas Background -->
 <canvas id="heroCanvas"></canvas>
@@ -383,11 +510,311 @@
     </div>
   </section>
 
+  <!-- ============================================================
+       WATCH IT HAPPEN
+       The two figures below are not illustrations. They are rendered
+       by `agent-saga animate` from write-ahead logs produced by real
+       runs of the real engine, regenerated by `python site/build_assets.py`.
+       Do not hand-edit the SVG between the markers -- the build
+       overwrites it, which is the point: the picture cannot drift
+       away from what the engine actually did.
+       ============================================================ -->
+  <section id="watch">
+    <div class="wrap">
+      <div style="text-align:center; margin-bottom: 3rem;">
+        <span class="eyebrow" data-reveal>▶ Watch it happen</span>
+        <h2 data-reveal>The undo runs <span class="amber">backwards</span>.</h2>
+        <p class="lede" style="margin-inline:auto" data-reveal>
+          Step 4 fails. Steps 3, 2, 1 come apart in reverse, one at a time.
+          Both figures below were rendered by <code>agent-saga animate</code> from
+          the write-ahead log of an actual run — same reconstruction the static
+          <code>agent-saga graph</code> export uses, so a picture and a diagram of
+          one log cannot disagree.
+        </p>
+      </div>
+
+      <div class="anim-grid">
+        <figure class="saga-anim" style="margin:0" data-reveal>
+          <!-- BEGIN:rollback-clean -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 498" width="880" height="498" role="img" aria-label="ROLLBACK CLEAN: 4 step(s) undone in reverse order, nothing left behind">
+<title>Step 4 fails - every effect undone</title>
+<desc>ROLLBACK CLEAN. 4 step(s) undone in reverse order, nothing left behind.</desc>
+<style>
+text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;dominant-baseline:middle}
+.t{fill:#e5e7eb}.m{fill:#8b9bb4}
+.a0{animation:a0 7.85s linear infinite;}@keyframes a0{0%,1.91%{opacity:0}7.26%,100%{opacity:1}}
+.a1{animation:a1 7.85s linear infinite;}@keyframes a1{0%,1.91%{opacity:.25}8.92%{opacity:1}15.92%,100%{opacity:.25}}
+.a2{animation:a2 7.85s linear infinite;}@keyframes a2{0%,3.06%{opacity:.25}10.06%{opacity:1}17.07%,100%{opacity:.25}}
+.a3{animation:a3 7.85s linear infinite;}@keyframes a3{0%,4.2%{opacity:.25}11.21%{opacity:1}18.22%,100%{opacity:.25}}
+.a4{animation:a4 7.85s linear infinite;}@keyframes a4{0%,5.35%{opacity:.25}12.36%{opacity:1}19.36%,100%{opacity:.25}}
+.a5{animation:a5 7.85s linear infinite;}@keyframes a5{0%,6.5%{opacity:.25}13.5%{opacity:1}20.51%,100%{opacity:.25}}
+.a6{animation:a6 7.85s linear infinite;}@keyframes a6{0%,7.64%{opacity:.25}14.65%{opacity:1}21.66%,100%{opacity:.25}}
+.a7{animation:a7 7.85s linear infinite;}@keyframes a7{0%,7.01%{opacity:0}12.36%,100%{opacity:1}}
+.a8{animation:a8 7.85s linear infinite;}@keyframes a8{0%,33.76%{opacity:0}39.11%,100%{opacity:1}}
+.a9{animation:a9 7.85s linear infinite;}@keyframes a9{0%,9.55%{opacity:0;transform:translateY(7px)}14.9%,100%{opacity:1;transform:translateY(0)}}
+.a10{animation:a10 7.85s linear infinite;}@keyframes a10{0%,52.23%{opacity:0;transform:translateY(7px)}57.58%,100%{opacity:1;transform:translateY(0)}}
+.a11{animation:a11 7.85s linear infinite;}@keyframes a11{0%,14.65%{opacity:0;transform:translateY(7px)}20%,100%{opacity:1;transform:translateY(0)}}
+.a12{animation:a12 7.85s linear infinite;}@keyframes a12{0%,47.13%{opacity:0;transform:translateY(7px)}52.48%,100%{opacity:1;transform:translateY(0)}}
+.a13{animation:a13 7.85s linear infinite;}@keyframes a13{0%,19.75%{opacity:0;transform:translateY(7px)}25.1%,100%{opacity:1;transform:translateY(0)}}
+.a14{animation:a14 7.85s linear infinite;}@keyframes a14{0%,42.04%{opacity:0;transform:translateY(7px)}47.39%,100%{opacity:1;transform:translateY(0)}}
+.a15{animation:a15 7.85s linear infinite;}@keyframes a15{0%,24.84%{opacity:0;transform:translateY(7px)}30.19%,100%{opacity:1;transform:translateY(0)}}
+.a16{animation:a16 7.85s linear infinite;}@keyframes a16{0%,36.94%{opacity:0;transform:translateY(7px)}42.29%,100%{opacity:1;transform:translateY(0)}}
+.a17{animation:a17 7.85s linear infinite;}@keyframes a17{0%,63.06%{opacity:0;transform:translateY(7px)}69.43%,100%{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;opacity:1 !important;transform:none !important}}
+</style>
+<rect width="880" height="498" rx="18" fill="#0b0f19"/>
+<rect x="1" y="1" width="878" height="496" rx="18" fill="none" stroke="#1f2937"/>
+<g class="a0">
+<text class="t" x="40" y="50" font-size="20" font-weight="700">Step 4 fails - every effect undone</text>
+<text class="m" x="40" y="74" font-size="12">checkout-clean-demo</text>
+<text class="m" x="840" y="50" font-size="12" text-anchor="end">agent-saga</text>
+</g>
+<rect class="a1" x="748" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="758" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a2" x="764" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="774" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a3" x="780" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="790" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a4" x="796" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="806" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a5" x="812" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="822" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a6" x="828" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="24" y="90" width="832" height="1" fill="#1a2231"/>
+<text class="m a7" x="40" y="128" font-size="11" letter-spacing="1.5">FORWARD PATH ↓</text>
+<text class="a8" x="840" y="128" font-size="11" letter-spacing="1.5" text-anchor="end" fill="#ef4444">↑ ROLLBACK, LIFO</text>
+<g class="a9">
+<rect x="24" y="146" width="832" height="54" rx="12" fill="#161d2e" stroke="#1f2937"/>
+<rect x="34" y="158" width="4" height="30" rx="2" fill="#f59e0b"/>
+<text x="54" y="173" font-size="12" text-anchor="middle" fill="#8b9bb4">1</text>
+<text class="t" x="74" y="167" font-size="14">stripe.charge</text>
+<text x="74" y="185" font-size="11" fill="#38bdf8">committed</text>
+<rect x="510" y="161" width="122" height="24" rx="12" fill="none" stroke="#f59e0b"/>
+<text x="571" y="173" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">COMPENSABLE</text>
+</g>
+<g class="a10">
+<rect x="34" y="158" width="4" height="30" rx="2" fill="#10b981"/>
+<rect x="644" y="161" width="196" height="24" rx="12" fill="#10b981" fill-opacity="0.14" stroke="#10b981"/>
+<text x="742" y="173" font-size="10" text-anchor="middle" fill="#10b981" letter-spacing="0.5">COMPENSATED</text>
+</g>
+<g class="a11">
+<rect x="24" y="208" width="832" height="54" rx="12" fill="#161d2e" stroke="#1f2937"/>
+<rect x="34" y="220" width="4" height="30" rx="2" fill="#f59e0b"/>
+<text x="54" y="235" font-size="12" text-anchor="middle" fill="#8b9bb4">2</text>
+<text class="t" x="74" y="229" font-size="14">inventory.reserve</text>
+<text x="74" y="247" font-size="11" fill="#38bdf8">committed</text>
+<rect x="510" y="223" width="122" height="24" rx="12" fill="none" stroke="#f59e0b"/>
+<text x="571" y="235" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">COMPENSABLE</text>
+</g>
+<g class="a12">
+<rect x="34" y="220" width="4" height="30" rx="2" fill="#10b981"/>
+<rect x="644" y="223" width="196" height="24" rx="12" fill="#10b981" fill-opacity="0.14" stroke="#10b981"/>
+<text x="742" y="235" font-size="10" text-anchor="middle" fill="#10b981" letter-spacing="0.5">COMPENSATED</text>
+</g>
+<g class="a13">
+<rect x="24" y="270" width="832" height="54" rx="12" fill="#161d2e" stroke="#1f2937"/>
+<rect x="34" y="282" width="4" height="30" rx="2" fill="#f59e0b"/>
+<text x="54" y="297" font-size="12" text-anchor="middle" fill="#8b9bb4">3</text>
+<text class="t" x="74" y="291" font-size="14">ledger.post_entry</text>
+<text x="74" y="309" font-size="11" fill="#38bdf8">committed</text>
+<rect x="510" y="285" width="122" height="24" rx="12" fill="none" stroke="#f59e0b"/>
+<text x="571" y="297" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">COMPENSABLE</text>
+</g>
+<g class="a14">
+<rect x="34" y="282" width="4" height="30" rx="2" fill="#10b981"/>
+<rect x="644" y="285" width="196" height="24" rx="12" fill="#10b981" fill-opacity="0.14" stroke="#10b981"/>
+<text x="742" y="297" font-size="10" text-anchor="middle" fill="#10b981" letter-spacing="0.5">COMPENSATED</text>
+</g>
+<g class="a15">
+<rect x="24" y="332" width="832" height="54" rx="12" fill="#161d2e" stroke="#1f2937"/>
+<rect x="34" y="344" width="4" height="30" rx="2" fill="#f59e0b"/>
+<text x="54" y="359" font-size="12" text-anchor="middle" fill="#8b9bb4">4</text>
+<text class="t" x="74" y="353" font-size="14">crm.update</text>
+<text x="74" y="371" font-size="11" fill="#f59e0b">UNKNOWN - may have landed</text>
+<rect x="510" y="347" width="122" height="24" rx="12" fill="none" stroke="#f59e0b"/>
+<text x="571" y="359" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">COMPENSABLE</text>
+</g>
+<g class="a16">
+<rect x="34" y="344" width="4" height="30" rx="2" fill="#10b981"/>
+<rect x="644" y="347" width="196" height="24" rx="12" fill="#10b981" fill-opacity="0.14" stroke="#10b981"/>
+<text x="742" y="359" font-size="10" text-anchor="middle" fill="#10b981" letter-spacing="0.5">COMPENSATED</text>
+</g>
+<g class="a17">
+<rect x="24" y="408" width="832" height="66" rx="14" fill="#10b981" fill-opacity="0.10" stroke="#10b981"/>
+<rect x="24" y="408" width="4" height="66" rx="2" fill="#10b981"/>
+<text x="40" y="432" font-size="15" font-weight="700" fill="#10b981">ROLLBACK CLEAN</text>
+<text class="m" x="40" y="453" font-size="12">4 step(s) undone in reverse order, nothing left behind</text>
+</g>
+</svg>
+          <!-- END:rollback-clean -->
+          <figcaption>
+            Every step had a working inverse. Engine verdict:
+            <b style="color:var(--reversible)">clean = True</b>.
+          </figcaption>
+        </figure>
+
+        <figure class="saga-anim" style="margin:0" data-reveal="scale">
+          <!-- BEGIN:rollback-orphan -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 498" width="880" height="498" role="img" aria-label="ROLLBACK INCOMPLETE: 2 compensated, 2 orphaned">
+<title>Step 4 fails - two effects had no undo</title>
+<desc>ROLLBACK INCOMPLETE. 2 compensated, 2 orphaned.</desc>
+<style>
+text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;dominant-baseline:middle}
+.t{fill:#e5e7eb}.m{fill:#8b9bb4}
+.a0{animation:a0 7.85s linear infinite;}@keyframes a0{0%,1.91%{opacity:0}7.26%,100%{opacity:1}}
+.a1{animation:a1 7.85s linear infinite;}@keyframes a1{0%,1.91%{opacity:.25}8.92%{opacity:1}15.92%,100%{opacity:.25}}
+.a2{animation:a2 7.85s linear infinite;}@keyframes a2{0%,3.06%{opacity:.25}10.06%{opacity:1}17.07%,100%{opacity:.25}}
+.a3{animation:a3 7.85s linear infinite;}@keyframes a3{0%,4.2%{opacity:.25}11.21%{opacity:1}18.22%,100%{opacity:.25}}
+.a4{animation:a4 7.85s linear infinite;}@keyframes a4{0%,5.35%{opacity:.25}12.36%{opacity:1}19.36%,100%{opacity:.25}}
+.a5{animation:a5 7.85s linear infinite;}@keyframes a5{0%,6.5%{opacity:.25}13.5%{opacity:1}20.51%,100%{opacity:.25}}
+.a6{animation:a6 7.85s linear infinite;}@keyframes a6{0%,7.64%{opacity:.25}14.65%{opacity:1}21.66%,100%{opacity:.25}}
+.a7{animation:a7 7.85s linear infinite;}@keyframes a7{0%,7.01%{opacity:0}12.36%,100%{opacity:1}}
+.a8{animation:a8 7.85s linear infinite;}@keyframes a8{0%,33.76%{opacity:0}39.11%,100%{opacity:1}}
+.a9{animation:a9 7.85s linear infinite;}@keyframes a9{0%,9.55%{opacity:0;transform:translateY(7px)}14.9%,100%{opacity:1;transform:translateY(0)}}
+.a10{animation:a10 7.85s linear infinite;}@keyframes a10{0%,52.23%{opacity:0;transform:translateY(7px)}57.58%,100%{opacity:1;transform:translateY(0)}}
+.a11{animation:a11 7.85s linear infinite;}@keyframes a11{0%,14.65%{opacity:0;transform:translateY(7px)}20%,100%{opacity:1;transform:translateY(0)}}
+.a12{animation:a12 7.85s linear infinite;}@keyframes a12{0%,47.13%{opacity:0;transform:translateY(7px)}52.48%,100%{opacity:1;transform:translateY(0)}}
+.a13{animation:a13 7.85s linear infinite;}@keyframes a13{0%,19.75%{opacity:0;transform:translateY(7px)}25.1%,100%{opacity:1;transform:translateY(0)}}
+.a14{animation:a14 7.85s linear infinite;}@keyframes a14{0%,42.04%{opacity:0;transform:translateY(7px)}47.39%,100%{opacity:1;transform:translateY(0)}}
+.a15{animation:a15 7.85s linear infinite;}@keyframes a15{0%,24.84%{opacity:0;transform:translateY(7px)}30.19%,100%{opacity:1;transform:translateY(0)}}
+.a16{animation:a16 7.85s linear infinite;}@keyframes a16{0%,36.94%{opacity:0;transform:translateY(7px)}42.29%,100%{opacity:1;transform:translateY(0)}}
+.a17{animation:a17 7.85s linear infinite;}@keyframes a17{0%,63.06%{opacity:0;transform:translateY(7px)}69.43%,100%{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;opacity:1 !important;transform:none !important}}
+</style>
+<rect width="880" height="498" rx="18" fill="#0b0f19"/>
+<rect x="1" y="1" width="878" height="496" rx="18" fill="none" stroke="#1f2937"/>
+<g class="a0">
+<text class="t" x="40" y="50" font-size="20" font-weight="700">Step 4 fails - two effects had no undo</text>
+<text class="m" x="40" y="74" font-size="12">checkout-orphan-demo</text>
+<text class="m" x="840" y="50" font-size="12" text-anchor="end">agent-saga</text>
+</g>
+<rect class="a1" x="748" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="758" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a2" x="764" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="774" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a3" x="780" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="790" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a4" x="796" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="806" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a5" x="812" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="822" y="74.5" width="6" height="1" fill="#1f2937"/>
+<rect class="a6" x="828" y="70" width="10" height="10" rx="2.5" fill="#f59e0b"/>
+<rect x="24" y="90" width="832" height="1" fill="#1a2231"/>
+<text class="m a7" x="40" y="128" font-size="11" letter-spacing="1.5">FORWARD PATH ↓</text>
+<text class="a8" x="840" y="128" font-size="11" letter-spacing="1.5" text-anchor="end" fill="#ef4444">↑ ROLLBACK, LIFO</text>
+<g class="a9">
+<rect x="24" y="146" width="832" height="54" rx="12" fill="#161d2e" stroke="#1f2937"/>
+<rect x="34" y="158" width="4" height="30" rx="2" fill="#f59e0b"/>
+<text x="54" y="173" font-size="12" text-anchor="middle" fill="#8b9bb4">1</text>
+<text class="t" x="74" y="167" font-size="14">stripe.charge</text>
+<text x="74" y="185" font-size="11" fill="#38bdf8">committed</text>
+<rect x="510" y="161" width="122" height="24" rx="12" fill="none" stroke="#f59e0b"/>
+<text x="571" y="173" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">COMPENSABLE</text>
+</g>
+<g class="a10">
+<rect x="34" y="158" width="4" height="30" rx="2" fill="#10b981"/>
+<rect x="644" y="161" width="196" height="24" rx="12" fill="#10b981" fill-opacity="0.14" stroke="#10b981"/>
+<text x="742" y="173" font-size="10" text-anchor="middle" fill="#10b981" letter-spacing="0.5">COMPENSATED</text>
+</g>
+<g class="a11">
+<rect x="24" y="208" width="832" height="54" rx="12" fill="#161d2e" stroke="#1f2937"/>
+<rect x="34" y="220" width="4" height="30" rx="2" fill="#f59e0b"/>
+<text x="54" y="235" font-size="12" text-anchor="middle" fill="#8b9bb4">2</text>
+<text class="t" x="74" y="229" font-size="14">inventory.reserve</text>
+<text x="74" y="247" font-size="11" fill="#38bdf8">committed</text>
+<rect x="510" y="223" width="122" height="24" rx="12" fill="none" stroke="#f59e0b"/>
+<text x="571" y="235" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">COMPENSABLE</text>
+</g>
+<g class="a12">
+<rect x="34" y="220" width="4" height="30" rx="2" fill="#10b981"/>
+<rect x="644" y="223" width="196" height="24" rx="12" fill="#10b981" fill-opacity="0.14" stroke="#10b981"/>
+<text x="742" y="235" font-size="10" text-anchor="middle" fill="#10b981" letter-spacing="0.5">COMPENSATED</text>
+</g>
+<g class="a13">
+<rect x="24" y="270" width="832" height="54" rx="12" fill="#161d2e" stroke="#1f2937"/>
+<rect x="34" y="282" width="4" height="30" rx="2" fill="#f59e0b"/>
+<text x="54" y="297" font-size="12" text-anchor="middle" fill="#8b9bb4">3</text>
+<text class="t" x="74" y="291" font-size="14">ledger.post_entry</text>
+<text x="74" y="309" font-size="11" fill="#38bdf8">committed</text>
+<rect x="510" y="285" width="122" height="24" rx="12" fill="none" stroke="#f59e0b"/>
+<text x="571" y="297" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">COMPENSABLE</text>
+</g>
+<g class="a14">
+<rect x="34" y="282" width="4" height="30" rx="2" fill="#f59e0b"/>
+<rect x="644" y="285" width="196" height="24" rx="12" fill="#f59e0b" fill-opacity="0.14" stroke="#f59e0b"/>
+<text x="742" y="297" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">ORPHANED - no undo</text>
+</g>
+<g class="a15">
+<rect x="24" y="332" width="832" height="54" rx="12" fill="#161d2e" stroke="#1f2937"/>
+<rect x="34" y="344" width="4" height="30" rx="2" fill="#f59e0b"/>
+<text x="54" y="359" font-size="12" text-anchor="middle" fill="#8b9bb4">4</text>
+<text class="t" x="74" y="353" font-size="14">crm.update</text>
+<text x="74" y="371" font-size="11" fill="#f59e0b">UNKNOWN - may have landed</text>
+<rect x="510" y="347" width="122" height="24" rx="12" fill="none" stroke="#f59e0b"/>
+<text x="571" y="359" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">COMPENSABLE</text>
+</g>
+<g class="a16">
+<rect x="34" y="344" width="4" height="30" rx="2" fill="#f59e0b"/>
+<rect x="644" y="347" width="196" height="24" rx="12" fill="#f59e0b" fill-opacity="0.14" stroke="#f59e0b"/>
+<text x="742" y="359" font-size="10" text-anchor="middle" fill="#f59e0b" letter-spacing="0.5">ORPHANED - no undo</text>
+</g>
+<g class="a17">
+<rect x="24" y="408" width="832" height="66" rx="14" fill="#f59e0b" fill-opacity="0.10" stroke="#f59e0b"/>
+<rect x="24" y="408" width="4" height="66" rx="2" fill="#f59e0b"/>
+<text x="40" y="432" font-size="15" font-weight="700" fill="#f59e0b">ROLLBACK INCOMPLETE</text>
+<text class="m" x="40" y="453" font-size="12">2 compensated, 2 orphaned</text>
+</g>
+</svg>
+          <!-- END:rollback-orphan -->
+          <figcaption>
+            Same failure, two steps declared <code>COMPENSABLE</code> and shipped no
+            inverse. Engine verdict:
+            <b style="color:var(--irreversible)">clean = False</b>.
+          </figcaption>
+        </figure>
+      </div>
+
+      <p class="lede" style="margin: 2rem auto 0; text-align:center; font-size:1rem" data-reveal>
+        The right-hand one is the reason to trust the left-hand one. A tool that
+        drew every rollback green would be telling you nothing.
+      </p>
+
+      <!-- Every number here is measured, and every one has a command beside it
+           that reproduces it. See docs/BENCHMARKS.md for the methodology. -->
+      <div class="stat-row" style="margin-top:3.5rem">
+        <div class="stat" data-reveal>
+          <b data-count="2487">0</b>
+          <span>tests passing · <code>pytest -q</code></span>
+        </div>
+        <div class="stat" data-reveal>
+          <b data-count="321">0</b>
+          <span>failure interleavings proven · <code>verify_rollback_invariants()</code></span>
+        </div>
+        <div class="stat" data-reveal>
+          <b data-count="13">0</b>
+          <span>framework adapters</span>
+        </div>
+        <div class="stat" data-reveal>
+          <b data-count="17" data-suffix="µs">0</b>
+          <span>fast-path overhead, p50</span>
+        </div>
+        <div class="stat" data-reveal>
+          <b data-count="0">0</b>
+          <span>required dependencies</span>
+        </div>
+      </div>
+
+      <div class="marquee" style="margin-top:3rem" data-reveal>
+        <div class="marquee-track" id="adapterMarquee"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- AGENT SDK — THE NEW ONE-CALL SURFACE -->
   <section id="demo">
     <div class="wrap">
       <p class="eyebrow">The 5-second proof</p>
-      <h2>Three acts. Nothing simulated.</h2>
+      <h2 data-reveal>Three acts. Nothing simulated.</h2>
       <p class="lede"><code>agent-saga demo</code> runs the real engine against a real
       write-ahead log, with a real gate, real compensations, and a real killed
       process. No network, no API keys, no configuration. The "world" is a JSON
@@ -395,7 +822,7 @@
       process to find.</p>
 
       <div class="feat-grid">
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>Act I &middot; No transaction</h3>
           <p>An ordinary agent charges a card, launches a server, then step&nbsp;3 fails.</p>
           <p><b>Left behind:</b> <code>charges: ['ch_1']</code>, <code>servers: ['i-1']</code>.
@@ -403,7 +830,7 @@
           someone has to find it by hand, and first they have to know it happened.</p>
         </div>
 
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>Act II &middot; The same calls, in a saga</h3>
           <p>Identical tools, wrapped rather than rewritten. Step&nbsp;3 fails exactly
           as before.</p>
@@ -412,7 +839,7 @@
           so it can never say clean when the engine says partial.</p>
         </div>
 
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>Act III &middot; The process is killed</h3>
           <p>The saga charges $99, fsyncs the intent, then calls <code>os._exit()</code>
           &mdash; skipping <code>finally</code>, <code>atexit</code>, and loop shutdown.
@@ -441,7 +868,7 @@
   <section id="proof">
     <div class="wrap">
       <p class="eyebrow">Proof, not adjectives</p>
-      <h2>321 failure interleavings. Seven invariants. Zero violations.</h2>
+      <h2 data-reveal>321 failure interleavings. Seven invariants. Zero violations.</h2>
       <p class="lede">Every claim on this page maps to a command you can run. This one takes
       under a second:</p>
 
@@ -463,7 +890,7 @@ print(report.format_text())
       kind of claim this project exists to avoid.</p>
 
       <div class="feat-grid">
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>&#128200; Benchmarks with methodology</h3>
           <p>Fast path <b>~17&micro;s</b>, durable path <b>~7.9ms</b> &mdash; reported
           separately and never blended, because one is a deque push and the other is an
@@ -471,14 +898,14 @@ print(report.format_text())
           the figure that travels between machines is agent-saga's <b>marginal</b> cost:
           0.97ms, 27%.</p>
         </div>
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>&#129514; Prove YOUR rollback works</h3>
           <p><code>prove_rollback()</code> breaks your workflow at every step, in both
           failure shapes, and compares the world to its starting state. It catches the case
           nothing else does: a compensation that runs, returns success, and undoes
           <em>nothing</em>.</p>
         </div>
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>&#128279; Zero-config observability</h3>
           <p>Spans carry <b>OpenTelemetry GenAI semantic conventions</b>, so Langfuse, Arize
           Phoenix, Datadog, Grafana and Honeycomb render agent-saga traces in panels already
@@ -492,12 +919,12 @@ print(report.format_text())
   <section id="wal-superpowers">
     <div class="wrap">
       <p class="eyebrow">What only this log makes possible</p>
-      <h2>Every framework logs. Ours records whether the effect had to be undone.</h2>
+      <h2 data-reveal>Every framework logs. Ours records whether the effect had to be undone.</h2>
       <p class="lede">That single fact is ground truth nobody else collects &mdash; and six
       capabilities fall straight out of it.</p>
 
       <div class="feat-grid">
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>&#127891; Training data labelled by reality</h3>
           <p><code>build_corpus()</code> labels every action by whether the world kept it.
           The hard part is blame: when step 5 fails, steps 1&ndash;4 roll back <em>and they
@@ -505,14 +932,14 @@ print(report.format_text())
           worked &mdash; so they are <code>COLLATERAL</code> and excluded. DPO-shaped
           preference pairs, matched within a tool.</p>
         </div>
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>&#9202; Try a cheaper model on real history</h3>
           <p><code>counterfactual_replay()</code> turns the log into a simulator of that
           afternoon's world. <b>Nothing executes</b> &mdash; the replay never invokes a
           forward callable at all. When the candidate diverges the answer is
           <code>UNKNOWABLE</code>, not a guess.</p>
         </div>
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>&#127917; Share traffic, not customers</h3>
           <p><code>WALProfile.fit()</code> keeps shapes and ranges, never a value a person
           typed &mdash; so the <em>profile itself</em> is shareable. Fifty real sagas become
@@ -520,21 +947,21 @@ print(report.format_text())
           a log indistinguishable from a real one is an instrument for fabricating evidence,
           not a fixture.</p>
         </div>
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>&#128302; A gate that improves as you run</h3>
           <p><code>FailureModel.fit()</code> learns which call shapes had to be undone, and
           reports <b>lift over the base rate</b> &mdash; "9 of 12 failed" is meaningless when
           three quarters of everything fails. Below its support threshold it produces no
           number and says silence is not a clean bill of health.</p>
         </div>
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>&#128737; No side effect on an invented number</h3>
           <p><code>ProvenancePolicy</code> classifies every argument: SOURCED &gt; USER &gt;
           DERIVED &gt; MODEL. Untagged means MODEL, and <b>SOURCED is verified against the
           document</b>, not accepted on the label. An agent may not move money on a figure
           it made up.</p>
         </div>
-        <div class="feat-card">
+        <div class="feat-card" data-reveal>
           <h3>&#127760; 13 framework adapters</h3>
           <p>LangGraph, CrewAI, AutoGen, LlamaIndex, OpenAI Agents, <b>Semantic Kernel</b>,
           <b>Vertex AI</b>, Temporal, Camunda, SQLAlchemy, Supabase. One saga spans all of
@@ -560,7 +987,7 @@ print(report.format_text())
   <section style="background: var(--panel); border-bottom: 1px solid var(--border); padding: 4rem 0;">
     <div class="wrap">
       <p class="eyebrow">AgentKit SDK</p>
-      <h2>One object. Three verbs. A safety net an agent can <span class="amber">read</span>.</h2>
+      <h2 data-reveal>One object. Three verbs. A safety net an agent can <span class="amber">read</span>.</h2>
       <p class="lede">The whole engine — the gate, typed compensation, the tamper-evident log, the audit proofs — behind one import. An agent wraps a tool once, runs work inside a transaction, and (the genuinely new part) can ask the system what it is <i>guaranteed</i> and whether it is safe to act right now.</p>
 
       <div style="display:grid; gap:1.6rem; grid-template-columns:1fr; margin-top:2.5rem;">
@@ -584,17 +1011,17 @@ async with kit.transaction():
       </div>
 
       <div class="feat-grid" style="margin-top:1.6rem;">
-        <div class="feat-card" onclick="openFeatureModal('agentkit_guarantees')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('agentkit_guarantees')">
           <h3>📜 guarantees() — a manifest it can trust</h3>
           <p>A versioned, JSON-serialisable statement of exactly what is enforced <i>before</i> an effect and guaranteed <i>after</i> — including an explicit <code>not_claimed</code> clause. A safety surface that hides its limits is a liability; this one states them.</p>
           <span class="feat-inspect-hint">Click to inspect the manifest →</span>
         </div>
-        <div class="feat-card" onclick="openFeatureModal('agentkit_status')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('agentkit_status')">
           <h3>🚦 status() — fail-closed live posture</h3>
           <p>Before a burst of effectful work, an agent asks <code>kit.status()</code>. If a global kill-switch is halting effects — or if that signal simply can't be read — it reports <b>not ready</b>. Never a confident green when the truth is unknown.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
-        <div class="feat-card" onclick="openFeatureModal('agentkit_passthrough')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('agentkit_passthrough')">
           <h3>🔌 Zero-ceremony pass-through</h3>
           <p>The same wrapped tool runs untouched outside a transaction — so it works identically in a script, a notebook, or a test with no saga boundary and no special-casing.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
@@ -604,35 +1031,35 @@ async with kit.transaction():
   <section style="background: var(--panel); border-y: 1px solid var(--border); padding: 4rem 0;">
     <div class="wrap">
       <p class="eyebrow">Core Design Philosophy</p>
-      <h2>The 5 Fundamental Principles of agent-saga.</h2>
+      <h2 data-reveal>The 5 Fundamental Principles of agent-saga.</h2>
       <p class="lede">The core contract that separates true transactional safety from post-disaster cleanup scripts.</p>
 
       <div class="category-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-top: 2rem;">
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge" style="background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent);">Principle 1</span>
           <h3 style="margin-top: 0.8rem;">🎯 Auditable Consistency is the Contract</h3>
           <p><i>“A bank does not buy a post-disaster cleanup script — it buys a control that refuses to enter an uncompensable boundary without a human on the hook.”</i></p>
         </div>
 
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge" style="background: color-mix(in srgb, var(--reversible) 15%, transparent); color: var(--reversible);">Principle 2</span>
           <h3 style="margin-top: 0.8rem;">⚡ Runtime-Derived Compensations</h3>
           <p>AI agents choose forward tools dynamically at runtime. The inverse action can only be derived <b>after</b> the forward step executes and returns concrete state parameters (e.g., charge IDs, row IDs).</p>
         </div>
 
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge" style="background: color-mix(in srgb, var(--compensable) 15%, transparent); color: var(--compensable);">Principle 3</span>
           <h3 style="margin-top: 0.8rem;">🔍 Honest Rollbacks (clean vs. partial)</h3>
           <p>Swallowing partial failures is a critical vulnerability. Operators must always distinguish a 100% clean rollback from a partial failure requiring human intervention (<code>RollbackReport.clean</code>).</p>
         </div>
 
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge" style="background: color-mix(in srgb, var(--irreversible) 15%, transparent); color: var(--irreversible);">Principle 4</span>
           <h3 style="margin-top: 0.8rem;">🛑 Pre-Flight Gates over Post-Cleanup</h3>
           <p>High-risk or non-compensable actions trigger policy gates <b>before</b> any side-effect is modified — the only point at which refusal is completely free.</p>
         </div>
 
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge" style="background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent);">Principle 5</span>
           <h3 style="margin-top: 0.8rem;">💥 Fail Loud, Never Silent</h3>
           <p>Write-Ahead Logs must <b>never</b> silently swallow unreadable or corrupted records. If a recovery daemon cannot parse an entry, it halts and alerts immediately.</p>
@@ -645,46 +1072,46 @@ async with kit.transaction():
   <section id="categories">
     <div class="wrap">
       <p class="eyebrow">Universal Spectrum Coverage</p>
-      <h2>From Hobby Makers & Coders to High-Precision Aerospace.</h2>
+      <h2 data-reveal>From Hobby Makers & Coders to High-Precision Aerospace.</h2>
       <p class="lede">Whether building an indie side project, auto-refactoring code, executing $10M banking transfers, or diagnosing patient treatments, agent-saga powers mission-critical reliability everywhere.</p>
       
       <div class="category-grid">
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge">Hobbyists & Makers</span>
           <span class="cat-icon">🛠️</span>
           <h3>IoT & Hardware Robotics</h3>
           <p>Enforces hardware actuator angle limits and battery voltage bounds, preventing physical servo burnout or runaway robot motor commands.</p>
         </div>
 
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge">Coders & Software Engineers</span>
           <span class="cat-icon">💻</span>
           <h3>GitHub & Cloud Infrastructure</h3>
           <p>Plug-and-play GitHub/GitLab PR auto-reverts and AWS/GCP/K8s infrastructure auto-cleanup if deployment or coding agent tasks fail.</p>
         </div>
 
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge">Banking & FinTech</span>
           <span class="cat-icon">🏦</span>
           <h3>High-Value Wire & Billing</h3>
           <p>Enforces 3/3 Triple Redundant Consensus before executing multi-million dollar transfers, preventing hallucinated refunds or duplicated wire charges.</p>
         </div>
 
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge">Medical & Healthcare</span>
           <span class="cat-icon">🩺</span>
           <h3>Prescription & Diagnosis Safety</h3>
           <p>Intersects LLM treatment recommendations against strict clinical boundary range rules (0.1mg - 50mg), blocking lethal medication overdose attempts pre-flight.</p>
         </div>
 
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge">Observability & Tracing</span>
           <span class="cat-icon">📊</span>
           <h3>LangSmith, Phoenix & OTEL</h3>
           <p>Stamps Saga UUID and prompt context into OpenTelemetry spans and LLM trace providers, linking hallucinated prompts directly to rollback causes.</p>
         </div>
 
-        <div class="cat-card">
+        <div class="cat-card" data-reveal>
           <span class="cat-badge">Risk Team Dashboard</span>
           <span class="cat-icon">🛡️</span>
           <h3>Interactive Web UI & Replay</h3>
@@ -701,7 +1128,7 @@ async with kit.transaction():
   <section id="sandbox">
     <div class="wrap">
       <p class="eyebrow">Interactive Practical Playground</p>
-      <h2>Practically test your own input data: Before vs. After agent-saga.</h2>
+      <h2 data-reveal>Practically test your own input data: Before vs. After agent-saga.</h2>
       <p class="lede">Type custom input parameters below. Use the prominent toggle switch to compare how raw AI models crash and corrupt data (BEFORE) versus how agent-saga verifies and auto-restores state (AFTER).</p>
 
       <div class="sandbox-shell">
@@ -758,101 +1185,101 @@ async with kit.transaction():
   <section id="features">
     <div class="wrap">
       <p class="eyebrow">Core Capabilities</p>
-      <h2>Click any capability to inspect its real code & architecture.</h2>
+      <h2 data-reveal>Click any capability to inspect its real code & architecture.</h2>
       <p class="lede">Every card below maps to shipping, tested code in the package — not a roadmap. The suite is 2,103 tests green.</p>
 
       <div class="feat-grid">
-        <div class="feat-card" onclick="openFeatureModal('grounding')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('grounding')">
           <h3>🧾 Grounded Answers</h3>
           <p>A hallucination cannot pose as a sourced fact. Every claim in an answer is <code>VERIFIED</code> against live SHA-256 receipts — or wears a label: <code>UNCITED</code>, <code>BROKEN_CITATION</code>, <code>BROKEN_QUOTE</code>. Your policy decides what unlabeled claims may touch.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('certify')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('certify')">
           <h3>✅ Rollback-Safety Certificates</h3>
           <p>Machine-checkable proof that every committed effect was accounted for. <code>agent-saga certify</code> returns non-zero in CI, so a release that could strand an uncompensated charge can't ship.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('provenance')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('provenance')">
           <h3>🌳 Selective-Disclosure Audit Proofs</h3>
           <p>Prove one saga to an auditor without revealing any other. A Merkle tree with domain-separated leaves yields a compact inclusion proof under a published root.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('predictive')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('predictive')">
           <h3>⚡ Predictive Pre-Execution</h3>
           <p>Speculatively run REVERSIBLE-only steps ahead of confirmation behind an HMAC lease bound to (intent, tool, expiry). Stale, forged, or cross-intent speculations can never be redeemed.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('passkey')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('passkey')">
           <h3>🔐 Passkey / Hardware Approvals</h3>
           <p>An IRREVERSIBLE step can demand a hardware-bound Ed25519 signature over a digest of the exact action — so an approval can't be replayed onto a different call.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('mesh')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('mesh')">
           <h3>🕸️ Offline Mesh Sagas (CRDT)</h3>
           <p>Agents acting offline on separate devices keep local WALs that merge with a commutative, idempotent, associative G-Set CRDT — any sync order converges to the same history.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('async_sink')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('async_sink')">
           <h3>🛰️ Edge / Async Storage Sink</h3>
           <p>The engine is separable from disk: point the WAL at any async store (proven, not asserted) to run the same guarantees at the edge or in a WASM sandbox.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('cloud_server')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('cloud_server')">
           <h3>☁️ Self-Hosted Control Plane (cloud-server)</h3>
           <p>Run your own control plane backend (<code>agent-saga cloud-server</code>) matching the <code>sagaops.dev</code> SaaS REST API for audit ingest, approvals, and fleet budget sync.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('bpmn_designer')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('bpmn_designer')">
           <h3>📐 BPMN 2.0 Visual Workflow Designer</h3>
           <p>Interactive web canvas tab on the dashboard to visually design agent compensation flows and export typed <code>@saga_scope</code> Python code in 1 click.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('pytest_plugin')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('pytest_plugin')">
           <h3>🧪 Standalone pytest-agent-saga Package</h3>
           <p>Dedicated Pytest companion package (<code>pip install pytest-agent-saga</code>) providing isolated WAL fixtures, multi-point chaos runners, and deterministic replay assertions.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('redact_path')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('redact_path')">
           <h3>🛡️ Array & Dotted Redaction (redact_path)</h3>
           <p>Surgically mask nested fields including list indices (e.g. <code>redact_path(records, "kwargs.items.0.cvv")</code>) without writing custom lambda functions.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('self_healing')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('self_healing')">
           <h3>🔄 Multi-Turn Agent Self-Healing Loop</h3>
           <p>Bounded correction loop (<code>SelfHealingLoop</code>) that feeds gate refusal reasons back to the agent with exponential backoff and human escalation fallback.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('embedding_risk')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('embedding_risk')">
           <h3>🧠 Zero-Config Embedding Risk Scorer</h3>
           <p>Dynamic anomaly risk scoring against known-bad tool calls (<code>EmbeddingRiskScorer</code>) with zero external dependencies and offline execution.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('slack_app')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('slack_app')">
           <h3>💬 Slack OAuth & Slash Command Integration</h3>
           <p>Interactive Slack Block Kit app with OAuth URL construction (<code>build_oauth_install_url</code>) and <code>/saga-approve</code> slash command handling.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('otel')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('otel')">
           <h3>📊 OpenTelemetry & LangSmith Tracing</h3>
           <p>Binds Saga UUIDs to OpenTelemetry spans, LangChain callbacks, and Phoenix traces, identifying the exact prompt context that caused a rollback.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
 
-        <div class="feat-card" onclick="openFeatureModal('ui')">
+        <div class="feat-card" data-reveal onclick="openFeatureModal('ui')">
           <h3>💻 Protected Web Dashboard (agent-saga ui)</h3>
           <p>Web UI dashboard serving visual approval queues, SSE live WAL streaming, spend limit gauges, and token authentication.</p>
           <span class="feat-inspect-hint">Click to inspect code →</span>
@@ -865,7 +1292,7 @@ async with kit.transaction():
   <section id="install">
     <div class="wrap">
       <p class="eyebrow">Developer Documentation</p>
-      <h2>Quickstart & Integration Reference.</h2>
+      <h2 data-reveal>Quickstart & Integration Reference.</h2>
       <p class="lede">Get started in 30 seconds. Wrap your agent loops in a single decorator or context manager.</p>
 
       <div class="docs-card">
@@ -949,10 +1376,139 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 </footer>
 
 <script>
+  /* ============================================================
+     MOTION LAYER
+     One shared media query, consulted live rather than latched at
+     load: a visitor who turns the OS setting on mid-session gets
+     the quiet page without reloading.
+     ============================================================ */
+  var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  /* --- scroll reveal ---------------------------------------- */
+  (function () {
+    var targets = document.querySelectorAll('[data-reveal]');
+    if (!targets.length) return;
+
+    if (REDUCED.matches || !('IntersectionObserver' in window)) {
+      // No observer, or no appetite for motion: show everything now.
+      // The CSS hidden state is already scoped out under reduced
+      // motion, so this is belt-and-braces for old browsers.
+      targets.forEach(function (el) { el.classList.add('is-in'); });
+      return;
+    }
+
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var el = entry.target;
+        // Stagger siblings so a row of cards arrives as a sequence
+        // rather than a single flat pop.
+        var group = el.parentElement ? el.parentElement.children : [el];
+        var index = Array.prototype.indexOf.call(group, el);
+        el.style.setProperty('--reveal-delay', Math.min(index, 6) * 70 + 'ms');
+        el.classList.add('is-in');
+        io.unobserve(el);          // reveal once; never re-hide on scroll-up
+      });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 });
+
+    targets.forEach(function (el) { io.observe(el); });
+  })();
+
+  /* --- scroll progress -------------------------------------- */
+  (function () {
+    var bar = document.getElementById('scrollProgress');
+    if (!bar) return;
+    var ticking = false;
+    function update() {
+      var doc = document.documentElement;
+      var max = doc.scrollHeight - doc.clientHeight;
+      var ratio = max > 0 ? Math.min(1, doc.scrollTop / max) : 0;
+      bar.style.transform = 'scaleX(' + ratio + ')';
+      ticking = false;
+    }
+    window.addEventListener('scroll', function () {
+      if (ticking) return;                 // one write per frame, no thrash
+      ticking = true;
+      window.requestAnimationFrame(update);
+    }, { passive: true });
+    update();
+  })();
+
+  /* --- cursor spotlight ------------------------------------- */
+  (function () {
+    if (REDUCED.matches) return;
+    if (!window.matchMedia('(hover: hover)').matches) return;
+    document.addEventListener('pointermove', function (e) {
+      var card = e.target.closest && e.target.closest('.feat-card, .cat-card');
+      if (!card) return;
+      var r = card.getBoundingClientRect();
+      // Custom properties only -- the gradient moves on the compositor,
+      // nothing reflows.
+      card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+      card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    }, { passive: true });
+  })();
+
+  /* --- adapter marquee -------------------------------------- */
+  (function () {
+    var track = document.getElementById('adapterMarquee');
+    if (!track) return;
+    // The 13 modules in agent_saga/adapters/, named as they are on disk.
+    // tests/test_site_assets.py asserts this list matches the package.
+    var adapters = ['langgraph', 'crewai', 'openai_agents', 'autogen',
+                    'llamaindex', 'semantic_kernel', 'vertex_ai', 'temporal',
+                    'camunda', 'sqlalchemy', 'supabase', 'base_db',
+                    'framework_wrappers'];
+    // Rendered twice: the keyframe translates by -50%, so the second copy is
+    // exactly what slides in as the first slides out. One copy would jump.
+    var html = adapters.concat(adapters)
+      .map(function (n) { return '<span>' + n + '</span>'; }).join('');
+    track.innerHTML = html;
+  })();
+
+  /* --- count-up numbers ------------------------------------- */
+  (function () {
+    var stats = document.querySelectorAll('[data-count]');
+    if (!stats.length) return;
+
+    function paint(el, value) {
+      var decimals = parseInt(el.dataset.decimals || '0', 10);
+      el.textContent = (el.dataset.prefix || '')
+        + value.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+        + (el.dataset.suffix || '');
+    }
+
+    if (REDUCED.matches || !('IntersectionObserver' in window)) {
+      stats.forEach(function (el) { paint(el, parseFloat(el.dataset.count)); });
+      return;
+    }
+
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var el = entry.target;
+        io.unobserve(el);
+        var target = parseFloat(el.dataset.count);
+        var started = null;
+        (function step(now) {
+          if (started === null) started = now;
+          var t = Math.min(1, (now - started) / 1100);
+          var eased = 1 - Math.pow(1 - t, 3);
+          paint(el, target * eased);
+          if (t < 1) window.requestAnimationFrame(step);
+          else paint(el, target);      // land exactly on the real number
+        })(performance.now());
+      });
+    }, { threshold: 0.5 });
+
+    stats.forEach(function (el) { paint(el, 0); io.observe(el); });
+  })();
+
   /* Canvas Background Particle Animation */
   (function () {
     var canvas = document.getElementById('heroCanvas');
     if (!canvas) return;
+    if (REDUCED.matches) { canvas.style.display = 'none'; return; }
     var ctx = canvas.getContext('2d');
     var pts = [];
     function resize() {
@@ -1684,6 +2240,18 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
     var mobileNav = document.querySelector('.nav-links');
     if (mobileNav) { mobileNav.classList.remove('open'); }
 
+    // A hidden view's elements never intersect anything, so their reveal
+    // observers have not fired. Reveal whatever is already on screen in the
+    // view being opened -- otherwise the top of every tab but the first is
+    // blank for a frame, and on a short view, permanently.
+    if (target) {
+      target.querySelectorAll('[data-reveal]:not(.is-in)').forEach(function (el) {
+        if (el.getBoundingClientRect().top < window.innerHeight * 1.1) {
+          el.classList.add('is-in');
+        }
+      });
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -1701,7 +2269,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
   <div class="wrap" style="max-width: 860px;">
     <div style="text-align: center; margin-bottom: 2.5rem;">
       <span class="eyebrow">✉️ Reviews, Feedback & Founder Contact</span>
-      <h2>Tell us what broke, what worked, and what's missing</h2>
+      <h2 data-reveal>Tell us what broke, what worked, and what's missing</h2>
       <p class="lede" style="margin-inline: auto;">
         Enterprise inquiry, integration requirement, bug report, or a review of how it went in production — all of it is wanted, especially the unflattering kind.
       </p>
