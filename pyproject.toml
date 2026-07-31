@@ -70,6 +70,8 @@ crewai = ["crewai"]
 openai-agents = ["openai-agents"]
 llamaindex = ["llama-index-core>=0.11"]
 autogen = ["autogen-core>=0.4"]
+semantic-kernel = ["semantic-kernel>=1.0"]
+vertexai = ["google-cloud-aiplatform>=1.60"]
 
 # -- everything --------------------------------------------------------------
 all = [
@@ -82,6 +84,7 @@ all = [
     # framework adapters
     "langchain-core>=0.3", "langgraph>=0.2", "crewai", "openai-agents",
     "llama-index-core>=0.11", "autogen-core>=0.4",
+    "semantic-kernel>=1.0", "google-cloud-aiplatform>=1.60",
 ]
 
 [project.scripts]
