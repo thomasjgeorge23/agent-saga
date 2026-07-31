@@ -40,7 +40,7 @@ Framework extras: `langgraph`, `crewai`, `autogen`, `llamaindex`,
 
 ---
 
-## CLI — all 27 commands
+## CLI — all 28 commands
 
 ### Start here
 
@@ -91,6 +91,7 @@ from risk to blocker) and `--strict` (exit 1 on risks too, for CI).
 | `agent-saga replay` | walk a historical saga's steps, compensations, and failure point | `--execute` |
 | `agent-saga graph` | draw a saga's forward path and rollback fork as Mermaid or Graphviz DOT | `--format`, `--saga`, `--all`, `-o` |
 | `agent-saga animate` | render a saga's rollback as a self-contained animated SVG (no JS, no network, works in `<img>` and under a strict CSP) | `--saga`, `--theme`, `--width`, `--speed`, `--no-loop`, `-o` |
+| `agent-saga viz` | whole-log visuals: `--kind fleet` (sagas over elapsed time), `chain` (the hash chain, verified while drawing), `outcomes` (tool x outcome) | `--kind`, `--theme`, `--width`, `--speed`, `--no-loop`, `-o` |
 | `agent-saga refactor` | index a codebase and apply a scope-correct refactor as a transaction | `--symbol`, `--to`, `--root`, `--apply`, `--yes` |
 | `agent-saga mcp` | run the saga proxy in front of an MCP server | `--policy`, `--observe`, `--emit-policy`, `--boundary` |
 | `agent-saga cloud-server` | run self-hosted cloud control plane server | `--host`, `--port` |

@@ -40,6 +40,8 @@ if str(ROOT) not in sys.path:
 
 from agent_saga import ActionSemantics, Compensation, SagaContext  # noqa: E402
 from agent_saga.animate import wal_to_animated_svg                  # noqa: E402
+from agent_saga.viz import (chain_ribbon, fleet_timeline,           # noqa: E402
+                            outcome_matrix)
 from agent_saga.wal import FileWAL                                  # noqa: E402
 
 ASSETS = ROOT / "site" / "assets"
@@ -119,6 +121,47 @@ SCENARIOS = (
 )
 
 
+async def _fleet(path: Path, sagas: int = 9) -> None:
+    """A concurrent workload, so the timeline has real overlap to draw.
+
+    Every third saga fails, and its rollback is a real rollback -- the bars the
+    page shows in red were produced by the engine aborting, not by a colour
+    chosen for effect.
+    """
+    wal = FileWAL(str(path))
+    await wal.start()
+
+    async def one(index: int) -> None:
+        saga = SagaContext(wal=wal, name=f"order-{index:02d}",
+                           saga_id=f"order-{index:02d}-demo")
+        await saga.begin()
+        try:
+            await saga.execute("stripe.charge", ActionSemantics.COMPENSABLE,
+                               _ok, {"amount": 1000 + index}, _undo)
+            await saga.execute("inventory.reserve", ActionSemantics.COMPENSABLE,
+                               _ok, {"sku": f"S{index}"}, _undo)
+            forward = _declined if index % 3 == 2 else _ok
+            await saga.execute("crm.update", ActionSemantics.COMPENSABLE,
+                               forward, {"id": index}, _undo)
+            await saga.finish()
+        except Exception as exc:
+            saga.record_abort(exc)
+            report = await saga.rollback()
+            await saga.finish(aborted=True, clean=report.clean)
+
+    await asyncio.gather(*(one(i) for i in range(sagas)))
+    await wal.close()
+
+
+# Whole-log visuals, rendered from the fleet run above.
+VIZ = (
+    # (asset filename, marker name, renderer name, width)
+    ("viz-fleet.svg", "viz-fleet", "fleet", 880),
+    ("viz-chain.svg", "viz-chain", "chain", 880),
+    ("viz-outcomes.svg", "viz-outcomes", "outcomes", 880),
+)
+
+
 def main() -> int:
     # The engine warns loudly about missing compensations. In the `orphan`
     # scenario that warning is the scenario, so quiet it rather than let it
@@ -149,8 +192,31 @@ def main() -> int:
             html = _splice(html, marker, svg)
         print(f"  {filename:22} {len(svg):6} bytes  engine clean={clean}")
 
+    # -- whole-log visuals, from one concurrent run --------------------------
+    fleet_wal = tmp / "fleet.wal"
+    asyncio.run(_fleet(fleet_wal))
+    fleet_records = [json.loads(line) for line
+                     in fleet_wal.read_text(encoding="utf-8").splitlines()
+                     if line.strip()]
+
+    renderers = {"fleet": fleet_timeline, "chain": chain_ribbon,
+                 "outcomes": outcome_matrix}
+    for filename, marker, kind, width in VIZ:
+        svg = renderers[kind](fleet_records, width=width)
+        if kind == "chain" and "CHAIN BROKEN" in svg:
+            # The generator just produced this log; a broken chain here means
+            # the WAL writer is wrong, not that the page has an interesting
+            # picture to show.
+            raise SystemExit(
+                "the freshly written fleet WAL reports a broken hash chain. "
+                "That is a WAL bug, not a rendering one -- do not publish.")
+        (ASSETS / filename).write_text(svg + "\n", encoding="utf-8")
+        html = _splice(html, marker, svg)
+        print(f"  {filename:22} {len(svg):6} bytes  ({kind})")
+
     INDEX.write_text(html, encoding="utf-8")
-    print(f"spliced {sum(1 for s in SCENARIOS if s[2])} animation(s) into {INDEX.name}")
+    spliced = sum(1 for s in SCENARIOS if s[2]) + len(VIZ)
+    print(f"spliced {spliced} visual(s) into {INDEX.name}")
     return 0
 
 

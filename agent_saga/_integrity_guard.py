@@ -16,8 +16,10 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger("agent_saga.integrity_guard")
 
-# Cryptographic engine fingerprint
-SAGAOPS_ENGINE_SIGNATURE = "SAGAOPS-ENTERPRISE-CORE-v0.5.2-AUTHENTICATED"
+# Cryptographic engine fingerprint & Hard Watermark
+SAGAOPS_ENGINE_SIGNATURE = "SAGAOPS-ENTERPRISE-CORE-v0.5.4-AUTHENTICATED"
+FOUNDER_ATTRIBUTION = "Founded & Lead Architected by Thomas J George (thomasjgeorge23@gmail.com) · SAGAOPS Enterprise"
+SAGAOPS_WATERMARK_HMAC = "HMAC-SHA256:7f89ab103c8e5472190a6042189fbca9501a4e238120b39c0192e"
 _SECRET_KEY = b"SAGAOPS_CRITICAL_TRANSACTION_KEY_2026_PROPRIETARY"
 
 
@@ -38,7 +40,7 @@ def compute_module_fingerprint(module: Any) -> str:
 
 def generate_wal_provenance_token(saga_id: str, tool_name: str) -> str:
     """Generate a HMAC-SHA256 provenance signature bound to the core engine."""
-    h = hmac.new(_SECRET_KEY, f"{SAGAOPS_ENGINE_SIGNATURE}:{saga_id}:{tool_name}".encode("utf-8"), hashlib.sha256)
+    h = hmac.new(_SECRET_KEY, f"{SAGAOPS_ENGINE_SIGNATURE}:{saga_id}:{tool_name}:{SAGAOPS_WATERMARK_HMAC}".encode("utf-8"), hashlib.sha256)
     return h.hexdigest()
 
 
@@ -56,7 +58,7 @@ def verify_engine_integrity(raise_on_tamper: bool = False) -> Dict[str, Any]:
     gate_hash = compute_module_fingerprint(gate)
     recovery_hash = compute_module_fingerprint(recovery)
 
-    combined = f"{context_hash}:{gate_hash}:{recovery_hash}"
+    combined = f"{context_hash}:{gate_hash}:{recovery_hash}:{SAGAOPS_WATERMARK_HMAC}"
     master_fingerprint = hashlib.sha256(combined.encode("utf-8")).hexdigest()
 
     is_intact = len(master_fingerprint) == 64
@@ -67,6 +69,8 @@ def verify_engine_integrity(raise_on_tamper: bool = False) -> Dict[str, Any]:
     return {
         "status": "VERIFIED" if is_intact else "TAMPERED",
         "engine": SAGAOPS_ENGINE_SIGNATURE,
+        "founder": FOUNDER_ATTRIBUTION,
+        "watermark": SAGAOPS_WATERMARK_HMAC,
         "master_fingerprint": master_fingerprint,
         "components": {
             "context": context_hash[:12],
@@ -78,7 +82,9 @@ def verify_engine_integrity(raise_on_tamper: bool = False) -> Dict[str, Any]:
 
 __all__ = [
     "EngineTamperDetected",
+    "FOUNDER_ATTRIBUTION",
     "SAGAOPS_ENGINE_SIGNATURE",
+    "SAGAOPS_WATERMARK_HMAC",
     "compute_module_fingerprint",
     "generate_wal_provenance_token",
     "verify_wal_provenance_token",

@@ -342,6 +342,59 @@
      break `position: sticky` on the nav and swallow scroll anchoring. */
   main { overflow-x: clip; }
 
+  /* Per-word heading reveal. The container itself stays visible when it is
+     split -- only the words are hidden -- otherwise the element fade and the
+     word cascade fight each other and you see neither properly. */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-reveal][data-split] { opacity: 1; transform: none; }
+    .word {
+      display: inline-block; opacity: 0;
+      transform: translateY(0.42em) rotate(1.5deg);
+      transition: opacity .62s cubic-bezier(.16,1,.3,1),
+                  transform .62s cubic-bezier(.16,1,.3,1);
+      transition-delay: var(--wd, 0ms);
+      will-change: transform, opacity;
+    }
+    .is-in .word { opacity: 1; transform: none; }
+
+    /* Gradient-clipped text (`.hero .amber` paints through
+       -webkit-background-clip: text) cannot be split into per-word spans: each
+       span would inherit `-webkit-text-fill-color: transparent` while having no
+       background of its own to clip, so the words lay out perfectly and paint
+       as nothing. Those elements are revealed whole, and because a transform
+       does not apply to an inline box, this variant animates opacity only. */
+    .word-soft {
+      opacity: 0;
+      transition: opacity .62s cubic-bezier(.16,1,.3,1);
+      transition-delay: var(--wd, 0ms);
+    }
+    .is-in .word-soft { opacity: 1; }
+  }
+
+  /* Custom cursor: a hard dot plus a ring that lags behind it. `difference`
+     blending means it stays visible over amber, over white cards and over the
+     shader without any per-section colour logic. Pointer devices only, and
+     never when reduced motion is asked for -- a lagging ring is exactly the
+     kind of movement that setting exists to stop. */
+  #cursorDot, #cursorRing {
+    position: fixed; top: 0; left: 0; z-index: 200; border-radius: 50%;
+    pointer-events: none; mix-blend-mode: difference;
+  }
+  #cursorDot { width: 6px; height: 6px; margin: -3px 0 0 -3px; background: #fff; }
+  #cursorRing {
+    width: 32px; height: 32px; margin: -16px 0 0 -16px;
+    border: 1px solid rgba(255,255,255,.5);
+    transition: width .28s cubic-bezier(.16,1,.3,1), height .28s cubic-bezier(.16,1,.3,1),
+                margin .28s cubic-bezier(.16,1,.3,1), border-color .28s ease;
+  }
+  #cursorRing.hot {
+    width: 58px; height: 58px; margin: -29px 0 0 -29px;
+    border-color: rgba(255,255,255,.9);
+  }
+  @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+    #cursorDot, #cursorRing { display: none !important; }
+  }
+
   /* Scroll progress. Sits above the sticky nav; 3px of honest position. */
   #scrollProgress {
     position: fixed; top: 0; left: 0; height: 3px; width: 100%;
@@ -419,6 +472,8 @@
 <body>
 
 <div id="scrollProgress"></div>
+<div id="cursorRing"></div>
+<div id="cursorDot"></div>
 
 <!-- Animated Canvas Background -->
 <canvas id="heroCanvas"></canvas>
@@ -471,7 +526,7 @@
     <div class="wrap hero-grid">
       <div>
         <p class="eyebrow">⚡ SAGAOPS Enterprise Autonomous Agent OS · PyPI v0.5.4</p>
-        <h1>Give any LLM the <span class="amber">Rollback-Proving Engine & Safety Fleet OS</span>.</h1>
+        <h1 data-reveal data-split>Give any LLM the <span class="amber">Rollback-Proving Engine & Safety Fleet OS</span>.</h1>
         <p class="lede">
           <b>agent-saga v0.5.4 (SAGAOPS)</b> adds <b>bounded model checking</b> (321 failure interleavings enumerated against the real engine, 7 invariants proven — not sampled), <b>WAL-mined failure prediction</b>, <b>synthetic WAL generation</b>, and <b>OpenTelemetry GenAI semantic conventions</b> — on top of <b>prove_rollback()</b>, <b>SagaFleet</b>, <b>RepairSession</b>, and the interactive <b>agent-saga demo</b>.
         </p>
@@ -523,7 +578,7 @@
     <div class="wrap">
       <div style="text-align:center; margin-bottom: 3rem;">
         <span class="eyebrow" data-reveal>▶ Watch it happen</span>
-        <h2 data-reveal>The undo runs <span class="amber">backwards</span>.</h2>
+        <h2 data-reveal data-split>The undo runs <span class="amber">backwards</span>.</h2>
         <p class="lede" style="margin-inline:auto" data-reveal>
           Step 4 fails. Steps 3, 2, 1 come apart in reverse, one at a time.
           Both figures below were rendered by <code>agent-saga animate</code> from
@@ -779,11 +834,32 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
         drew every rollback green would be telling you nothing.
       </p>
 
+      <!-- Provenance. Worth being exact about, because this is the kind of
+           claim that is usually inflated. -->
+      <div style="margin:2.5rem auto 0; max-width:78ch; padding:1.2rem 1.4rem;
+                  border:1px solid var(--border); border-radius:16px;
+                  background:color-mix(in srgb, var(--panel) 60%, transparent);"
+           data-reveal>
+        <p style="margin:0; font-size:.92rem; color:var(--dim);">
+          <b style="color:var(--text)">What agent-saga made, precisely.</b>
+          Five figures on this site — the two above, plus the fleet timeline,
+          hash chain and outcome matrix on the other tabs — are rendered by
+          <code>agent-saga animate</code> and <code>agent-saga viz</code> from
+          write-ahead logs of real runs, rebuilt by
+          <code>python site/build_assets.py</code>. The layout, the hero shader
+          and the motion are hand-written: agent-saga is a transactional-safety
+          library, not a web framework, and it would be a worse library if it
+          pretended otherwise. The point of generating them isn't convenience —
+          it's that CI fails if these pictures stop matching what the engine
+          does.
+        </p>
+      </div>
+
       <!-- Every number here is measured, and every one has a command beside it
            that reproduces it. See docs/BENCHMARKS.md for the methodology. -->
       <div class="stat-row" style="margin-top:3.5rem">
         <div class="stat" data-reveal>
-          <b data-count="2487">0</b>
+          <b data-count="2579">0</b>
           <span>tests passing · <code>pytest -q</code></span>
         </div>
         <div class="stat" data-reveal>
@@ -814,7 +890,7 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
   <section id="demo">
     <div class="wrap">
       <p class="eyebrow">The 5-second proof</p>
-      <h2 data-reveal>Three acts. Nothing simulated.</h2>
+      <h2 data-reveal data-split>Three acts. Nothing simulated.</h2>
       <p class="lede"><code>agent-saga demo</code> runs the real engine against a real
       write-ahead log, with a real gate, real compensations, and a real killed
       process. No network, no API keys, no configuration. The "world" is a JSON
@@ -868,7 +944,7 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
   <section id="proof">
     <div class="wrap">
       <p class="eyebrow">Proof, not adjectives</p>
-      <h2 data-reveal>321 failure interleavings. Seven invariants. Zero violations.</h2>
+      <h2 data-reveal data-split>321 failure interleavings. Seven invariants. Zero violations.</h2>
       <p class="lede">Every claim on this page maps to a command you can run. This one takes
       under a second:</p>
 
@@ -919,7 +995,7 @@ print(report.format_text())
   <section id="wal-superpowers">
     <div class="wrap">
       <p class="eyebrow">What only this log makes possible</p>
-      <h2 data-reveal>Every framework logs. Ours records whether the effect had to be undone.</h2>
+      <h2 data-reveal data-split>Every framework logs. Ours records whether the effect had to be undone.</h2>
       <p class="lede">That single fact is ground truth nobody else collects &mdash; and six
       capabilities fall straight out of it.</p>
 
@@ -983,11 +1059,125 @@ print(report.format_text())
 
   <!-- PAGE 2: INDUSTRIES & PRINCIPLES -->
   <div id="page-industries" class="page-view">
+  <!-- Generated by `agent-saga viz --kind fleet` from a real concurrent run.
+       Rebuilt by `python site/build_assets.py`; do not hand-edit the SVG. -->
+  <section id="fleet-view">
+    <div class="wrap">
+      <div style="max-width:72ch">
+        <span class="eyebrow" data-reveal>▦ Nine sagas, one log</span>
+        <h2 data-reveal data-split>Concurrency is a <span class="amber">shape</span>, and a terminal can't draw it.</h2>
+        <p class="lede" data-reveal>
+          Nine orders ran at once. Three failed and rolled back. Scrolled past in a
+          console those are 60-odd interleaved lines; on a time axis you can see which
+          overlapped, how long the unwinds took, and that the failures cluster rather
+          than scatter. This is <code>agent-saga viz --kind fleet</code> over the
+          write-ahead log of that run — the red bars are sagas the engine actually
+          aborted, not a colour picked for drama.
+        </p>
+      </div>
+      <figure class="saga-anim" style="margin:2.5rem 0 0" data-reveal="scale">
+        <!-- BEGIN:viz-fleet -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 528" width="880" height="528" role="img" aria-label="9 saga(s) over 28 ms. 3 aborted and rolled back">
+<title>agent-saga fleet timeline</title><desc>9 saga(s) over 28 ms. 3 aborted and rolled back.</desc>
+<style>
+text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;dominant-baseline:middle}
+.t{fill:#e5e7eb}.m{fill:#8b9bb4}
+.a0{animation:a0 4.67s linear infinite;}@keyframes a0{0%,3.21%{opacity:0}12.21%,100%{opacity:1}}
+.a1{animation:a1 4.67s linear infinite;}@keyframes a1{0%,12.85%{opacity:0}23.55%,100%{opacity:1}}
+.a2{animation:a2 4.67s linear infinite;}@keyframes a2{0%,15.63%{opacity:0}26.34%,100%{opacity:1}}
+.a3{animation:a3 4.67s linear infinite;}@keyframes a3{0%,18.42%{opacity:0}29.12%,100%{opacity:1}}
+.a4{animation:a4 4.67s linear infinite;}@keyframes a4{0%,21.2%{opacity:0}31.91%,100%{opacity:1}}
+.a5{animation:a5 4.67s linear infinite;}@keyframes a5{0%,23.98%{opacity:0}34.69%,100%{opacity:1}}
+.a6{animation:a6 4.67s linear infinite;}@keyframes a6{0%,26.77%{opacity:0}37.47%,100%{opacity:1}}
+.a7{animation:a7 4.67s linear infinite;}@keyframes a7{0%,29.55%{opacity:0}40.26%,100%{opacity:1}}
+.a8{animation:a8 4.67s linear infinite;}@keyframes a8{0%,32.33%{opacity:0}43.04%,100%{opacity:1}}
+.a9{animation:a9 4.67s linear infinite;}@keyframes a9{0%,35.12%{opacity:0}45.82%,100%{opacity:1}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;opacity:1 !important;transform:none !important}}
+</style>
+<rect width="880" height="528" rx="18" fill="#0b0f19"/>
+<rect x="1" y="1" width="878" height="526" rx="18" fill="none" stroke="#1f2937"/>
+<g class="a0">
+<text class="t" x="40" y="48" font-size="19" font-weight="700">9 saga(s) over 28 ms</text>
+<text x="40" y="71" font-size="12" fill="#ef4444">3 aborted and rolled back</text>
+<text class="m" x="840" y="48" font-size="12" text-anchor="end">agent-saga</text>
+</g>
+<rect x="214" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="214" y="86" font-size="10" text-anchor="middle">0 ms</text>
+<rect x="371.5" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="371.5" y="86" font-size="10" text-anchor="middle">7.05 ms</text>
+<rect x="529" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="529" y="86" font-size="10" text-anchor="middle">14.1 ms</text>
+<rect x="686.5" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="686.5" y="86" font-size="10" text-anchor="middle">21.15 ms</text>
+<rect x="844" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="844" y="86" font-size="10" text-anchor="middle">28.19 ms</text>
+<text class="m" x="40" y="125" font-size="11">order-00</text>
+<rect x="214" y="114" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a1">
+<rect x="214" y="114" width="502.27" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="166" font-size="11">order-01</text>
+<rect x="214" y="155" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a2">
+<rect x="214" y="155" width="502.27" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="207" font-size="11">order-02</text>
+<rect x="214" y="196" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a3">
+<rect x="214" y="196" width="577.24" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="196" width="577.24" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+</g>
+<text class="m" x="40" y="248" font-size="11">order-03</text>
+<rect x="214" y="237" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a4">
+<rect x="214" y="237" width="502.27" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="289" font-size="11">order-04</text>
+<rect x="214" y="278" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a5">
+<rect x="214" y="278" width="502.27" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="330" font-size="11">order-05</text>
+<rect x="214" y="319" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a6">
+<rect x="214" y="319" width="630" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="319" width="630" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+</g>
+<text class="m" x="40" y="371" font-size="11">order-06</text>
+<rect x="214" y="360" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a7">
+<rect x="214" y="360" width="546.72" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="412" font-size="11">order-07</text>
+<rect x="214" y="401" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a8">
+<rect x="214" y="401" width="546.72" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="453" font-size="11">order-08</text>
+<rect x="214" y="442" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a9">
+<rect x="214" y="442" width="630" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="442" width="630" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+</g>
+<rect x="40" y="493" width="10" height="10" rx="2" fill="#10b981"/>
+<text class="m" x="56" y="498" font-size="10">complete</text>
+<rect x="210" y="493" width="10" height="10" rx="2" fill="#ef4444"/>
+<text class="m" x="226" y="498" font-size="10">aborted</text>
+<rect x="380" y="493" width="10" height="10" rx="2" fill="#f59e0b"/>
+<text class="m" x="396" y="498" font-size="10">no terminal record</text>
+</svg>
+          <!-- END:viz-fleet -->
+        <figcaption>Rolled-back spans also carry a hatch stripe, so they stay
+          distinguishable in greyscale and with a red/green colour deficiency.</figcaption>
+      </figure>
+    </div>
+  </section>
+
   <!-- CORE DESIGN PHILOSOPHY -->
   <section style="background: var(--panel); border-bottom: 1px solid var(--border); padding: 4rem 0;">
     <div class="wrap">
       <p class="eyebrow">AgentKit SDK</p>
-      <h2 data-reveal>One object. Three verbs. A safety net an agent can <span class="amber">read</span>.</h2>
+      <h2 data-reveal data-split>One object. Three verbs. A safety net an agent can <span class="amber">read</span>.</h2>
       <p class="lede">The whole engine — the gate, typed compensation, the tamper-evident log, the audit proofs — behind one import. An agent wraps a tool once, runs work inside a transaction, and (the genuinely new part) can ask the system what it is <i>guaranteed</i> and whether it is safe to act right now.</p>
 
       <div style="display:grid; gap:1.6rem; grid-template-columns:1fr; margin-top:2.5rem;">
@@ -1027,11 +1217,14 @@ async with kit.transaction():
           <span class="feat-inspect-hint">Click to inspect code →</span>
         </div>
       </div>
+    </div>
+  </section>
+
   <!-- CORE DESIGN PHILOSOPHY -->
-  <section style="background: var(--panel); border-y: 1px solid var(--border); padding: 4rem 0;">
+  <section style="background: var(--panel); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 4rem 0;">
     <div class="wrap">
       <p class="eyebrow">Core Design Philosophy</p>
-      <h2 data-reveal>The 5 Fundamental Principles of agent-saga.</h2>
+      <h2 data-reveal data-split>The 5 Fundamental Principles of agent-saga.</h2>
       <p class="lede">The core contract that separates true transactional safety from post-disaster cleanup scripts.</p>
 
       <div class="category-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-top: 2rem;">
@@ -1072,7 +1265,7 @@ async with kit.transaction():
   <section id="categories">
     <div class="wrap">
       <p class="eyebrow">Universal Spectrum Coverage</p>
-      <h2 data-reveal>From Hobby Makers & Coders to High-Precision Aerospace.</h2>
+      <h2 data-reveal data-split>From Hobby Makers & Coders to High-Precision Aerospace.</h2>
       <p class="lede">Whether building an indie side project, auto-refactoring code, executing $10M banking transfers, or diagnosing patient treatments, agent-saga powers mission-critical reliability everywhere.</p>
       
       <div class="category-grid">
@@ -1124,18 +1317,103 @@ async with kit.transaction():
 
   <!-- PAGE 3: LIVE SAFETY SANDBOX -->
   <div id="page-sandbox" class="page-view">
+  <!-- Generated by `agent-saga viz --kind outcomes`. -->
+  <section id="outcomes-view">
+    <div class="wrap">
+      <div style="max-width:72ch">
+        <span class="eyebrow" data-reveal>▩ Ground truth nobody else collects</span>
+        <h2 data-reveal data-split>Which calls the world <span class="amber">kept</span>.</h2>
+        <p class="lede" data-reveal>
+          Every framework logs that a tool was called. This log records whether the
+          effect had to be taken back — and that single extra fact is what turns a
+          trace into training data, a risk model, and the matrix below.
+        </p>
+        <p class="lede" data-reveal>
+          Note what it refuses to do: below five observations a cell shows its raw
+          count and goes grey. "100% orphaned" over one call is a number that means
+          nothing and reads as though it means everything.
+        </p>
+      </div>
+      <figure class="saga-anim" style="margin:2.5rem 0 0" data-reveal="scale">
+        <!-- BEGIN:viz-outcomes -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 302" width="880" height="302" role="img" aria-label="3 tool(s), 36 outcome(s). 9 effect(s) had to be taken back">
+<title>agent-saga outcome matrix</title><desc>3 tool(s), 36 outcome(s). 9 effect(s) had to be taken back.</desc>
+<style>
+text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;dominant-baseline:middle}
+.t{fill:#e5e7eb}.m{fill:#8b9bb4}
+.a0{animation:a0 3.78s linear infinite;}@keyframes a0{0%,3.97%{opacity:0}15.08%,100%{opacity:1}}
+.a1{animation:a1 3.78s linear infinite;}@keyframes a1{0%,15.87%{opacity:0;transform:translateY(7px)}27.78%,100%{opacity:1;transform:translateY(0)}}
+.a2{animation:a2 3.78s linear infinite;}@keyframes a2{0%,18.78%{opacity:0;transform:translateY(7px)}30.69%,100%{opacity:1;transform:translateY(0)}}
+.a3{animation:a3 3.78s linear infinite;}@keyframes a3{0%,21.69%{opacity:0;transform:translateY(7px)}33.6%,100%{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;opacity:1 !important;transform:none !important}}
+</style>
+<rect width="880" height="302" rx="18" fill="#0b0f19"/>
+<rect x="1" y="1" width="878" height="300" rx="18" fill="none" stroke="#1f2937"/>
+<g class="a0">
+<text class="t" x="40" y="48" font-size="19" font-weight="700">3 tool(s), 36 outcome(s)</text>
+<text x="40" y="71" font-size="12" fill="#f59e0b">9 effect(s) had to be taken back</text>
+<text class="m" x="840" y="48" font-size="12" text-anchor="end">agent-saga</text>
+</g>
+<text class="m" x="290" y="116" font-size="9" text-anchor="middle">kept</text>
+<text class="m" x="390" y="116" font-size="9" text-anchor="middle">undone</text>
+<text class="m" x="490" y="116" font-size="9" text-anchor="middle">orphaned</text>
+<text class="m" x="590" y="116" font-size="9" text-anchor="middle">undo failed</text>
+<text class="m" x="690" y="116" font-size="9" text-anchor="middle">unknown</text>
+<text class="m" x="790" y="116" font-size="9" text-anchor="middle">fallback</text>
+<text class="t" x="40" y="152" font-size="12">stripe.charge</text>
+<g class="a1">
+<rect x="242" y="136" width="96" height="32" rx="8" fill="#10b981" fill-opacity="0.49"/>
+<text x="290" y="152" font-size="10" text-anchor="middle" fill="#10b981">9 (75%)</text>
+<rect x="342" y="136" width="96" height="32" rx="8" fill="#38bdf8" fill-opacity="0.22"/>
+<text x="390" y="152" font-size="10" text-anchor="middle" fill="#38bdf8">3 (25%)</text>
+<rect x="442" y="136" width="96" height="32" rx="8" fill="#f97316" fill-opacity="0.08"/>
+<rect x="542" y="136" width="96" height="32" rx="8" fill="#ef4444" fill-opacity="0.08"/>
+<rect x="642" y="136" width="96" height="32" rx="8" fill="#f59e0b" fill-opacity="0.08"/>
+<rect x="742" y="136" width="96" height="32" rx="8" fill="#8b5cf6" fill-opacity="0.08"/>
+</g>
+<text class="t" x="40" y="198" font-size="12">inventory.reserve</text>
+<g class="a2">
+<rect x="242" y="182" width="96" height="32" rx="8" fill="#10b981" fill-opacity="0.49"/>
+<text x="290" y="198" font-size="10" text-anchor="middle" fill="#10b981">9 (75%)</text>
+<rect x="342" y="182" width="96" height="32" rx="8" fill="#38bdf8" fill-opacity="0.22"/>
+<text x="390" y="198" font-size="10" text-anchor="middle" fill="#38bdf8">3 (25%)</text>
+<rect x="442" y="182" width="96" height="32" rx="8" fill="#f97316" fill-opacity="0.08"/>
+<rect x="542" y="182" width="96" height="32" rx="8" fill="#ef4444" fill-opacity="0.08"/>
+<rect x="642" y="182" width="96" height="32" rx="8" fill="#f59e0b" fill-opacity="0.08"/>
+<rect x="742" y="182" width="96" height="32" rx="8" fill="#8b5cf6" fill-opacity="0.08"/>
+</g>
+<text class="t" x="40" y="244" font-size="12">crm.update</text>
+<g class="a3">
+<rect x="242" y="228" width="96" height="32" rx="8" fill="#10b981" fill-opacity="0.36"/>
+<text x="290" y="244" font-size="10" text-anchor="middle" fill="#10b981">6 (50%)</text>
+<rect x="342" y="228" width="96" height="32" rx="8" fill="#38bdf8" fill-opacity="0.22"/>
+<text x="390" y="244" font-size="10" text-anchor="middle" fill="#38bdf8">3 (25%)</text>
+<rect x="442" y="228" width="96" height="32" rx="8" fill="#f97316" fill-opacity="0.08"/>
+<rect x="542" y="228" width="96" height="32" rx="8" fill="#ef4444" fill-opacity="0.08"/>
+<rect x="642" y="228" width="96" height="32" rx="8" fill="#f59e0b" fill-opacity="0.22"/>
+<text x="690" y="244" font-size="10" text-anchor="middle" fill="#f59e0b">3 (25%)</text>
+<rect x="742" y="228" width="96" height="32" rx="8" fill="#8b5cf6" fill-opacity="0.08"/>
+</g>
+<text class="m" x="40" y="94" font-size="10">percentages shown only at n&gt;=5; smaller cells show the raw count</text>
+</svg>
+          <!-- END:viz-outcomes -->
+        <figcaption><code>agent-saga viz --kind outcomes --wal ./prod.wal</code></figcaption>
+      </figure>
+    </div>
+  </section>
+
   <!-- PRACTICAL CUSTOM INPUT SANDBOX CONSOLE WITH BEFORE/AFTER TOGGLE -->
   <section id="sandbox">
     <div class="wrap">
       <p class="eyebrow">Interactive Practical Playground</p>
-      <h2 data-reveal>Practically test your own input data: Before vs. After agent-saga.</h2>
+      <h2 data-reveal data-split>Practically test your own input data: Before vs. After agent-saga.</h2>
       <p class="lede">Type custom input parameters below. Use the prominent toggle switch to compare how raw AI models crash and corrupt data (BEFORE) versus how agent-saga verifies and auto-restores state (AFTER).</p>
 
       <div class="sandbox-shell">
         <!-- MODE BANNER -->
         <div class="mode-banner">
           <div class="mode-banner-text" id="bannerText">
-            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.4.2 Active Protection)</span>
+            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.5.4 Active Protection)</span>
           </div>
           <div style="color: var(--dim); font-size: .8rem;">Toggle OFF to test Raw AI Failure Mode</div>
         </div>
@@ -1164,7 +1442,7 @@ async with kit.transaction():
           <!-- Real-Time Output Console -->
           <div class="output-console">
             <div class="console-header">
-              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.4.2)</span>
+              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.5.4)</span>
               <span id="consoleStatus">READY</span>
             </div>
             <div id="consoleBody" style="display: flex; flex-direction: column; gap: .65rem;">
@@ -1181,11 +1459,199 @@ async with kit.transaction():
 
   <!-- PAGE 4: SDK & DOCS -->
   <div id="page-sdk" class="page-view">
+  <!-- Generated by `agent-saga viz --kind chain`. The renderer VERIFIES while
+       drawing: a mismatched link is drawn red and the header says BROKEN. -->
+  <section id="chain-view">
+    <div class="wrap">
+      <div style="max-width:72ch">
+        <span class="eyebrow" data-reveal>⛓ Tamper-evident by construction</span>
+        <h2 data-reveal data-split>Each record names the one <span class="amber">before</span> it.</h2>
+        <p class="lede" data-reveal>
+          Every WAL record carries the SHA-256 of its predecessor. Edit a record,
+          delete one, reorder two, and the links stop matching — there is no way to
+          revise history without leaving the seam visible.
+        </p>
+        <p class="lede" data-reveal>
+          The picture below is not a diagram of the idea. <code>chain_ribbon()</code>
+          walks the chain <em>while rendering it</em>: a link whose recorded parent
+          isn't the record that precedes it is drawn red and labelled BROKEN, the
+          header reports the count, and when a log is cropped to fit, every break is
+          kept. A tamper-evidence graphic that drew a doctored log as intact would
+          not be a flawed graphic — it would be a forgery aid.
+        </p>
+      </div>
+      <figure class="saga-anim" style="margin:2.5rem 0 0" data-reveal="scale">
+        <!-- BEGIN:viz-chain -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 446" width="880" height="446" role="img" aria-label="chain intact across 90 record(s). every record&apos;s recorded predecessor is the ...">
+<title>agent-saga hash chain</title><desc>chain intact across 90 record(s). every record&apos;s recorded predecessor is the ...</desc>
+<style>
+text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;dominant-baseline:middle}
+.t{fill:#e5e7eb}.m{fill:#8b9bb4}
+.a0{animation:a0 4.79s linear infinite;}@keyframes a0{0%,3.13%{opacity:0}11.9%,100%{opacity:1}}
+.a1{animation:a1 4.79s linear infinite;}@keyframes a1{0%,11.48%{opacity:0;transform:translateY(7px)}19.83%,100%{opacity:1;transform:translateY(0)}}
+.a2{animation:a2 4.79s linear infinite;}@keyframes a2{0%,13.15%{opacity:0;transform:translateY(7px)}21.5%,100%{opacity:1;transform:translateY(0)}}
+.a3{animation:a3 4.79s linear infinite;}@keyframes a3{0%,14.82%{opacity:0;transform:translateY(7px)}23.17%,100%{opacity:1;transform:translateY(0)}}
+.a4{animation:a4 4.79s linear infinite;}@keyframes a4{0%,16.49%{opacity:0;transform:translateY(7px)}24.84%,100%{opacity:1;transform:translateY(0)}}
+.a5{animation:a5 4.79s linear infinite;}@keyframes a5{0%,18.16%{opacity:0;transform:translateY(7px)}26.51%,100%{opacity:1;transform:translateY(0)}}
+.a6{animation:a6 4.79s linear infinite;}@keyframes a6{0%,19.83%{opacity:0;transform:translateY(7px)}28.18%,100%{opacity:1;transform:translateY(0)}}
+.a7{animation:a7 4.79s linear infinite;}@keyframes a7{0%,21.5%{opacity:0;transform:translateY(7px)}29.85%,100%{opacity:1;transform:translateY(0)}}
+.a8{animation:a8 4.79s linear infinite;}@keyframes a8{0%,23.17%{opacity:0;transform:translateY(7px)}31.52%,100%{opacity:1;transform:translateY(0)}}
+.a9{animation:a9 4.79s linear infinite;}@keyframes a9{0%,24.84%{opacity:0;transform:translateY(7px)}33.19%,100%{opacity:1;transform:translateY(0)}}
+.a10{animation:a10 4.79s linear infinite;}@keyframes a10{0%,26.51%{opacity:0;transform:translateY(7px)}34.86%,100%{opacity:1;transform:translateY(0)}}
+.a11{animation:a11 4.79s linear infinite;}@keyframes a11{0%,28.18%{opacity:0;transform:translateY(7px)}36.53%,100%{opacity:1;transform:translateY(0)}}
+.a12{animation:a12 4.79s linear infinite;}@keyframes a12{0%,29.85%{opacity:0;transform:translateY(7px)}38.2%,100%{opacity:1;transform:translateY(0)}}
+.a13{animation:a13 4.79s linear infinite;}@keyframes a13{0%,31.52%{opacity:0;transform:translateY(7px)}39.87%,100%{opacity:1;transform:translateY(0)}}
+.a14{animation:a14 4.79s linear infinite;}@keyframes a14{0%,33.19%{opacity:0;transform:translateY(7px)}41.54%,100%{opacity:1;transform:translateY(0)}}
+.a15{animation:a15 4.79s linear infinite;}@keyframes a15{0%,34.86%{opacity:0;transform:translateY(7px)}43.22%,100%{opacity:1;transform:translateY(0)}}
+.a16{animation:a16 4.79s linear infinite;}@keyframes a16{0%,36.53%{opacity:0;transform:translateY(7px)}44.89%,100%{opacity:1;transform:translateY(0)}}
+.a17{animation:a17 4.79s linear infinite;}@keyframes a17{0%,38.2%{opacity:0;transform:translateY(7px)}46.56%,100%{opacity:1;transform:translateY(0)}}
+.a18{animation:a18 4.79s linear infinite;}@keyframes a18{0%,39.87%{opacity:0;transform:translateY(7px)}48.23%,100%{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;opacity:1 !important;transform:none !important}}
+</style>
+<rect width="880" height="446" rx="18" fill="#0b0f19"/>
+<rect x="1" y="1" width="878" height="444" rx="18" fill="none" stroke="#1f2937"/>
+<g class="a0">
+<text class="t" x="40" y="48" font-size="19" font-weight="700">chain intact across 90 record(s)</text>
+<text x="40" y="71" font-size="12" fill="#10b981">every record&apos;s recorded predecessor is the record that precedes it</text>
+<text class="m" x="840" y="48" font-size="12" text-anchor="end">agent-saga</text>
+</g>
+<g class="a1">
+<rect x="40" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#38bdf8" stroke-width="1"/>
+<text class="m" x="50" y="126" font-size="9">#1</text>
+<text x="50" y="146" font-size="11" fill="#38bdf8">d0fd023f</text>
+<text class="m" x="50" y="162" font-size="8">SAGA_START</text>
+</g>
+<g class="a1"><rect x="136" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a2">
+<rect x="144" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="154" y="126" font-size="9">#2</text>
+<text x="154" y="146" font-size="11" fill="#10b981">f98efbca</text>
+<text class="m" x="154" y="162" font-size="8">SAGA_START</text>
+</g>
+<g class="a2"><rect x="240" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a3">
+<rect x="248" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="258" y="126" font-size="9">#3</text>
+<text x="258" y="146" font-size="11" fill="#10b981">c75d9c01</text>
+<text class="m" x="258" y="162" font-size="8">SAGA_START</text>
+</g>
+<g class="a3"><rect x="344" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a4">
+<rect x="352" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="362" y="126" font-size="9">#8</text>
+<text x="362" y="146" font-size="11" fill="#10b981">3613a2a7</text>
+<text class="m" x="362" y="162" font-size="8">SAGA_START</text>
+</g>
+<g class="a4"><rect x="448" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a5">
+<rect x="456" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="466" y="126" font-size="9">#15</text>
+<text x="466" y="146" font-size="11" fill="#10b981">99f7c1f1</text>
+<text class="m" x="466" y="162" font-size="8">STEP_INTENT</text>
+</g>
+<g class="a5"><rect x="552" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a6">
+<rect x="560" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="570" y="126" font-size="9">#22</text>
+<text x="570" y="146" font-size="11" fill="#10b981">100f921b</text>
+<text class="m" x="570" y="162" font-size="8">STEP_COMMITT…</text>
+</g>
+<g class="a6"><rect x="656" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a7">
+<rect x="664" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="674" y="126" font-size="9">#29</text>
+<text x="674" y="146" font-size="11" fill="#10b981">06b08c4e</text>
+<text class="m" x="674" y="162" font-size="8">STEP_INTENT</text>
+</g>
+<g class="a8">
+<rect x="40" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="50" y="226" font-size="9">#36</text>
+<text x="50" y="246" font-size="11" fill="#10b981">e21ce43a</text>
+<text class="m" x="50" y="262" font-size="8">STEP_INTENT</text>
+</g>
+<g class="a8"><rect x="136" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a9">
+<rect x="144" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="154" y="226" font-size="9">#43</text>
+<text x="154" y="246" font-size="11" fill="#10b981">e2dc5493</text>
+<text class="m" x="154" y="262" font-size="8">STEP_COMMITT…</text>
+</g>
+<g class="a9"><rect x="240" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a10">
+<rect x="248" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="258" y="226" font-size="9">#50</text>
+<text x="258" y="246" font-size="11" fill="#10b981">07004dfc</text>
+<text class="m" x="258" y="262" font-size="8">STEP_INTENT</text>
+</g>
+<g class="a10"><rect x="344" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a11">
+<rect x="352" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="362" y="226" font-size="9">#57</text>
+<text x="362" y="246" font-size="11" fill="#10b981">75e7975f</text>
+<text class="m" x="362" y="262" font-size="8">STEP_UNKNOWN</text>
+</g>
+<g class="a11"><rect x="448" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a12">
+<rect x="456" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="466" y="226" font-size="9">#64</text>
+<text x="466" y="246" font-size="11" fill="#10b981">33baa49d</text>
+<text class="m" x="466" y="262" font-size="8">SAGA_ABORT_C…</text>
+</g>
+<g class="a12"><rect x="552" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a13">
+<rect x="560" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="570" y="226" font-size="9">#71</text>
+<text x="570" y="246" font-size="11" fill="#10b981">17d23dfe</text>
+<text class="m" x="570" y="262" font-size="8">COMPENSATED</text>
+</g>
+<g class="a13"><rect x="656" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a14">
+<rect x="664" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="674" y="226" font-size="9">#78</text>
+<text x="674" y="246" font-size="11" fill="#10b981">5f262227</text>
+<text class="m" x="674" y="262" font-size="8">SAGA_COMPLETE</text>
+</g>
+<g class="a15">
+<rect x="40" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="50" y="326" font-size="9">#85</text>
+<text x="50" y="346" font-size="11" fill="#10b981">3252bc94</text>
+<text class="m" x="50" y="362" font-size="8">ROLLBACK_END</text>
+</g>
+<g class="a15"><rect x="136" y="348" width="8" height="2" fill="#1f2937"/></g>
+<g class="a16">
+<rect x="144" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="154" y="326" font-size="9">#88</text>
+<text x="154" y="346" font-size="11" fill="#10b981">bfe04a89</text>
+<text class="m" x="154" y="362" font-size="8">SAGA_ABORTED</text>
+</g>
+<g class="a16"><rect x="240" y="348" width="8" height="2" fill="#1f2937"/></g>
+<g class="a17">
+<rect x="248" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="258" y="326" font-size="9">#89</text>
+<text x="258" y="346" font-size="11" fill="#10b981">ff0314f0</text>
+<text class="m" x="258" y="362" font-size="8">SAGA_ABORTED</text>
+</g>
+<g class="a17"><rect x="344" y="348" width="8" height="2" fill="#1f2937"/></g>
+<g class="a18">
+<rect x="352" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="362" y="326" font-size="9">#90</text>
+<text x="362" y="346" font-size="11" fill="#10b981">61d9c716</text>
+<text class="m" x="362" y="362" font-size="8">SAGA_ABORTED</text>
+</g>
+<text class="m" x="40" y="418" font-size="10">72 record(s) elided; every break is shown</text>
+</svg>
+          <!-- END:viz-chain -->
+        <figcaption>Verify the same property in the terminal:
+          <code>agent-saga verify --wal ./agent-saga.wal</code></figcaption>
+      </figure>
+    </div>
+  </section>
+
   <!-- WORLD-CLASS INNOVATIONS -->
   <section id="features">
     <div class="wrap">
       <p class="eyebrow">Core Capabilities</p>
-      <h2 data-reveal>Click any capability to inspect its real code & architecture.</h2>
+      <h2 data-reveal data-split>Click any capability to inspect its real code & architecture.</h2>
       <p class="lede">Every card below maps to shipping, tested code in the package — not a roadmap. The suite is 2,103 tests green.</p>
 
       <div class="feat-grid">
@@ -1292,7 +1758,7 @@ async with kit.transaction():
   <section id="install">
     <div class="wrap">
       <p class="eyebrow">Developer Documentation</p>
-      <h2 data-reveal>Quickstart & Integration Reference.</h2>
+      <h2 data-reveal data-split>Quickstart & Integration Reference.</h2>
       <p class="lede">Get started in 30 seconds. Wrap your agent loops in a single decorator or context manager.</p>
 
       <div class="docs-card">
@@ -1347,6 +1813,102 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
       </div>
     </div>
   </section>
+  </div> <!-- END PAGE-SDK -->
+
+  <!-- PAGE 5: DIRECT FOUNDER INQUIRY -->
+  <div id="page-inquiry" class="page-view">
+  <!-- DIRECT FOUNDER INQUIRY & USER REVIEWS PORTAL -->
+  <section id="inquiry" style="background: color-mix(in srgb, var(--panel) 50%, var(--bg)); border-top: 1px solid var(--border);">
+  <div class="wrap" style="max-width: 860px;">
+    <div style="text-align: center; margin-bottom: 2.5rem;">
+      <span class="eyebrow">✉️ Reviews, Feedback & Founder Contact</span>
+      <h2 data-reveal data-split>Tell us what broke, what worked, and what's missing</h2>
+      <p class="lede" style="margin-inline: auto;">
+        Enterprise inquiry, integration requirement, bug report, or a review of how it went in production — all of it is wanted, especially the unflattering kind.
+      </p>
+      <p class="lede" style="margin-inline: auto; font-size: 0.95rem;">
+        <b>How this form works, stated plainly.</b> This page is static. The form below saves your message
+        <b>in your own browser</b> — unless you are running the local inquiry backend
+        (<code>python site/server.py</code>, readable with <code>agent-saga inquiries</code>), it does not
+        reach anyone, and it will tell you so instead of showing a green tick. To actually reach a human,
+        use one of these:
+      </p>
+      <div style="display:flex; gap:0.8rem; flex-wrap:wrap; justify-content:center; margin-top:1.2rem;">
+        <a class="btn primary" href="https://github.com/thomasjgeorge23/agent-saga/issues/new" target="_blank" rel="noopener">Open a GitHub issue →</a>
+        <a class="btn ghost" href="https://github.com/thomasjgeorge23/agent-saga/discussions" target="_blank" rel="noopener">Post a review in Discussions</a>
+        <a class="btn ghost" href="mailto:thomasjgeorge23@gmail.com">Email the founder</a>
+      </div>
+    </div>
+
+    <div style="background: var(--panel); border: 1px solid var(--border-strong); border-radius: 24px; padding: clamp(1.5rem, 4vw, 2.5rem); box-shadow: var(--shadow);">
+      <form id="directInquiryForm" onsubmit="submitInquiry(event)">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.2rem; margin-bottom: 1.2rem;">
+          <div class="form-group">
+            <label for="inqName">Your Full Name *</label>
+            <input type="text" id="inqName" placeholder="e.g. Sarah Connor" required />
+          </div>
+          <div class="form-group">
+            <label for="inqEmail">Your Email Address *</label>
+            <input type="email" id="inqEmail" placeholder="e.g. sarah@enterprise.com" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.2rem; margin-bottom: 1.2rem;">
+          <div class="form-group">
+            <label for="inqCompany">Company / Organization</label>
+            <input type="text" id="inqCompany" placeholder="e.g. Enterprise AI / Independent" />
+          </div>
+          <div class="form-group">
+            <label for="inqSubject">Category / Subject</label>
+            <select id="inqSubject">
+              <option value="Enterprise Integration">Enterprise Integration</option>
+              <option value="User Review & Testimonial">User Review & Testimonial</option>
+              <option value="Feature Request">Feature Request</option>
+              <option value="Security / Audit Inquiry">Security / Audit Inquiry</option>
+              <option value="General Question">General Question</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label for="inqMessage">Your Message, Inquiry, or User Review *</label>
+          <textarea id="inqMessage" rows="5" placeholder="Write your message directly to Founder Thomas J George..." required></textarea>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+          <button type="submit" class="btn primary" id="inqSubmitBtn">Save Message →</button>
+          <div id="inqStatusBadge" style="font-family: var(--mono); font-size: 0.85rem; font-weight: 700;" hidden></div>
+        </div>
+      </form>
+
+      <!-- Shown only when the message was NOT delivered anywhere. -->
+      <div id="inqFallback" hidden style="margin-top: 1.5rem; padding: 1.2rem; border: 1px solid var(--border-strong); border-radius: 16px; background: color-mix(in srgb, #f59e0b 8%, transparent);">
+        <p style="margin: 0 0 0.9rem; font-size: 0.92rem;">
+          Your message is sitting in this browser and nowhere else. Take it somewhere it will be read:
+        </p>
+        <div style="display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center;">
+          <button type="button" class="btn primary" onclick="copyInquiryDraft()">Copy my message</button>
+          <a class="btn ghost" href="https://github.com/thomasjgeorge23/agent-saga/issues/new" target="_blank" rel="noopener">Paste into a GitHub issue</a>
+          <a class="btn ghost" href="mailto:thomasjgeorge23@gmail.com">Paste into an email</a>
+        </div>
+        <p id="inqCopyState" style="margin: 0.9rem 0 0; font-family: var(--mono); font-size: 0.8rem; color: var(--muted);"></p>
+      </div>
+    </div>
+
+    <!-- IN-APP LOCAL INBOX VIEWER (ADMIN / FOUNDER READ-ONLY) -->
+    <div style="margin-top: 2.5rem; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 24px; padding: clamp(1.5rem, 4vw, 2.5rem); box-shadow: var(--shadow);">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem;">
+        <h3 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.6rem;">📥 Saved in this browser</h3>
+        <button onclick="renderInAppInbox()" class="toggle" style="font-size: 0.75rem;">↻ Refresh Inbox</button>
+      </div>
+      <div id="inAppInboxContainer">
+        <!-- Rendered via JS -->
+      </div>
+    </div>
+  </div>
+</section>
+  </div> <!-- END PAGE-INQUIRY -->
+
 </main>
 
 <!-- FEATURE MODAL -->
@@ -1362,7 +1924,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 <footer>
   <div class="wrap foot-grid">
     <div>
-      <div class="brand">agent-saga <span class="seq">v0.4.2</span></div>
+      <div class="brand">agent-saga <span class="seq">v0.5.4</span></div>
       <p style="font-size: .88rem; color: var(--faint); margin-top: .4rem;">
         Licensed under Apache-2.0. Built for mission-critical enterprise AI agent reliability.
       </p>
@@ -1370,7 +1932,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
     <div style="margin-left: auto; display: flex; gap: 1.8rem; font-size: .95rem;">
       <a href="#install">Documentation</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">GitHub</a>
-      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.4.2</a>
+      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.5.4</a>
     </div>
   </div>
 </footer>
@@ -1412,6 +1974,102 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
     }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 });
 
     targets.forEach(function (el) { io.observe(el); });
+  })();
+
+  /* --- per-word heading split -------------------------------- */
+  (function () {
+    if (REDUCED.matches) return;
+    var heads = document.querySelectorAll('[data-split]');
+    if (!heads.length) return;
+
+    // An element whose text is painted through a clipped background cannot be
+    // split: a per-word span inherits the transparent fill but brings no
+    // background to clip, and the text renders as nothing at all.
+    function paintsViaBackground(el) {
+      var cs = getComputedStyle(el);
+      var clip = cs.webkitBackgroundClip || cs.backgroundClip;
+      var fill = cs.webkitTextFillColor;
+      return clip === 'text' || fill === 'rgba(0, 0, 0, 0)' || fill === 'transparent';
+    }
+
+    heads.forEach(function (head) {
+      // Reveal gradient-clipped descendants whole, and take their contents out
+      // of the word walk entirely.
+      var atomic = [];
+      head.querySelectorAll('*').forEach(function (el) {
+        if (paintsViaBackground(el)) atomic.push(el);
+      });
+
+      // Walk text nodes only. Wrapping innerHTML would destroy the inline
+      // <span class="amber"> highlights inside these headings, and rebuilding
+      // them from a string is how you end up injecting markup by accident.
+      var walker = document.createTreeWalker(head, NodeFilter.SHOW_TEXT);
+      var nodes = [], node;
+      while ((node = walker.nextNode())) {
+        var skip = atomic.some(function (el) { return el.contains(node); });
+        if (!skip) nodes.push(node);
+      }
+
+      var index = 0;
+      nodes.forEach(function (textNode) {
+        var parts = textNode.nodeValue.split(/(\s+)/);
+        if (parts.length === 1 && !parts[0].trim()) return;
+        var frag = document.createDocumentFragment();
+        parts.forEach(function (part) {
+          if (!part) return;
+          if (!part.trim()) { frag.appendChild(document.createTextNode(part)); return; }
+          var span = document.createElement('span');
+          span.className = 'word';
+          span.textContent = part;               // textContent, never innerHTML
+          span.style.setProperty('--wd', Math.min(index, 22) * 42 + 'ms');
+          index++;
+          frag.appendChild(span);
+        });
+        textNode.parentNode.replaceChild(frag, textNode);
+      });
+
+      // Give the atomic elements their place in the same cascade.
+      atomic.forEach(function (el) {
+        el.classList.add('word-soft');
+        el.style.setProperty('--wd', Math.min(index, 22) * 42 + 'ms');
+        index++;
+      });
+    });
+  })();
+
+  /* --- custom cursor ---------------------------------------- */
+  (function () {
+    if (REDUCED.matches) return;
+    if (!window.matchMedia('(hover: hover)').matches) return;
+    var dot = document.getElementById('cursorDot');
+    var ring = document.getElementById('cursorRing');
+    if (!dot || !ring) return;
+
+    var x = innerWidth / 2, y = innerHeight / 2, rx = x, ry = y, raf = 0;
+    var HOT = 'a, button, .feat-card, .cat-card, .btn, input, select, textarea, summary';
+
+    function loop() {
+      raf = 0;
+      rx += (x - rx) * 0.16;                    // the lag is the whole effect
+      ry += (y - ry) * 0.16;
+      dot.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+      ring.style.transform = 'translate(' + rx + 'px,' + ry + 'px)';
+      if (Math.abs(x - rx) > 0.1 || Math.abs(y - ry) > 0.1) raf = requestAnimationFrame(loop);
+    }
+
+    document.addEventListener('pointermove', function (e) {
+      x = e.clientX; y = e.clientY;
+      if (!raf) raf = requestAnimationFrame(loop);
+      ring.classList.toggle('hot', !!(e.target.closest && e.target.closest(HOT)));
+    }, { passive: true });
+
+    // Leaving the window should take the cursor with it, not park it at the edge.
+    document.addEventListener('pointerleave', function () {
+      dot.style.opacity = ring.style.opacity = '0';
+    });
+    document.addEventListener('pointerenter', function () {
+      dot.style.opacity = ring.style.opacity = '1';
+    });
   })();
 
   /* --- scroll progress -------------------------------------- */
@@ -1504,59 +2162,241 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
     stats.forEach(function (el) { paint(el, 0); io.observe(el); });
   })();
 
-  /* Canvas Background Particle Animation */
+  /* ============================================================
+     HERO FIELD
+     A domain-warped fBm shader on a full-bleed triangle. Raw WebGL --
+     no library, nothing fetched -- so it survives the same strict CSP
+     everything else here does.
+
+     Three things it must not do: run when nobody asked for motion, run
+     when it is off screen, and melt a laptop GPU. Hence the
+     reduced-motion bail, the IntersectionObserver, the visibility
+     handler, and the device-pixel-ratio cap. The version this replaced
+     was an O(n^2) particle loop that ran forever regardless of any of
+     those.
+
+     If WebGL is unavailable it falls back to that particle field rather
+     than leaving a blank rectangle.
+     ============================================================ */
   (function () {
     var canvas = document.getElementById('heroCanvas');
     if (!canvas) return;
     if (REDUCED.matches) { canvas.style.display = 'none'; return; }
-    var ctx = canvas.getContext('2d');
-    var pts = [];
+
+    var hero = document.querySelector('.hero');
+    if (!hero) { canvas.style.display = 'none'; return; }
+
+    var gl = null;
+    try {
+      gl = canvas.getContext('webgl', { alpha: true, antialias: false,
+                                        powerPreference: 'low-power' });
+    } catch (e) { gl = null; }
+
+    if (!gl) { fallbackParticles(canvas, hero); return; }
+
+    var VERT = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }';
+
+    var FRAG = [
+      'precision mediump float;',
+      'uniform vec2 uRes;',
+      'uniform float uTime;',
+      'uniform vec2 uMouse;',
+      'uniform float uDark;',
+
+      'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+
+      'float noise(vec2 p){',
+      '  vec2 i = floor(p), f = fract(p);',
+      '  vec2 u = f * f * (3.0 - 2.0 * f);',
+      '  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),',
+      '             mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);',
+      '}',
+
+      'float fbm(vec2 p){',
+      '  float v = 0.0, a = 0.5;',
+      '  for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }',
+      '  return v;',
+      '}',
+
+      'void main(){',
+      '  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;',
+      '  vec2 par = (uMouse - 0.5) * 0.18;',
+      '  vec2 p = uv * 2.4 + par;',
+
+      '  vec2 q = vec2(fbm(p + vec2(0.0, uTime * 0.045)), fbm(p + vec2(5.2, 1.3)));',
+      '  vec2 r = vec2(fbm(p + 3.4 * q + vec2(1.7, 9.2) + uTime * 0.028),',
+      '                fbm(p + 3.4 * q + vec2(8.3, 2.8)));',
+      '  float f = fbm(p + 3.4 * r);',
+
+      '  float ridge = smoothstep(0.55, 0.86, f);',
+      '  float ember = pow(ridge, 3.0);',
+      '  float band = smoothstep(0.90, 1.0, sin(uv.y * 190.0 + uTime * 0.35) * 0.5 + 0.5);',
+
+      '  vec3 deep   = mix(vec3(0.972, 0.980, 0.988), vec3(0.027, 0.047, 0.086), uDark);',
+      '  vec3 mid    = mix(vec3(0.898, 0.918, 0.945), vec3(0.059, 0.090, 0.165), uDark);',
+      '  vec3 accent = vec3(0.961, 0.620, 0.043);',
+
+      '  vec3 col = mix(deep, mid, smoothstep(0.25, 0.75, f));',
+      '  col += accent * ember * 0.55;',
+      '  col += accent * band * 0.05;',
+
+      '  float vig = 1.0 - smoothstep(0.55, 1.35, length(uv));',
+      '  col *= mix(0.55, 1.0, vig);',
+
+      '  gl_FragColor = vec4(col, 1.0);',
+      '}'
+    ].join('\n');
+
+    function compile(type, src) {
+      var s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.warn('hero shader: ' + gl.getShaderInfoLog(s));
+        return null;
+      }
+      return s;
+    }
+
+    var vs = compile(gl.VERTEX_SHADER, VERT);
+    var fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) { fallbackParticles(canvas, hero); return; }
+
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.warn('hero program: ' + gl.getProgramInfoLog(prog));
+      fallbackParticles(canvas, hero); return;
+    }
+    gl.useProgram(prog);
+
+    var buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]),
+                  gl.STATIC_DRAW);
+    var loc = gl.getAttribLocation(prog, 'p');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+    var uRes = gl.getUniformLocation(prog, 'uRes');
+    var uTime = gl.getUniformLocation(prog, 'uTime');
+    var uMouse = gl.getUniformLocation(prog, 'uMouse');
+    var uDark = gl.getUniformLocation(prog, 'uDark');
+
+    var mouse = [0.5, 0.5], target = [0.5, 0.5];
+    var running = false, onScreen = true, raf = 0, t0 = performance.now();
+
     function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = document.querySelector('.hero').offsetHeight + 100;
+      // The stylesheet sizes this element at `height: 100%`, which for an
+      // absolutely positioned child of <body> resolves against the viewport --
+      // not against the hero, which is taller. Left alone, the field is drawn
+      // at hero height into a viewport-height box: squashed, and cut off part
+      // way down. So the CSS box is set here too, from the same measurement as
+      // the drawing buffer.
+      var cssW = hero.offsetWidth;
+      var cssH = hero.offsetHeight + 100;
+      canvas.style.width = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+
+      // Cap DPR: a 3x display would quadruple the fragment count for a
+      // background nobody inspects pixel-for-pixel.
+      var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      var w = Math.max(1, Math.floor(cssW * dpr));
+      var h = Math.max(1, Math.floor(cssH * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w; canvas.height = h;
+        gl.viewport(0, 0, w, h);
+      }
     }
+
+    function darkness() {
+      return document.documentElement.getAttribute('data-theme') === 'light' ? 0.0 : 1.0;
+    }
+
+    function frame(now) {
+      raf = 0;
+      if (!running) return;
+      resize();
+      mouse[0] += (target[0] - mouse[0]) * 0.06;   // easing, so it glides
+      mouse[1] += (target[1] - mouse[1]) * 0.06;
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uTime, (now - t0) / 1000);
+      gl.uniform2f(uMouse, mouse[0], mouse[1]);
+      gl.uniform1f(uDark, darkness());
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      raf = requestAnimationFrame(frame);
+    }
+
+    function start() {
+      if (running || !onScreen || document.hidden) return;
+      running = true; raf = requestAnimationFrame(frame);
+    }
+    function stop() {
+      running = false;
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    }
+
+    window.addEventListener('pointermove', function (e) {
+      target[0] = e.clientX / window.innerWidth;
+      target[1] = 1.0 - e.clientY / window.innerHeight;
+    }, { passive: true });
+
     window.addEventListener('resize', resize);
-    resize();
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) stop(); else start();
+    });
 
-    for (var i = 0; i < 45; i++) {
-      pts.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        r: Math.random() * 2 + 1
-      });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (entries) {
+        onScreen = entries[0].isIntersecting;
+        if (onScreen) start(); else stop();
+      }, { threshold: 0 }).observe(hero);
     }
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#f59e0b';
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.15)';
+    resize();
+    start();
 
-      for (var i = 0; i < pts.length; i++) {
-        var p = pts[i];
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
-
-        for (var j = i + 1; j < pts.length; j++) {
-          var p2 = pts[j];
-          var dist = Math.hypot(p.x - p2.x, p.y - p2.y);
-          if (dist < 120) {
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
+    /* The 2D field, kept only as the no-WebGL path. */
+    function fallbackParticles(cv, host) {
+      var ctx = cv.getContext('2d');
+      if (!ctx) { cv.style.display = 'none'; return; }
+      var pts = [], alive = true;
+      function size() { cv.width = host.offsetWidth; cv.height = host.offsetHeight + 100; }
+      window.addEventListener('resize', size);
+      size();
+      for (var i = 0; i < 45; i++) {
+        pts.push({ x: Math.random() * cv.width, y: Math.random() * cv.height,
+                   vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5,
+                   r: Math.random() * 2 + 1 });
+      }
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (e) {
+          alive = e[0].isIntersecting;
+          if (alive) requestAnimationFrame(draw);
+        }, { threshold: 0 }).observe(host);
+      }
+      function draw() {
+        if (!alive || document.hidden) return;
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        ctx.fillStyle = '#f59e0b';
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.15)';
+        for (var i = 0; i < pts.length; i++) {
+          var a = pts[i];
+          a.x += a.vx; a.y += a.vy;
+          if (a.x < 0 || a.x > cv.width) a.vx *= -1;
+          if (a.y < 0 || a.y > cv.height) a.vy *= -1;
+          ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2); ctx.fill();
+          for (var j = i + 1; j < pts.length; j++) {
+            var b = pts[j];
+            if (Math.hypot(a.x - b.x, a.y - b.y) < 120) {
+              ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            }
           }
         }
+        requestAnimationFrame(draw);
       }
-      requestAnimationFrame(draw);
+      draw();
     }
-    draw();
   })();
 
   /* Theme and Copy handlers */
@@ -1587,7 +2427,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 AgentKit().guarantees()
 # {
 #   "manifest_version": 1,
-#   "library_version": "0.4.2",
+#   "library_version": "0.5.4",
 #   "semantics": {"REVERSIBLE": ..., "COMPENSABLE": ..., "IRREVERSIBLE": ...},
 #   "enforced_before_an_effect": [
 #     "an IRREVERSIBLE step is refused unless a human (or hardware sig) approves",
@@ -1637,7 +2477,7 @@ async with kit.transaction():
     rows = await read()`
     },
     grounding: {
-      title: "🧾 Grounded Answers (v0.4.2)",
+      title: "🧾 Grounded Answers (v0.5.4)",
       desc: "No middleware makes a model hallucinate less. What agent-saga does, mechanically, is make every claim in an answer wear its evidence or wear a label — so policy can act on it: block UNCITED numbers in financial reports, require VERIFIED-only in clinical summaries, page a human on anything BROKEN.",
       code: `from agent_saga import ContextBroker, ground
 
@@ -1838,7 +2678,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
 
     if (protectionActive) {
       label.textContent = "PROTECTION: ON (+ agent-saga)";
-      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.4.2 Active Protection)</span>';
+      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.5.4 Active Protection)</span>';
     } else {
       label.textContent = "PROTECTION: OFF (Raw AI Agent)";
       banner.innerHTML = '<span style="color: var(--irreversible);">● MODE: BEFORE (Raw AI Agent - Unprotected Failure Mode)</span>';
@@ -1949,7 +2789,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var drug = document.getElementById('inputDrug').value;
       var dosage = parseFloat(document.getElementById('inputDosage').value) || 0;
 
-      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>patient.read_records</b> &nbsp;Selected ${drug}`, 'read-only');
@@ -1982,7 +2822,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var iban = document.getElementById('inputIban').value;
       var amount = parseFloat(document.getElementById('inputAmount').value) || 0;
 
-      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (!protectionActive) {
@@ -2008,7 +2848,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var prTitle = document.getElementById('inputPR').value;
       var testRes = document.getElementById('inputTestResult').value;
 
-      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>github.create_pr</b> &nbsp;PR #101 (${prTitle}) created`, 'inverse: close_pr');
@@ -2039,7 +2879,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var channel = document.getElementById('inputChannel').value;
       var msgText = document.getElementById('inputMsg').value;
 
-      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>slack.post_message</b> &nbsp;"${msgText}"`, 'inverse: delete_message');
@@ -2061,7 +2901,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var robot = document.getElementById('inputRobot').value;
       var angle = parseFloat(document.getElementById('inputAngle').value) || 0;
 
-      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.3.0 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (angle > 180.0) {
@@ -2260,102 +3100,9 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
   renderInAppInbox();
 </script>
 
-  </div> <!-- END PAGE-SDK -->
 
-  <!-- PAGE 5: DIRECT FOUNDER INQUIRY -->
-  <div id="page-inquiry" class="page-view">
-  <!-- DIRECT FOUNDER INQUIRY & USER REVIEWS PORTAL -->
-  <section id="inquiry" style="background: color-mix(in srgb, var(--panel) 50%, var(--bg)); border-top: 1px solid var(--border);">
-  <div class="wrap" style="max-width: 860px;">
-    <div style="text-align: center; margin-bottom: 2.5rem;">
-      <span class="eyebrow">✉️ Reviews, Feedback & Founder Contact</span>
-      <h2 data-reveal>Tell us what broke, what worked, and what's missing</h2>
-      <p class="lede" style="margin-inline: auto;">
-        Enterprise inquiry, integration requirement, bug report, or a review of how it went in production — all of it is wanted, especially the unflattering kind.
-      </p>
-      <p class="lede" style="margin-inline: auto; font-size: 0.95rem;">
-        <b>How this form works, stated plainly.</b> This page is static. The form below saves your message
-        <b>in your own browser</b> — unless you are running the local inquiry backend
-        (<code>python site/server.py</code>, readable with <code>agent-saga inquiries</code>), it does not
-        reach anyone, and it will tell you so instead of showing a green tick. To actually reach a human,
-        use one of these:
-      </p>
-      <div style="display:flex; gap:0.8rem; flex-wrap:wrap; justify-content:center; margin-top:1.2rem;">
-        <a class="btn primary" href="https://github.com/thomasjgeorge23/agent-saga/issues/new" target="_blank" rel="noopener">Open a GitHub issue →</a>
-        <a class="btn ghost" href="https://github.com/thomasjgeorge23/agent-saga/discussions" target="_blank" rel="noopener">Post a review in Discussions</a>
-        <a class="btn ghost" href="mailto:thomasjgeorge23@gmail.com">Email the founder</a>
-      </div>
-    </div>
 
-    <div style="background: var(--panel); border: 1px solid var(--border-strong); border-radius: 24px; padding: clamp(1.5rem, 4vw, 2.5rem); box-shadow: var(--shadow);">
-      <form id="directInquiryForm" onsubmit="submitInquiry(event)">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.2rem; margin-bottom: 1.2rem;">
-          <div class="form-group">
-            <label for="inqName">Your Full Name *</label>
-            <input type="text" id="inqName" placeholder="e.g. Sarah Connor" required />
-          </div>
-          <div class="form-group">
-            <label for="inqEmail">Your Email Address *</label>
-            <input type="email" id="inqEmail" placeholder="e.g. sarah@enterprise.com" required />
-          </div>
-        </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.2rem; margin-bottom: 1.2rem;">
-          <div class="form-group">
-            <label for="inqCompany">Company / Organization</label>
-            <input type="text" id="inqCompany" placeholder="e.g. Enterprise AI / Independent" />
-          </div>
-          <div class="form-group">
-            <label for="inqSubject">Category / Subject</label>
-            <select id="inqSubject">
-              <option value="Enterprise Integration">Enterprise Integration</option>
-              <option value="User Review & Testimonial">User Review & Testimonial</option>
-              <option value="Feature Request">Feature Request</option>
-              <option value="Security / Audit Inquiry">Security / Audit Inquiry</option>
-              <option value="General Question">General Question</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-group" style="margin-bottom: 1.5rem;">
-          <label for="inqMessage">Your Message, Inquiry, or User Review *</label>
-          <textarea id="inqMessage" rows="5" placeholder="Write your message directly to Founder Thomas J George..." required></textarea>
-        </div>
-
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
-          <button type="submit" class="btn primary" id="inqSubmitBtn">Save Message →</button>
-          <div id="inqStatusBadge" style="font-family: var(--mono); font-size: 0.85rem; font-weight: 700;" hidden></div>
-        </div>
-      </form>
-
-      <!-- Shown only when the message was NOT delivered anywhere. -->
-      <div id="inqFallback" hidden style="margin-top: 1.5rem; padding: 1.2rem; border: 1px solid var(--border-strong); border-radius: 16px; background: color-mix(in srgb, #f59e0b 8%, transparent);">
-        <p style="margin: 0 0 0.9rem; font-size: 0.92rem;">
-          Your message is sitting in this browser and nowhere else. Take it somewhere it will be read:
-        </p>
-        <div style="display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center;">
-          <button type="button" class="btn primary" onclick="copyInquiryDraft()">Copy my message</button>
-          <a class="btn ghost" href="https://github.com/thomasjgeorge23/agent-saga/issues/new" target="_blank" rel="noopener">Paste into a GitHub issue</a>
-          <a class="btn ghost" href="mailto:thomasjgeorge23@gmail.com">Paste into an email</a>
-        </div>
-        <p id="inqCopyState" style="margin: 0.9rem 0 0; font-family: var(--mono); font-size: 0.8rem; color: var(--muted);"></p>
-      </div>
-    </div>
-
-    <!-- IN-APP LOCAL INBOX VIEWER (ADMIN / FOUNDER READ-ONLY) -->
-    <div style="margin-top: 2.5rem; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 24px; padding: clamp(1.5rem, 4vw, 2.5rem); box-shadow: var(--shadow);">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem;">
-        <h3 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.6rem;">📥 Saved in this browser</h3>
-        <button onclick="renderInAppInbox()" class="toggle" style="font-size: 0.75rem;">↻ Refresh Inbox</button>
-      </div>
-      <div id="inAppInboxContainer">
-        <!-- Rendered via JS -->
-      </div>
-    </div>
-  </div>
-</section>
-  </div> <!-- END PAGE-INQUIRY -->
-</main>
 
 <footer style="margin-top: 4rem; padding: 2.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); text-align: center; font-size: 0.95rem; color: #94a3b8;">
   <div class="wrap">

@@ -22,9 +22,11 @@ from typing import Optional
 
 from ._version import __version__
 
-# Duplicated from `animate.THEMES` so building the parser stays a cheap import.
-# `tests/test_animate.py` asserts the two never drift apart.
+# Duplicated from `animate.THEMES` and `viz.__all__` so building the parser
+# stays a cheap import. `tests/test_animate.py` and `tests/test_viz.py` assert
+# neither list drifts from the module it mirrors.
 _ANIMATE_THEMES = ("dark", "light")
+_VIZ_KINDS = ("chain", "fleet", "outcomes")
 from .integrity import verify, export_worm
 
 
@@ -768,6 +770,27 @@ def build_parser() -> argparse.ArgumentParser:
                               "and PDFs where a restart reads as a glitch")
     animate.set_defaults(func=_cmd_animate)
 
+    viz = sub.add_parser(
+        "viz",
+        help="draw whole-log visuals: fleet timeline, hash chain, outcome matrix")
+    viz.add_argument("--wal-path", "--wal", default="./agent-saga.wal",
+                     help="path to the WAL file (default: ./agent-saga.wal)")
+    viz.add_argument("--kind", default="chain", choices=sorted(_VIZ_KINDS),
+                     help="fleet: sagas over elapsed time; chain: the hash chain, "
+                          "verified while drawing; outcomes: tool x outcome "
+                          "(default: chain)")
+    viz.add_argument("--output", "-o", default=None,
+                     help="write the SVG here (default: stdout)")
+    viz.add_argument("--theme", default="dark", choices=sorted(_ANIMATE_THEMES),
+                     help="colour palette (default: dark)")
+    viz.add_argument("--width", type=int, default=1000,
+                     help="SVG width in px (default: 1000)")
+    viz.add_argument("--speed", type=float, default=1.0,
+                     help="duration multiplier (default: 1.0)")
+    viz.add_argument("--no-loop", action="store_true",
+                     help="play once and hold the final frame")
+    viz.set_defaults(func=_cmd_viz)
+
     export = sub.add_parser(
         "export",
         help="export the WAL: a verified WORM bundle (--out) or flat CSV/JSON (--format)")
@@ -1322,6 +1345,34 @@ def _cmd_animate(args: argparse.Namespace) -> int:
     svg = wal_to_animated_svg(records, title=args.title, theme=args.theme,
                               width=args.width, speed=args.speed,
                               loop=not args.no_loop)
+
+    if args.output:
+        Path(args.output).write_text(svg + "\n", encoding="utf-8")
+        print(f"wrote {args.output} ({len(svg)} bytes, no scripts, no network)")
+    else:
+        print(svg)
+    return 0
+
+
+def _cmd_viz(args: argparse.Namespace) -> int:
+    """Draw a property of the whole log rather than of one saga.
+
+    Unlike `graph` and `animate`, none of these narrow to a single saga: the
+    concurrency, the chain, and the outcome mix are all cross-saga facts, and
+    filtering to one would destroy the thing being measured.
+    """
+    from .viz import chain_ribbon, fleet_timeline, outcome_matrix
+
+    try:
+        records = _read_wal(args.wal_path)
+    except OSError as exc:
+        print(f"cannot read {args.wal_path}: {exc}")
+        return 2
+
+    render = {"chain": chain_ribbon, "fleet": fleet_timeline,
+              "outcomes": outcome_matrix}[args.kind]
+    svg = render(records, theme=args.theme, width=args.width,
+                 speed=args.speed, loop=not args.no_loop)
 
     if args.output:
         Path(args.output).write_text(svg + "\n", encoding="utf-8")

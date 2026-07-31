@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 528" width="880" height="528" role="img" aria-label="9 saga(s) over 28 ms. 3 aborted and rolled back">
+<title>agent-saga fleet timeline</title><desc>9 saga(s) over 28 ms. 3 aborted and rolled back.</desc>
+<style>
+text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;dominant-baseline:middle}
+.t{fill:#e5e7eb}.m{fill:#8b9bb4}
+.a0{animation:a0 4.67s linear infinite;}@keyframes a0{0%,3.21%{opacity:0}12.21%,100%{opacity:1}}
+.a1{animation:a1 4.67s linear infinite;}@keyframes a1{0%,12.85%{opacity:0}23.55%,100%{opacity:1}}
+.a2{animation:a2 4.67s linear infinite;}@keyframes a2{0%,15.63%{opacity:0}26.34%,100%{opacity:1}}
+.a3{animation:a3 4.67s linear infinite;}@keyframes a3{0%,18.42%{opacity:0}29.12%,100%{opacity:1}}
+.a4{animation:a4 4.67s linear infinite;}@keyframes a4{0%,21.2%{opacity:0}31.91%,100%{opacity:1}}
+.a5{animation:a5 4.67s linear infinite;}@keyframes a5{0%,23.98%{opacity:0}34.69%,100%{opacity:1}}
+.a6{animation:a6 4.67s linear infinite;}@keyframes a6{0%,26.77%{opacity:0}37.47%,100%{opacity:1}}
+.a7{animation:a7 4.67s linear infinite;}@keyframes a7{0%,29.55%{opacity:0}40.26%,100%{opacity:1}}
+.a8{animation:a8 4.67s linear infinite;}@keyframes a8{0%,32.33%{opacity:0}43.04%,100%{opacity:1}}
+.a9{animation:a9 4.67s linear infinite;}@keyframes a9{0%,35.12%{opacity:0}45.82%,100%{opacity:1}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;opacity:1 !important;transform:none !important}}
+</style>
+<rect width="880" height="528" rx="18" fill="#0b0f19"/>
+<rect x="1" y="1" width="878" height="526" rx="18" fill="none" stroke="#1f2937"/>
+<g class="a0">
+<text class="t" x="40" y="48" font-size="19" font-weight="700">9 saga(s) over 28 ms</text>
+<text x="40" y="71" font-size="12" fill="#ef4444">3 aborted and rolled back</text>
+<text class="m" x="840" y="48" font-size="12" text-anchor="end">agent-saga</text>
+</g>
+<rect x="214" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="214" y="86" font-size="10" text-anchor="middle">0 ms</text>
+<rect x="371.5" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="371.5" y="86" font-size="10" text-anchor="middle">7.05 ms</text>
+<rect x="529" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="529" y="86" font-size="10" text-anchor="middle">14.1 ms</text>
+<rect x="686.5" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="686.5" y="86" font-size="10" text-anchor="middle">21.15 ms</text>
+<rect x="844" y="92" width="1" height="384" fill="#1a2231"/>
+<text class="m" x="844" y="86" font-size="10" text-anchor="middle">28.19 ms</text>
+<text class="m" x="40" y="125" font-size="11">order-00</text>
+<rect x="214" y="114" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a1">
+<rect x="214" y="114" width="502.27" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="166" font-size="11">order-01</text>
+<rect x="214" y="155" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a2">
+<rect x="214" y="155" width="502.27" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="207" font-size="11">order-02</text>
+<rect x="214" y="196" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a3">
+<rect x="214" y="196" width="577.24" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="196" width="577.24" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+</g>
+<text class="m" x="40" y="248" font-size="11">order-03</text>
+<rect x="214" y="237" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a4">
+<rect x="214" y="237" width="502.27" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="289" font-size="11">order-04</text>
+<rect x="214" y="278" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a5">
+<rect x="214" y="278" width="502.27" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="330" font-size="11">order-05</text>
+<rect x="214" y="319" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a6">
+<rect x="214" y="319" width="630" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="319" width="630" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+</g>
+<text class="m" x="40" y="371" font-size="11">order-06</text>
+<rect x="214" y="360" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a7">
+<rect x="214" y="360" width="546.72" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="412" font-size="11">order-07</text>
+<rect x="214" y="401" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a8">
+<rect x="214" y="401" width="546.72" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+</g>
+<text class="m" x="40" y="453" font-size="11">order-08</text>
+<rect x="214" y="442" width="630" height="22" rx="6" fill="#161d2e"/>
+<g class="a9">
+<rect x="214" y="442" width="630" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="442" width="630" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+</g>
+<rect x="40" y="493" width="10" height="10" rx="2" fill="#10b981"/>
+<text class="m" x="56" y="498" font-size="10">complete</text>
+<rect x="210" y="493" width="10" height="10" rx="2" fill="#ef4444"/>
+<text class="m" x="226" y="498" font-size="10">aborted</text>
+<rect x="380" y="493" width="10" height="10" rx="2" fill="#f59e0b"/>
+<text class="m" x="396" y="498" font-size="10">no terminal record</text>
+</svg>

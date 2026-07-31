@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 446" width="880" height="446" role="img" aria-label="chain intact across 90 record(s). every record&apos;s recorded predecessor is the ...">
+<title>agent-saga hash chain</title><desc>chain intact across 90 record(s). every record&apos;s recorded predecessor is the ...</desc>
+<style>
+text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;dominant-baseline:middle}
+.t{fill:#e5e7eb}.m{fill:#8b9bb4}
+.a0{animation:a0 4.79s linear infinite;}@keyframes a0{0%,3.13%{opacity:0}11.9%,100%{opacity:1}}
+.a1{animation:a1 4.79s linear infinite;}@keyframes a1{0%,11.48%{opacity:0;transform:translateY(7px)}19.83%,100%{opacity:1;transform:translateY(0)}}
+.a2{animation:a2 4.79s linear infinite;}@keyframes a2{0%,13.15%{opacity:0;transform:translateY(7px)}21.5%,100%{opacity:1;transform:translateY(0)}}
+.a3{animation:a3 4.79s linear infinite;}@keyframes a3{0%,14.82%{opacity:0;transform:translateY(7px)}23.17%,100%{opacity:1;transform:translateY(0)}}
+.a4{animation:a4 4.79s linear infinite;}@keyframes a4{0%,16.49%{opacity:0;transform:translateY(7px)}24.84%,100%{opacity:1;transform:translateY(0)}}
+.a5{animation:a5 4.79s linear infinite;}@keyframes a5{0%,18.16%{opacity:0;transform:translateY(7px)}26.51%,100%{opacity:1;transform:translateY(0)}}
+.a6{animation:a6 4.79s linear infinite;}@keyframes a6{0%,19.83%{opacity:0;transform:translateY(7px)}28.18%,100%{opacity:1;transform:translateY(0)}}
+.a7{animation:a7 4.79s linear infinite;}@keyframes a7{0%,21.5%{opacity:0;transform:translateY(7px)}29.85%,100%{opacity:1;transform:translateY(0)}}
+.a8{animation:a8 4.79s linear infinite;}@keyframes a8{0%,23.17%{opacity:0;transform:translateY(7px)}31.52%,100%{opacity:1;transform:translateY(0)}}
+.a9{animation:a9 4.79s linear infinite;}@keyframes a9{0%,24.84%{opacity:0;transform:translateY(7px)}33.19%,100%{opacity:1;transform:translateY(0)}}
+.a10{animation:a10 4.79s linear infinite;}@keyframes a10{0%,26.51%{opacity:0;transform:translateY(7px)}34.86%,100%{opacity:1;transform:translateY(0)}}
+.a11{animation:a11 4.79s linear infinite;}@keyframes a11{0%,28.18%{opacity:0;transform:translateY(7px)}36.53%,100%{opacity:1;transform:translateY(0)}}
+.a12{animation:a12 4.79s linear infinite;}@keyframes a12{0%,29.85%{opacity:0;transform:translateY(7px)}38.2%,100%{opacity:1;transform:translateY(0)}}
+.a13{animation:a13 4.79s linear infinite;}@keyframes a13{0%,31.52%{opacity:0;transform:translateY(7px)}39.87%,100%{opacity:1;transform:translateY(0)}}
+.a14{animation:a14 4.79s linear infinite;}@keyframes a14{0%,33.19%{opacity:0;transform:translateY(7px)}41.54%,100%{opacity:1;transform:translateY(0)}}
+.a15{animation:a15 4.79s linear infinite;}@keyframes a15{0%,34.86%{opacity:0;transform:translateY(7px)}43.22%,100%{opacity:1;transform:translateY(0)}}
+.a16{animation:a16 4.79s linear infinite;}@keyframes a16{0%,36.53%{opacity:0;transform:translateY(7px)}44.89%,100%{opacity:1;transform:translateY(0)}}
+.a17{animation:a17 4.79s linear infinite;}@keyframes a17{0%,38.2%{opacity:0;transform:translateY(7px)}46.56%,100%{opacity:1;transform:translateY(0)}}
+.a18{animation:a18 4.79s linear infinite;}@keyframes a18{0%,39.87%{opacity:0;transform:translateY(7px)}48.23%,100%{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;opacity:1 !important;transform:none !important}}
+</style>
+<rect width="880" height="446" rx="18" fill="#0b0f19"/>
+<rect x="1" y="1" width="878" height="444" rx="18" fill="none" stroke="#1f2937"/>
+<g class="a0">
+<text class="t" x="40" y="48" font-size="19" font-weight="700">chain intact across 90 record(s)</text>
+<text x="40" y="71" font-size="12" fill="#10b981">every record&apos;s recorded predecessor is the record that precedes it</text>
+<text class="m" x="840" y="48" font-size="12" text-anchor="end">agent-saga</text>
+</g>
+<g class="a1">
+<rect x="40" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#38bdf8" stroke-width="1"/>
+<text class="m" x="50" y="126" font-size="9">#1</text>
+<text x="50" y="146" font-size="11" fill="#38bdf8">d0fd023f</text>
+<text class="m" x="50" y="162" font-size="8">SAGA_START</text>
+</g>
+<g class="a1"><rect x="136" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a2">
+<rect x="144" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="154" y="126" font-size="9">#2</text>
+<text x="154" y="146" font-size="11" fill="#10b981">f98efbca</text>
+<text class="m" x="154" y="162" font-size="8">SAGA_START</text>
+</g>
+<g class="a2"><rect x="240" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a3">
+<rect x="248" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="258" y="126" font-size="9">#3</text>
+<text x="258" y="146" font-size="11" fill="#10b981">c75d9c01</text>
+<text class="m" x="258" y="162" font-size="8">SAGA_START</text>
+</g>
+<g class="a3"><rect x="344" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a4">
+<rect x="352" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="362" y="126" font-size="9">#8</text>
+<text x="362" y="146" font-size="11" fill="#10b981">3613a2a7</text>
+<text class="m" x="362" y="162" font-size="8">SAGA_START</text>
+</g>
+<g class="a4"><rect x="448" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a5">
+<rect x="456" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="466" y="126" font-size="9">#15</text>
+<text x="466" y="146" font-size="11" fill="#10b981">99f7c1f1</text>
+<text class="m" x="466" y="162" font-size="8">STEP_INTENT</text>
+</g>
+<g class="a5"><rect x="552" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a6">
+<rect x="560" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="570" y="126" font-size="9">#22</text>
+<text x="570" y="146" font-size="11" fill="#10b981">100f921b</text>
+<text class="m" x="570" y="162" font-size="8">STEP_COMMITT…</text>
+</g>
+<g class="a6"><rect x="656" y="148" width="8" height="2" fill="#1f2937"/></g>
+<g class="a7">
+<rect x="664" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="674" y="126" font-size="9">#29</text>
+<text x="674" y="146" font-size="11" fill="#10b981">06b08c4e</text>
+<text class="m" x="674" y="162" font-size="8">STEP_INTENT</text>
+</g>
+<g class="a8">
+<rect x="40" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="50" y="226" font-size="9">#36</text>
+<text x="50" y="246" font-size="11" fill="#10b981">e21ce43a</text>
+<text class="m" x="50" y="262" font-size="8">STEP_INTENT</text>
+</g>
+<g class="a8"><rect x="136" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a9">
+<rect x="144" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="154" y="226" font-size="9">#43</text>
+<text x="154" y="246" font-size="11" fill="#10b981">e2dc5493</text>
+<text class="m" x="154" y="262" font-size="8">STEP_COMMITT…</text>
+</g>
+<g class="a9"><rect x="240" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a10">
+<rect x="248" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="258" y="226" font-size="9">#50</text>
+<text x="258" y="246" font-size="11" fill="#10b981">07004dfc</text>
+<text class="m" x="258" y="262" font-size="8">STEP_INTENT</text>
+</g>
+<g class="a10"><rect x="344" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a11">
+<rect x="352" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="362" y="226" font-size="9">#57</text>
+<text x="362" y="246" font-size="11" fill="#10b981">75e7975f</text>
+<text class="m" x="362" y="262" font-size="8">STEP_UNKNOWN</text>
+</g>
+<g class="a11"><rect x="448" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a12">
+<rect x="456" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="466" y="226" font-size="9">#64</text>
+<text x="466" y="246" font-size="11" fill="#10b981">33baa49d</text>
+<text class="m" x="466" y="262" font-size="8">SAGA_ABORT_C…</text>
+</g>
+<g class="a12"><rect x="552" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a13">
+<rect x="560" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="570" y="226" font-size="9">#71</text>
+<text x="570" y="246" font-size="11" fill="#10b981">17d23dfe</text>
+<text class="m" x="570" y="262" font-size="8">COMPENSATED</text>
+</g>
+<g class="a13"><rect x="656" y="248" width="8" height="2" fill="#1f2937"/></g>
+<g class="a14">
+<rect x="664" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="674" y="226" font-size="9">#78</text>
+<text x="674" y="246" font-size="11" fill="#10b981">5f262227</text>
+<text class="m" x="674" y="262" font-size="8">SAGA_COMPLETE</text>
+</g>
+<g class="a15">
+<rect x="40" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="50" y="326" font-size="9">#85</text>
+<text x="50" y="346" font-size="11" fill="#10b981">3252bc94</text>
+<text class="m" x="50" y="362" font-size="8">ROLLBACK_END</text>
+</g>
+<g class="a15"><rect x="136" y="348" width="8" height="2" fill="#1f2937"/></g>
+<g class="a16">
+<rect x="144" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="154" y="326" font-size="9">#88</text>
+<text x="154" y="346" font-size="11" fill="#10b981">bfe04a89</text>
+<text class="m" x="154" y="362" font-size="8">SAGA_ABORTED</text>
+</g>
+<g class="a16"><rect x="240" y="348" width="8" height="2" fill="#1f2937"/></g>
+<g class="a17">
+<rect x="248" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="258" y="326" font-size="9">#89</text>
+<text x="258" y="346" font-size="11" fill="#10b981">ff0314f0</text>
+<text class="m" x="258" y="362" font-size="8">SAGA_ABORTED</text>
+</g>
+<g class="a17"><rect x="344" y="348" width="8" height="2" fill="#1f2937"/></g>
+<g class="a18">
+<rect x="352" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
+<text class="m" x="362" y="326" font-size="9">#90</text>
+<text x="362" y="346" font-size="11" fill="#10b981">61d9c716</text>
+<text class="m" x="362" y="362" font-size="8">SAGA_ABORTED</text>
+</g>
+<text class="m" x="40" y="418" font-size="10">72 record(s) elided; every break is shown</text>
+</svg>

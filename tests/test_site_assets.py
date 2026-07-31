@@ -199,6 +199,80 @@ def test_test_count_on_the_page_is_not_inflated(html):
         f"is stale. Run `pytest -q` and update it.")
 
 
+def test_no_stale_version_string_on_the_page(html):
+    """The footer said v0.4.2 while the nav badge said v0.5.4, for three
+    releases. A version number is the cheapest possible signal that a page is
+    maintained, so it is worth a test."""
+    from agent_saga._version import __version__
+
+    # Only versions that are unambiguously agent-saga's: ones written straight
+    # after the package name. Tags are stripped first so the nav badge
+    # (`agent-saga <span>v0.5.4</span>`) is caught too. A bare `2.0.0` on the
+    # page is a SQLAlchemy pin, `127.0.0.1` is an address, and `v2.0.0` is
+    # sample text in a demo input -- none of them are ours to keep current.
+    text = re.sub(r"<[^>]+>", " ", html)
+    found = set(re.findall(r"agent-saga\s+v?(\d+\.\d+\.\d+)", text))
+    found |= set(re.findall(r"PyPI\s+v?(\d+\.\d+\.\d+)", text))
+    assert found, "no agent-saga version found on the page at all"
+    stale = {v for v in found if v != __version__}
+    assert not stale, (
+        f"page shows agent-saga version(s) {sorted(stale)} but this is "
+        f"{__version__}")
+
+
+def test_generated_visual_markers_are_all_filled(html):
+    """Every BEGIN/END pair must contain a real SVG. An empty marker block is a
+    blank figure on a live page with nothing in the console to say why."""
+    pairs = re.findall(r"<!-- BEGIN:([\w-]+) -->(.*?)<!-- END:\1 -->", html, re.DOTALL)
+    assert len(pairs) >= 5, f"expected at least 5 generated visuals, found {len(pairs)}"
+    for name, body in pairs:
+        assert body.strip().startswith("<svg"), f"{name} marker block is empty"
+        ET.fromstring(body.strip())
+
+
+def test_page_views_are_siblings_not_nested(html):
+    """Two of the five tabs rendered completely blank.
+
+    `<div id="page-sdk">` was never closed before `</main>`, and a `<section>`
+    inside page-industries was missing both its `</div>` and `</section>`. The
+    HTML parser's error recovery reparented page-sandbox, page-sdk and
+    page-inquiry *inside* page-industries -- so `display:none` on the ancestor
+    beat `active-view` on the child, and selecting Sandbox or SDK & Docs showed
+    nothing at all. Balanced tags are the whole defence, so they get a test.
+    """
+    views = re.findall(r'<div id="(page-[\w-]+)" class="page-view', html)
+    ends = re.findall(r"</div> <!-- END (PAGE-[\w-]+) -->", html)
+    assert len(views) == len(ends), (
+        f"{len(views)} page-view opens but {len(ends)} END markers")
+
+    for view in views:
+        start = html.index(f'<div id="{view}" class="page-view')
+        end_marker = f"</div> <!-- END {view.upper()} -->"
+        assert end_marker in html, f"{view} has no END marker"
+        block = html[start:html.index(end_marker, start) + len(end_marker)]
+
+        divs = len(re.findall(r"<div\b", block)) - len(re.findall(r"</div>", block))
+        secs = len(re.findall(r"<section\b", block)) - len(re.findall(r"</section>", block))
+        assert divs == 0, f"{view} leaves {divs} <div> unclosed"
+        assert secs == 0, f"{view} leaves {secs} <section> unclosed"
+
+        # No other view may start inside this one.
+        inner = re.findall(r'<div id="(page-[\w-]+)" class="page-view', block)
+        assert inner == [view], f"{view} contains {[v for v in inner if v != view]}"
+
+    assert html.count("</main>") == 1, "more than one </main>"
+
+
+def test_every_tab_has_a_generated_visual(html):
+    """The four non-overview tabs were walls of text. Each should now carry at
+    least one figure rendered from real execution data."""
+    for view in ("page-overview", "page-industries", "page-sandbox", "page-sdk"):
+        start = html.index(f'<div id="{view}" class="page-view')
+        nxt = html.find('<div id="page-', start + 10)
+        section = html[start:nxt if nxt != -1 else len(html)]
+        assert "<!-- BEGIN:" in section, f"{view} has no generated visual"
+
+
 def test_dependency_count_claim_is_true():
     """'0 required dependencies' has to survive contact with pyproject.toml."""
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -241,6 +315,33 @@ def test_javascript_failure_cannot_blank_the_page(html):
     assert not re.search(r"^\s*body\s*\{[^}]*opacity:\s*0", html, re.MULTILINE)
 
 
+def test_word_splitter_leaves_gradient_clipped_text_alone(html):
+    """`.hero .amber` paints through `-webkit-background-clip: text`. Splitting
+    it into per-word spans made each span inherit
+    `-webkit-text-fill-color: transparent` with no background of its own to
+    clip -- the headline laid out perfectly and rendered as nothing. The
+    splitter must detect that and reveal such elements whole."""
+    assert "paintsViaBackground" in html
+    assert "word-soft" in html
+    # The detection has to cover both spellings; browsers disagree on which
+    # computed property they report.
+    assert "webkitBackgroundClip" in html and "webkitTextFillColor" in html
+    # And the atomic variant must not carry a transform, which does nothing on
+    # an inline box and would silently not animate.
+    match = re.search(r"\.word-soft \{(.*?)\}", html, re.DOTALL)
+    assert match, "no .word-soft rule"
+    assert "transform" not in match.group(1)
+
+
+def test_hero_shader_has_a_lifecycle(html):
+    """A background shader that runs off-screen, in a hidden tab, or at 3x DPR
+    is a battery bug wearing a nice gradient."""
+    assert "IntersectionObserver" in html
+    assert "visibilitychange" in html
+    assert re.search(r"devicePixelRatio \|\| 1, 1\.5", html), "DPR is not capped"
+    assert "fallbackParticles" in html, "no non-WebGL fallback"
+
+
 def test_canvas_animation_is_disabled_under_reduced_motion(html):
     assert "REDUCED.matches" in html
     assert re.search(r"if \(REDUCED\.matches\) \{ canvas\.style\.display = 'none'", html)
@@ -254,16 +355,44 @@ def test_generated_svgs_carry_their_own_reduced_motion_block():
 
 # -- the build script is runnable and idempotent -----------------------------
 
-def test_build_script_is_idempotent(tmp_path):
-    """Running it twice must not change the tree the second time -- otherwise
-    it cannot be used as a CI drift check."""
-    before = {p.name: p.read_bytes() for p in ASSETS.glob("*.svg")}
-    index_before = INDEX.read_bytes()
+# The single-saga animations run sequentially with pinned saga ids, so they are
+# byte-reproducible. The whole-log visuals come from a genuinely concurrent run
+# -- nine sagas racing through one WAL -- and a real concurrent run does not
+# produce identical bytes twice: the interleaving differs, and so do the
+# timestamps and therefore the hashes. Forcing those to be stable would mean
+# faking the concurrency the fleet timeline exists to show, so they are pinned
+# on meaning instead of bytes.
+REPRODUCIBLE = ["rollback-clean.svg", "rollback-orphan.svg", "saga-success.svg"]
+CONCURRENT = ["viz-fleet.svg", "viz-chain.svg", "viz-outcomes.svg"]
+
+
+def test_build_script_is_idempotent_for_the_sequential_scenarios(tmp_path):
+    """The three single-saga animations must be byte-identical across rebuilds,
+    otherwise `git status` is noisy after every build and the drift check above
+    is meaningless."""
+    before = {name: (ASSETS / name).read_bytes() for name in REPRODUCIBLE}
 
     proc = subprocess.run([sys.executable, str(SITE / "build_assets.py")],
                           capture_output=True, text=True, cwd=str(ROOT))
     assert proc.returncode == 0, proc.stderr[-3000:]
 
-    after = {p.name: p.read_bytes() for p in ASSETS.glob("*.svg")}
-    assert after == before, "build_assets.py is not deterministic"
-    assert INDEX.read_bytes() == index_before, "build_assets.py rewrote index.html"
+    after = {name: (ASSETS / name).read_bytes() for name in REPRODUCIBLE}
+    assert after == before, "the sequential scenarios are not deterministic"
+
+
+@pytest.mark.parametrize("name", CONCURRENT)
+def test_concurrent_visuals_keep_their_meaning_across_rebuilds(name):
+    """These bytes legitimately change every build. What must not change is
+    what they say: an intact chain, a fleet with real aborts in it, and an
+    outcome matrix that saw effects taken back."""
+    svg = (ASSETS / name).read_text(encoding="utf-8")
+    ET.fromstring(svg)
+
+    if name == "viz-chain.svg":
+        assert "chain intact" in svg
+        assert "CHAIN BROKEN" not in svg and "PARTIALLY CHAINED" not in svg
+    elif name == "viz-fleet.svg":
+        assert "aborted and rolled back" in svg
+        assert "no timestamped saga records" not in svg
+    else:
+        assert "effect(s) had to be taken back" in svg
