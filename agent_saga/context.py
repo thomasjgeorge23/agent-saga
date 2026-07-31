@@ -454,11 +454,19 @@ class SagaContext:
         tok_step = set_step_id(step.step_id)
         try:
             try:
+                # GenAI conventions added alongside the saga-native attributes.
+                # `saga.semantics` and `saga.is_compensation` have no equivalent
+                # in the conventions and are what makes a rollback legible, so
+                # both vocabularies are emitted rather than one replaced.
+                from .observability.genai import tool_span_attributes
+
                 with get_tracer().span(step_span_name(tool), {
                     ATTR_STEP_ID: step.step_id,
                     ATTR_TOOL: tool,
                     ATTR_SEMANTICS: semantics.value,
                     ATTR_IS_COMPENSATION: False,
+                    **tool_span_attributes(tool=tool, call_id=step.step_id,
+                                           arguments=forward_kwargs),
                 }):
                     result = await _invoke(forward, forward_kwargs,
                                            timeout or self.default_timeout)

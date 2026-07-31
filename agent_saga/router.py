@@ -321,8 +321,27 @@ class Router:
         for attempt in range(1, self.attempts_per_host + 1):
             started = time.monotonic()
             try:
-                with get_tracer().span("llm.host.attempt", {
-                        "llm.host": adapter.name, "llm.attempt": attempt}):
+                # OTel GenAI semantic conventions alongside the saga-native
+                # attributes: the same span is then legible to Langfuse, Phoenix,
+                # Datadog and Grafana without any configuration, while the
+                # `llm.*` names existing dashboards read keep working.
+                from .observability.genai import (llm_span_attributes,
+                                                  llm_span_name)
+
+                model = getattr(getattr(adapter, "capabilities", lambda: None)(),
+                                "model", None) or None
+                span_attributes = {
+                    "llm.host": adapter.name, "llm.attempt": attempt,
+                    **llm_span_attributes(
+                        provider=adapter.name,
+                        request_model=model,
+                        max_tokens=request.max_tokens,
+                        temperature=request.temperature,
+                        input_messages=[{"role": m.role, "content": m.content}
+                                        for m in request.messages]),
+                }
+                with get_tracer().span(llm_span_name(model or adapter.name),
+                                       span_attributes):
                     if self.attempt_timeout is None:
                         return await adapter.complete(request)
                     try:
