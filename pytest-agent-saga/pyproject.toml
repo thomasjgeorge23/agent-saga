@@ -40,3 +40,17 @@ Repository = "https://github.com/thomasjgeorge23/agent-saga"
 
 [project.entry-points.pytest11]
 pytest_agent_saga = "pytest_agent_saga.plugin"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.claude",
+  "/.gemini",
+  "/.antigravity",
+  "/.cursor",
+  "/.copilot",
+  "/brain",
+  "/scratch",
+  "/*.log",
+  "/inquiries.json",
+  "/.saga_inquiries.json",
+]

@@ -120,6 +120,20 @@ packages = ["agent_saga"]
 # The dashboard is a data file, not a module -- ship it in the wheel.
 artifacts = ["agent_saga/ui/templates/*.html"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.claude",
+  "/.gemini",
+  "/.antigravity",
+  "/.cursor",
+  "/.copilot",
+  "/brain",
+  "/scratch",
+  "/*.log",
+  "/inquiries.json",
+  "/.saga_inquiries.json",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "tests"]
