@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agent-saga"
 dynamic = ["version"]
-description = "Kill the process mid-transaction and the charge still gets refunded. Run `agent-saga demo`. Transactional tool execution with crash-safe rollback, receipted context, truthful multi-model routing, and one audit log that reconstructs every decision."
+description = "Kill the process mid-transaction and the charge still gets refunded. Run `agent-saga demo`. Crash-safe rollback for AI agents: a hash-chained write-ahead log, compensations derived at runtime from what the tool actually returned, and bounded model checking that proves your workflow unwinds at every failure point before you ship it. Plus receipted context, truthful multi-model routing, and one audit log that reconstructs every decision. Works with LangGraph, CrewAI, OpenAI Agents, AutoGen, LlamaIndex, Semantic Kernel and Vertex AI."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -17,13 +17,28 @@ license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE", "TRADEMARKS.md"]
 authors = [{ name = "Thomas J George", email = "thomasjgeorge23@gmail.com" }]
 maintainers = [{ name = "Thomas J George", email = "thomasjgeorge23@gmail.com" }]
-keywords = ["ai-agents", "saga", "rollback", "compensation", "llm", "observability"]
+keywords = [
+    "ai-agents", "agent", "llm", "saga", "rollback", "compensation",
+    "write-ahead-log", "wal", "crash-recovery", "transactions", "idempotency",
+    "observability", "opentelemetry", "guardrails", "agent-safety",
+    "langgraph", "crewai", "autogen", "llamaindex", "mcp",
+]
 classifiers = [
     # No `License ::` classifier: PEP 639 deprecates it in favour of the SPDX
     # expression above, and PyPI rejects a distribution that carries both.
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Recovery Tools",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
 ]
 dependencies = []
 

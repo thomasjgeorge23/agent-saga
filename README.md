@@ -532,6 +532,86 @@ Your policy decides what unlabeled claims may touch: block `UNCITED` numbers
 in financial reports, require `VERIFIED`-only in clinical summaries, page a
 human on anything `BROKEN_*`.
 
+## What the write-ahead log makes possible
+
+Every agent framework logs. agent-saga's log records something none of the
+others do: **whether the effect had to be undone.** That single fact is ground
+truth nobody else collects, and four capabilities fall out of it.
+
+```python
+from agent_saga import (build_corpus, counterfactual_replay,
+                        WALProfile, synthesize, FailureModel)
+```
+
+**Training data, labelled by reality** — `build_corpus(records)`. Every action
+labelled by whether the world kept it. The hard part is blame: when step 5
+fails, steps 1–4 are rolled back *and they were correct*. Labelling them
+negative teaches a model to avoid the calls that worked, so they're
+`COLLATERAL` and excluded. `preference_pairs()` emits DPO-shaped pairs matched
+within a tool.
+
+**Try a cheaper model on real history, risk-free** — `counterfactual_replay()`.
+The log is a simulator of that afternoon's world. Point a candidate at it,
+serve recorded results, and nothing executes — the replay context never invokes
+a forward callable at all. When the candidate diverges, the answer is
+`UNKNOWABLE`, not a guess: the recording genuinely has no result for the call it
+made.
+
+**Share your traffic without sharing your customers** — `WALProfile.fit()` /
+`synthesize()`. The profile keeps shapes and ranges, never a value a person
+typed, so *the profile itself* is shareable. Fifty real sagas become fifty
+thousand synthetic ones for load-testing recovery. Every record is marked
+`__synthetic__` — an audit log indistinguishable from a real one is an
+instrument for fabricating evidence, not a test fixture.
+
+**A gate that gets better the longer you run** — `FailureModel.fit()`. Learns
+which call shapes had to be undone. Reports **lift over the base rate**, because
+"9 of 12 failed" is meaningless when three quarters of everything fails. Below
+its support threshold it produces no number and says silence isn't a clean bill
+of health. It ships no automatic blocking gate — a correlation is grounds to
+look, not to refuse.
+
+## Proof, not adjectives
+
+```bash
+python -c "import asyncio; from agent_saga import verify_rollback_invariants; print(asyncio.run(verify_rollback_invariants(max_steps=6)).format_text())"
+```
+
+**321 failure interleavings. Seven invariants. Zero violations.**
+
+`verify_rollback_invariants()` enumerates *every* failure shape up to N steps —
+which step's forward call raises × which subset of inverses then refuse ×
+whether a committed step has no inverse — and runs each against the real engine,
+not a model of it. LIFO order, no double compensation, bounded retries, exactly
+one outcome bucket per step, `clean` never claimed over an incomplete rollback,
+halt stranding only earlier steps, orphans reported rather than dropped.
+
+And it states its bound: this is bounded model checking, **not** a proof for
+unbounded N and not a claim about concurrency. "Verified" with no bound attached
+is the kind of claim this project exists to avoid.
+
+Benchmarks come with their methodology, in [docs/BENCHMARKS.md](docs/BENCHMARKS.md):
+fast path ~17 µs, durable path ~7.9 ms, reported separately and never blended —
+and the WAL measured against your device's own `fsync` floor, so the number that
+travels between machines is agent-saga's **marginal** cost: 0.97 ms, 27%.
+
+## It plugs into what you already run
+
+Spans carry **OpenTelemetry GenAI semantic conventions** (`gen_ai.system`,
+`gen_ai.request.model`, `gen_ai.usage.*`, `gen_ai.tool.name`, `error.type`) —
+so Langfuse, Arize Phoenix, Datadog LLM Observability, Grafana and Honeycomb
+render agent-saga traces in the panels already built for them, with **zero
+configuration**. The `saga.*` attributes stay alongside, because compensation
+semantics have no equivalent in the conventions.
+
+Prompt and argument capture is **off by default**: a tracing backend is usually
+a third party nobody classified as a data store.
+
+**13 framework adapters** — LangGraph, CrewAI, AutoGen, LlamaIndex, OpenAI
+Agents, **Semantic Kernel**, **Vertex AI**, Temporal, Camunda, SQLAlchemy,
+Supabase, and the one-line `wrap_*` wrappers. The public API is `wrap_tool` in
+every one.
+
 ## Does it have X? — the capability matrix
 
 Everything below is shipping, tested code with a module you can open. The core
@@ -1439,9 +1519,33 @@ is an intended Enterprise-tier feature, deliberately absent from this BYOK core.
 
 `agent-saga` and the SAGAOPS OS are created, architected, and maintained by **Thomas J George**.
 
-- ✉️ **Email**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com)
+**Tell us how it went — especially if it went badly.** A rollback library earns
+trust from reports of the case it got wrong, not from testimonials. If a
+compensation didn't fire, if `clean` said something you disagree with, if an
+adapter broke against a newer SDK: that is the most useful thing you can send.
+
+- 🐛 [**Open an issue**](https://github.com/thomasjgeorge23/agent-saga/issues/new) — bugs, adapter breakage, a `RollbackReport` that looks wrong. **Don't paste a production WAL**; ship a synthetic one that has the same shape and none of your data:
+  ```python
+  import json
+  from agent_saga.synthetic import WALProfile, synthesize
+
+  records = [json.loads(line) for line in open("saga.wal", encoding="utf-8") if line.strip()]
+  profile = WALProfile.fit(records, redact=["email", "account_id"])
+  shareable = synthesize(profile, sagas=50, seed=7)   # every record carries __synthetic__
+  ```
+  The profile keeps event order, tool mix and value *ranges*; it never keeps a
+  value a person typed. Attach `shareable` — the failure reproduces, your
+  customers don't travel with it.
+
+- 💬 [**Post a review in Discussions**](https://github.com/thomasjgeorge23/agent-saga/discussions) — what you shipped it on, what it cost you, what you'd rip out. Public, so the next person reads it too.
+- ✉️ **Email**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com) — enterprise integration and anything you'd rather not post publicly.
+- 🔒 **Security**: report privately per [SECURITY.md](https://github.com/thomasjgeorge23/agent-saga/blob/main/SECURITY.md), not in a public issue.
 - 🐙 **GitHub**: [github.com/thomasjgeorge23](https://github.com/thomasjgeorge23)
-- 💬 **Feedback & Reviews**: Users, enterprise engineering teams, and reviewers can send feedback, issue reports, or feature requests directly via email.
+
+The site's contact form saves to the browser it was typed in and, if you're
+running `python site/server.py`, to a local `inquiries.json` readable with
+`agent-saga inquiries`. It is **not** a hosted inbox and will say so rather than
+show you a green tick — use the links above to reach a person.
 
 ## License
 

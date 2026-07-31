@@ -52,3 +52,8 @@ TRADE_SECRETS_PROPRIETARY.md
 .saga_secrets/
 .env
 .env.*
+
+# Inquiry/review submissions captured by site/server.py. Real people's names,
+# emails and messages -- runtime data, never committed.
+inquiries.json
+.saga_inquiries.json

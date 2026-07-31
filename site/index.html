@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v0.5.1 — Kill the process mid-transaction. The charge still gets refunded.</title>
+<title>agent-saga v0.5.4 &mdash; Kill the process mid-transaction. The charge still gets refunded.</title>
 <meta name="description" content="Grounded answers where a hallucination cannot pose as a sourced fact, one-call AgentKit SDK, machine-checkable rollback-safety certificates, selective-disclosure audit proofs, hash-chained tamper-evident WAL, passkey/hardware approvals, and offline mesh sagas — the accountable agent runtime for AI that acts on the real world." />
 <style>
   :root {
@@ -280,6 +280,15 @@
     .install { flex-direction: column; align-items: flex-start; }
     .install button { width: 100%; text-align: center; }
   }
+
+  /* wide-content guard: a long command or code line scrolls inside
+     its own box rather than pushing the page sideways. */
+  pre.code-block { overflow-x: auto; max-width: 100%; background: #020617;
+    border: 1px solid #1e293b; border-radius: 8px; padding: 14px 16px;
+    font-size: 12.5px; line-height: 1.65; }
+  pre.code-block code { white-space: pre; }
+  .install { overflow-x: auto; }
+  .feat-card code { overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -334,10 +343,10 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">⚡ SAGAOPS Enterprise Autonomous Agent OS · PyPI v0.5.3</p>
+        <p class="eyebrow">⚡ SAGAOPS Enterprise Autonomous Agent OS · PyPI v0.5.4</p>
         <h1>Give any LLM the <span class="amber">Rollback-Proving Engine & Safety Fleet OS</span>.</h1>
         <p class="lede">
-          <b>agent-saga v0.5.3 (SAGAOPS)</b> introduces <b>prove_rollback()</b> (proves workflows unwind cleanly at every failure point before production), <b>SagaFleet</b> (cross-framework thread-safe orchestration), <b>RepairSession</b> (surgical step repair without full rollback), and the interactive <b>agent-saga demo</b>.
+          <b>agent-saga v0.5.4 (SAGAOPS)</b> adds <b>bounded model checking</b> (321 failure interleavings enumerated against the real engine, 7 invariants proven — not sampled), <b>WAL-mined failure prediction</b>, <b>synthetic WAL generation</b>, and <b>OpenTelemetry GenAI semantic conventions</b> — on top of <b>prove_rollback()</b>, <b>SagaFleet</b>, <b>RepairSession</b>, and the interactive <b>agent-saga demo</b>.
         </p>
         <p class="lede">
           Your agent will fail at step 4 of 5 — and one day it will fail by <em>dying</em>. A <code>try/except</code> keeps its cleanup in memory and dies with it. A checkpoint restores your <em>agent's</em> state; it cannot un-send a wire transfer. <b>agent-saga</b> writes the intent to a hash-chained log <em>before</em> the effect fires, so a <b>separate process</b> can finish the rollback the dead one couldn't.
@@ -428,6 +437,121 @@
       distinct outcomes. A partial rollback can never be drawn as a clean one.</p>
     </div>
   </section>
+
+  <section id="proof">
+    <div class="wrap">
+      <p class="eyebrow">Proof, not adjectives</p>
+      <h2>321 failure interleavings. Seven invariants. Zero violations.</h2>
+      <p class="lede">Every claim on this page maps to a command you can run. This one takes
+      under a second:</p>
+
+      <pre class="code-block"><code>from agent_saga import verify_rollback_invariants
+
+report = await verify_rollback_invariants(max_steps=6)
+print(report.format_text())
+# 321 interleavings executed &middot; 7 invariants &middot; VERIFIED</code></pre>
+
+      <p class="lede"><code>verify_rollback_invariants()</code> enumerates <b>every</b>
+      failure shape up to N steps &mdash; which step's forward call raises, which subset of
+      inverses then refuse, whether a committed step has no inverse at all &mdash; and runs
+      each against the real engine rather than a model of it. LIFO order, no double
+      compensation, bounded retries, one outcome bucket per step, <code>clean</code> never
+      claimed over an incomplete rollback, orphans reported rather than dropped.</p>
+
+      <p class="lede">And it states its bound: bounded model checking, <b>not</b> a proof for
+      unbounded N and not a claim about concurrency. "Verified" with no bound attached is the
+      kind of claim this project exists to avoid.</p>
+
+      <div class="feat-grid">
+        <div class="feat-card">
+          <h3>&#128200; Benchmarks with methodology</h3>
+          <p>Fast path <b>~17&micro;s</b>, durable path <b>~7.9ms</b> &mdash; reported
+          separately and never blended, because one is a deque push and the other is an
+          <code>fsync</code>. The WAL is measured against your device's own fsync floor, so
+          the figure that travels between machines is agent-saga's <b>marginal</b> cost:
+          0.97ms, 27%.</p>
+        </div>
+        <div class="feat-card">
+          <h3>&#129514; Prove YOUR rollback works</h3>
+          <p><code>prove_rollback()</code> breaks your workflow at every step, in both
+          failure shapes, and compares the world to its starting state. It catches the case
+          nothing else does: a compensation that runs, returns success, and undoes
+          <em>nothing</em>.</p>
+        </div>
+        <div class="feat-card">
+          <h3>&#128279; Zero-config observability</h3>
+          <p>Spans carry <b>OpenTelemetry GenAI semantic conventions</b>, so Langfuse, Arize
+          Phoenix, Datadog, Grafana and Honeycomb render agent-saga traces in panels already
+          built for them. Prompt capture is off by default &mdash; a tracing backend is
+          usually a third party.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="wal-superpowers">
+    <div class="wrap">
+      <p class="eyebrow">What only this log makes possible</p>
+      <h2>Every framework logs. Ours records whether the effect had to be undone.</h2>
+      <p class="lede">That single fact is ground truth nobody else collects &mdash; and six
+      capabilities fall straight out of it.</p>
+
+      <div class="feat-grid">
+        <div class="feat-card">
+          <h3>&#127891; Training data labelled by reality</h3>
+          <p><code>build_corpus()</code> labels every action by whether the world kept it.
+          The hard part is blame: when step 5 fails, steps 1&ndash;4 roll back <em>and they
+          were correct</em>. Labelling them negative teaches a model to avoid the calls that
+          worked &mdash; so they are <code>COLLATERAL</code> and excluded. DPO-shaped
+          preference pairs, matched within a tool.</p>
+        </div>
+        <div class="feat-card">
+          <h3>&#9202; Try a cheaper model on real history</h3>
+          <p><code>counterfactual_replay()</code> turns the log into a simulator of that
+          afternoon's world. <b>Nothing executes</b> &mdash; the replay never invokes a
+          forward callable at all. When the candidate diverges the answer is
+          <code>UNKNOWABLE</code>, not a guess.</p>
+        </div>
+        <div class="feat-card">
+          <h3>&#127917; Share traffic, not customers</h3>
+          <p><code>WALProfile.fit()</code> keeps shapes and ranges, never a value a person
+          typed &mdash; so the <em>profile itself</em> is shareable. Fifty real sagas become
+          fifty thousand synthetic ones. Every record is marked <code>__synthetic__</code>:
+          a log indistinguishable from a real one is an instrument for fabricating evidence,
+          not a fixture.</p>
+        </div>
+        <div class="feat-card">
+          <h3>&#128302; A gate that improves as you run</h3>
+          <p><code>FailureModel.fit()</code> learns which call shapes had to be undone, and
+          reports <b>lift over the base rate</b> &mdash; "9 of 12 failed" is meaningless when
+          three quarters of everything fails. Below its support threshold it produces no
+          number and says silence is not a clean bill of health.</p>
+        </div>
+        <div class="feat-card">
+          <h3>&#128737; No side effect on an invented number</h3>
+          <p><code>ProvenancePolicy</code> classifies every argument: SOURCED &gt; USER &gt;
+          DERIVED &gt; MODEL. Untagged means MODEL, and <b>SOURCED is verified against the
+          document</b>, not accepted on the label. An agent may not move money on a figure
+          it made up.</p>
+        </div>
+        <div class="feat-card">
+          <h3>&#127760; 13 framework adapters</h3>
+          <p>LangGraph, CrewAI, AutoGen, LlamaIndex, OpenAI Agents, <b>Semantic Kernel</b>,
+          <b>Vertex AI</b>, Temporal, Camunda, SQLAlchemy, Supabase. One saga spans all of
+          them &mdash; the boundary is a contextvar, so a wrapped tool joins whatever saga
+          is open, whichever framework called it.</p>
+        </div>
+      </div>
+
+      <p class="lede" style="margin-top:1.5rem;">Plus <code>agent-saga adopt</code> to wire
+      an existing project up mechanically (it will not decide your semantics &mdash; the
+      generated module refuses to import until a human classifies each side effect),
+      <code>cascade()</code> for verification-gated escalation across model tiers, and
+      <code>RepairSession</code> to fix one failed step and resume instead of unwinding
+      everything.</p>
+    </div>
+  </section>
+
   </div> <!-- END PAGE-OVERVIEW -->
 
   <!-- PAGE 2: INDUSTRIES & PRINCIPLES -->
@@ -1422,10 +1546,10 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
     if (!name || !email || !message) return;
 
     btn.disabled = true;
-    btn.textContent = 'Saving directly to app...';
+    btn.textContent = 'Saving...';
     badge.hidden = false;
     badge.style.color = '#f59e0b';
-    badge.textContent = '⌛ Saving inquiry...';
+    badge.textContent = '⌛ Saving...';
 
     var record = {
       id: 'inq_' + Date.now(),
@@ -1437,36 +1561,77 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       message: message
     };
 
-    // 1. Direct In-App Persistence (localStorage)
+    // 1. Local persistence, in THIS browser only.
+    var storedLocally = false;
     try {
       var existing = JSON.parse(localStorage.getItem('saga_inquiries') || '[]');
       existing.push(record);
       localStorage.setItem('saga_inquiries', JSON.stringify(existing));
+      storedLocally = true;
     } catch (err) {
-      console.warn('LocalStorage save notice:', err);
+      console.warn('LocalStorage save failed:', err);
     }
 
-    // 2. Direct HTTP Backend Persistence (site/server.py -> inquiries.json)
+    // 2. Backend persistence (site/server.py -> inquiries.json). This only
+    //    exists when someone is running the local server; on a static host
+    //    (GitHub Pages, file://) there is nothing listening and the message
+    //    reaches nobody.
+    var delivered = false;
     try {
       var backendUrl = window.location.protocol.startsWith('http') ? '/api/inquiry' : 'http://localhost:8000/api/inquiry';
-      await fetch(backendUrl, {
+      var resp = await fetch(backendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(record)
       });
+      delivered = resp.ok;
     } catch (err) {
-      console.log('Backend server API notice:', err);
+      console.log('No inquiry backend reachable:', err);
     }
 
-    // 3. Direct In-App Success Feedback
-    badge.style.color = '#10b981';
-    badge.textContent = '✓ Saved directly in app & physical inquiries.json!';
-    document.getElementById('directInquiryForm').reset();
+    // 3. Report what ACTUALLY happened. A library whose whole argument is that
+    //    `clean` is never claimed over an incomplete rollback does not get to
+    //    print "sent" over a request that failed.
+    var fallback = document.getElementById('inqFallback');
     btn.disabled = false;
-    btn.textContent = 'Send Direct Inquiry →';
-    
-    // Refresh local in-app inbox view
+    btn.textContent = 'Save Message →';
+
+    if (delivered) {
+      badge.style.color = '#10b981';
+      badge.textContent = '✓ Delivered to the running inquiry backend.';
+      if (fallback) fallback.hidden = true;
+      document.getElementById('directInquiryForm').reset();
+    } else if (storedLocally) {
+      badge.style.color = '#f59e0b';
+      badge.textContent = '● Saved in THIS browser only — not sent to anyone yet.';
+      if (fallback) fallback.hidden = false;
+      // Deliberately NOT reset: the text is still the only copy the person has,
+      // and clearing it would destroy a message we just admitted we didn't send.
+    } else {
+      badge.style.color = '#ef4444';
+      badge.textContent = '✗ Could not save (storage blocked). Nothing was sent.';
+      if (fallback) fallback.hidden = false;
+    }
+
     renderInAppInbox();
+  }
+
+  // Copies the composed message so it can be pasted into a real channel.
+  async function copyInquiryDraft() {
+    var f = id => (document.getElementById(id).value || '').trim();
+    var text = [
+      'Subject: ' + document.getElementById('inqSubject').value,
+      'From: ' + f('inqName') + ' <' + f('inqEmail') + '>',
+      'Company: ' + (f('inqCompany') || 'N/A'),
+      '', f('inqMessage')
+    ].join('\n');
+    var out = document.getElementById('inqCopyState');
+    try {
+      await navigator.clipboard.writeText(text);
+      out.textContent = 'Copied — paste it into an issue or an email.';
+    } catch (err) {
+      out.textContent = 'Clipboard blocked. Select the message above and copy manually.';
+    }
   }
 
   function renderInAppInbox() {
@@ -1535,11 +1700,23 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
   <section id="inquiry" style="background: color-mix(in srgb, var(--panel) 50%, var(--bg)); border-top: 1px solid var(--border);">
   <div class="wrap" style="max-width: 860px;">
     <div style="text-align: center; margin-bottom: 2.5rem;">
-      <span class="eyebrow">✉️ Direct Founder Contact & Review Portal</span>
-      <h2>Write Directly to Founder Thomas J George</h2>
+      <span class="eyebrow">✉️ Reviews, Feedback & Founder Contact</span>
+      <h2>Tell us what broke, what worked, and what's missing</h2>
       <p class="lede" style="margin-inline: auto;">
-        Have an enterprise inquiry, integration requirement, bug report, or user review? Write directly below — all submissions are stored in our secure private admin store and alerted directly to <b>thomasjgeorge23@gmail.com</b>.
+        Enterprise inquiry, integration requirement, bug report, or a review of how it went in production — all of it is wanted, especially the unflattering kind.
       </p>
+      <p class="lede" style="margin-inline: auto; font-size: 0.95rem;">
+        <b>How this form works, stated plainly.</b> This page is static. The form below saves your message
+        <b>in your own browser</b> — unless you are running the local inquiry backend
+        (<code>python site/server.py</code>, readable with <code>agent-saga inquiries</code>), it does not
+        reach anyone, and it will tell you so instead of showing a green tick. To actually reach a human,
+        use one of these:
+      </p>
+      <div style="display:flex; gap:0.8rem; flex-wrap:wrap; justify-content:center; margin-top:1.2rem;">
+        <a class="btn primary" href="https://github.com/thomasjgeorge23/agent-saga/issues/new" target="_blank" rel="noopener">Open a GitHub issue →</a>
+        <a class="btn ghost" href="https://github.com/thomasjgeorge23/agent-saga/discussions" target="_blank" rel="noopener">Post a review in Discussions</a>
+        <a class="btn ghost" href="mailto:thomasjgeorge23@gmail.com">Email the founder</a>
+      </div>
     </div>
 
     <div style="background: var(--panel); border: 1px solid var(--border-strong); border-radius: 24px; padding: clamp(1.5rem, 4vw, 2.5rem); box-shadow: var(--shadow);">
@@ -1578,16 +1755,29 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
         </div>
 
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
-          <button type="submit" class="btn primary" id="inqSubmitBtn">Send Direct Inquiry →</button>
+          <button type="submit" class="btn primary" id="inqSubmitBtn">Save Message →</button>
           <div id="inqStatusBadge" style="font-family: var(--mono); font-size: 0.85rem; font-weight: 700;" hidden></div>
         </div>
       </form>
+
+      <!-- Shown only when the message was NOT delivered anywhere. -->
+      <div id="inqFallback" hidden style="margin-top: 1.5rem; padding: 1.2rem; border: 1px solid var(--border-strong); border-radius: 16px; background: color-mix(in srgb, #f59e0b 8%, transparent);">
+        <p style="margin: 0 0 0.9rem; font-size: 0.92rem;">
+          Your message is sitting in this browser and nowhere else. Take it somewhere it will be read:
+        </p>
+        <div style="display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center;">
+          <button type="button" class="btn primary" onclick="copyInquiryDraft()">Copy my message</button>
+          <a class="btn ghost" href="https://github.com/thomasjgeorge23/agent-saga/issues/new" target="_blank" rel="noopener">Paste into a GitHub issue</a>
+          <a class="btn ghost" href="mailto:thomasjgeorge23@gmail.com">Paste into an email</a>
+        </div>
+        <p id="inqCopyState" style="margin: 0.9rem 0 0; font-family: var(--mono); font-size: 0.8rem; color: var(--muted);"></p>
+      </div>
     </div>
 
     <!-- IN-APP LOCAL INBOX VIEWER (ADMIN / FOUNDER READ-ONLY) -->
     <div style="margin-top: 2.5rem; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 24px; padding: clamp(1.5rem, 4vw, 2.5rem); box-shadow: var(--shadow);">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem;">
-        <h3 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.6rem;">📥 Saved In-App Messages & Reviews</h3>
+        <h3 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.6rem;">📥 Saved in this browser</h3>
         <button onclick="renderInAppInbox()" class="toggle" style="font-size: 0.75rem;">↻ Refresh Inbox</button>
       </div>
       <div id="inAppInboxContainer">

@@ -146,11 +146,22 @@ class SagaSiteHandler(SimpleHTTPRequestHandler):
             }
 
             save_inquiry(record)
-            notify_founder_email(record)
+            emailed = notify_founder_email(record)
 
+            # Say which of the two things actually happened. Without SMTP
+            # configured this server writes a file on the machine it is running
+            # on; calling that "delivered to the founder" is only true when the
+            # founder is the one running it.
             self._send_json({
                 "status": "ok",
-                "message": "Thank you! Your inquiry has been delivered directly to Founder Thomas J George.",
+                "emailed": emailed,
+                "message": (
+                    "Received and emailed to the maintainer."
+                    if emailed else
+                    f"Saved to {INQUIRIES_FILE} on this machine. No mail server is "
+                    f"configured, so it has not been sent anywhere -- read it with "
+                    f"`agent-saga inquiries`."
+                ),
                 "inquiry_id": record["id"],
             })
             return
