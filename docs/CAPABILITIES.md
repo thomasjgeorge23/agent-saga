@@ -184,6 +184,12 @@ concurrent edit.
 | Cost/token budgets | `cost_gate.py` | raises `CostBudgetExceeded`; real enforcement |
 | Blind audit commitments | `zkp.py` | keyed HMAC + Merkle inclusion proofs |
 | Cross-agent coordination | `multi_agent_mesh.py` | distributed saga across agent processes |
+| FastAPI Control Plane Service | `saga_service/service.py` | async lifespan, FileSnapshotStore, PreFlightGate rules ($5000+ & anti-spam), SnapshotGC daemon |
+| Next.js Governance Dashboard | `app/admin/sagas/page.tsx` | overview status cards, BYOK encryption monitor, manual GC sweep audit button |
+| Real-Time Transaction Trackers | `src/components/` | `SagaTransactionTracker.tsx`, `SagaVisualLedger.tsx`, `AgentSagaBadge.tsx` |
+| Visual Aesthetics & Animation Skill | `.agents/skills/` | `.agents/skills/agent-saga-visual-aesthetics/SKILL.md` bridge |
+| Cryptographic Integrity & Watermark | `_integrity_guard.py` | SHA-256 module fingerprints & HMAC-SHA256 tokens bound to SAGAOPS Enterprise (Owner: Thomas J George) |
+| Physical Local Inquiry System | `inquiry_store.py` | physical `inquiries.json` disk store + CLI reader (`agent-saga inquiries`), 0 mail redirects |
 
 ---
 

@@ -27,6 +27,18 @@ whole transaction — in-process on failure, or from a separate recovery daemon
 if the process itself dies. Infrastructure, vector stores, tickets, PRs,
 messages — and, yes, money.
 
+## SAGAOPS Enterprise Capabilities & Control Plane
+
+| Subsystem | Capabilities & Safety Mechanisms |
+|---|---|
+| **🛡️ Bounded Model Checking** | `agent_saga.verification.verify_rollback_invariants(max_steps=6)` exhaustively tests **321 failure interleavings** against 7 strict invariants before code ships. |
+| **🧠 Explainable Risk Scoring** | `agent_saga.risk.FailureModel` mines failure shapes from WAL logs, excludes `COLLATERAL` rollbacks, calculates lift over base rate, and enforces support thresholds. |
+| **🔐 BYOK Fernet & Anti-Tamper** | Hardware-grade AES-128-CBC Fernet encryption via `AGENT_SAGA_WAL_KEY`, HMAC-SHA256 provenance signatures, and SHA-256 module fingerprinting (`verify_engine_integrity()`). |
+| **⚙️ FastAPI Control Plane** | `saga_service/service.py` provides async lifespan, `FileSnapshotStore`, `PreFlightGate` high-value escalation ($5000+) & anti-spam filters, and background `SnapshotGC` daemon. |
+| **📊 Next.js Admin Dashboard** | `app/admin/sagas/page.tsx` & React components (`SagaTransactionTracker`, `SagaVisualLedger`, `AgentSagaBadge`) provide real-time kinetic visual audit cards and manual GC sweeps. |
+| **🎨 Visual Aesthetics Bridge** | `.agents/skills/agent-saga-visual-aesthetics/SKILL.md` bridges backend WAL state events into Framer Motion primitives, glassmorphism, and celebration particle bursts. |
+| **💾 Physical In-App Inquiry System** | Direct local disk persistence (`inquiries.json` & `.saga_inquiries.json`) and CLI inspector (`agent-saga inquiries`), eliminating external `mailto:` redirects. |
+
 ## The control nobody else has: argument provenance
 
 Here is a call that passes **every** safety control ever written for agents:

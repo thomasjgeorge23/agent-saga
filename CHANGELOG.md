@@ -55,6 +55,14 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
+## [0.5.7] - 2026-08-01
+
+### Added
+- **FastAPI Control Plane Service (`saga_service/service.py`)** — Production FastAPI app with asynchronous lifespan context manager, `FileSnapshotStore` under `saga_service/snapshots/`, `PreFlightGate` high-value escalation ($5,000+) & anti-spam keyword filters, background `SnapshotGC` daemon alongside `RecoveryDaemon`, and `/api/sagas/gate-check` & `/api/sagas/gc` endpoints.
+- **Next.js Admin Governance Dashboard (`app/admin/sagas/page.tsx`)** — Overview status cards monitoring Pre-Flight Gate, BYOK Fernet Encryption (`AGENT_SAGA_WAL_KEY`), and Snapshot GC with a manual "Run GC Sweep" button for instant snapshot pruning audits.
+- **Real-Time Transaction Tracker Components (`src/components/`)** — `SagaTransactionTracker.tsx`, `SagaVisualLedger.tsx`, and `AgentSagaBadge.tsx` featuring kinetic flow timelines, WAL console inspectors, live pulse dots, and 100% clean LIFO compensation alerts.
+- **Visual Aesthetics & Animation Bridge Skill (`.agents/skills/agent-saga-visual-aesthetics/SKILL.md`)** — Defines the architectural patterns for converting headless `agent-saga` backend transactional state events into Framer Motion animations, glassmorphism UI cards, and celebration particle bursts.
+
 ## [Unreleased]
 
 ### Added
