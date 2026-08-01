@@ -55,13 +55,17 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [0.5.7] - 2026-08-01
+## [0.5.8] - 2026-08-01
 
 ### Added
-- **FastAPI Control Plane Service (`saga_service/service.py`)** — Production FastAPI app with asynchronous lifespan context manager, `FileSnapshotStore` under `saga_service/snapshots/`, `PreFlightGate` high-value escalation ($5,000+) & anti-spam keyword filters, background `SnapshotGC` daemon alongside `RecoveryDaemon`, and `/api/sagas/gate-check` & `/api/sagas/gc` endpoints.
-- **Next.js Admin Governance Dashboard (`app/admin/sagas/page.tsx`)** — Overview status cards monitoring Pre-Flight Gate, BYOK Fernet Encryption (`AGENT_SAGA_WAL_KEY`), and Snapshot GC with a manual "Run GC Sweep" button for instant snapshot pruning audits.
-- **Real-Time Transaction Tracker Components (`src/components/`)** — `SagaTransactionTracker.tsx`, `SagaVisualLedger.tsx`, and `AgentSagaBadge.tsx` featuring kinetic flow timelines, WAL console inspectors, live pulse dots, and 100% clean LIFO compensation alerts.
-- **Visual Aesthetics & Animation Bridge Skill (`.agents/skills/agent-saga-visual-aesthetics/SKILL.md`)** — Defines the architectural patterns for converting headless `agent-saga` backend transactional state events into Framer Motion animations, glassmorphism UI cards, and celebration particle bursts.
+- **Declarative Auto-UI Compiler (`agent_saga.ui_compiler` & `src/skills/DeclarativeUICompiler.tsx`)** — Inspects Python `@saga` function ASTs and compiles machine-readable UI schemas, form layouts, and React types automatically.
+- **Dynamic Liquid Mesh Shader Engine (`src/skills/LiquidMeshEngine.tsx`)** — GPU-accelerated HTML5 canvas radial gradient mesh with Lerp physics velocity vectors (`mouse.x += (targetX - mouse.x) * 0.05`) dynamically shifting particle turbulence based on server load.
+- **WebGL 3D Shader State Sync (`src/skills/WebGL3DBindings.tsx`)** — Binds backend saga transitions (`RUNNING`, `SUCCESS`, `ROLLED_BACK`, `HALTED`) directly to WebGL 3D geometric clear colors and vertex shader ripples.
+- **Web Audio & Vibration Haptic Synthesizer (`src/skills/AudioHapticFeedback.ts`)** — Synthesizes 528Hz Solfeggio commit chimes, 110Hz sub-bass rumbles, and triggers dual-frequency haptic vibrations.
+- **Geospatial Trust Radar (`src/skills/SpatialTrustRadar.tsx`)** — Interactive 360° sweeping radar overlay with distance decay rings and `PreFlightGate` risk zone indicators.
+- **Autonomous Self-Healing UI (`src/skills/SelfHealingUI.tsx`)** — Renders AI-suggested inline alternative choices with 1-click retry when a saga step fails or rolls back.
+- **BYOK Privacy Matrix Visualizer (`src/skills/BYOKPrivacyMatrix.tsx`)** — Interactive zero-knowledge audit card displaying AES-128-CBC Fernet ciphertext and HMAC-SHA256 integrity tokens.
+- **Dev-Mode Chaos Resiliency Theater (`src/skills/ChaosResiliencyTheater.tsx`)** — Interactive fault injection simulator (`SIGKILL`, network dropouts, WAL line corruption) demonstrating live `RecoveryDaemon` sweeps.
 
 ## [Unreleased]
 
