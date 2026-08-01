@@ -15,8 +15,8 @@ license = "Apache-2.0"
 # NOTICE is required downstream by Apache-2.0 section 4(d); TRADEMARKS.md states
 # the section 6 carve-out. Both travel with the wheel, not just the repo.
 license-files = ["LICENSE", "NOTICE", "TRADEMARKS.md"]
-authors = [{ name = "Thomas J George", email = "thomasjgeorge23@gmail.com" }]
-maintainers = [{ name = "Thomas J George", email = "thomasjgeorge23@gmail.com" }]
+authors = [{ name = "SAGAOPS", email = "thomasjgeorge23@gmail.com" }]
+maintainers = [{ name = "SAGAOPS (Founder & Owner: Thomas J George)", email = "thomasjgeorge23@gmail.com" }]
 keywords = [
     "ai-agents", "agent", "llm", "saga", "rollback", "compensation",
     "write-ahead-log", "wal", "crash-recovery", "transactions", "idempotency",

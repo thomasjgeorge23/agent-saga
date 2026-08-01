@@ -17,8 +17,8 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger("agent_saga.integrity_guard")
 
 # Cryptographic engine fingerprint & Hard Watermark
-SAGAOPS_ENGINE_SIGNATURE = "SAGAOPS-ENTERPRISE-CORE-v0.5.4-AUTHENTICATED"
-FOUNDER_ATTRIBUTION = "Founded & Lead Architected by Thomas J George (thomasjgeorge23@gmail.com) · SAGAOPS Enterprise"
+SAGAOPS_ENGINE_SIGNATURE = "SAGAOPS-ENTERPRISE-CORE-v0.5.6-AUTHENTICATED"
+FOUNDER_ATTRIBUTION = "SAGAOPS Enterprise · Founded & Owned by Thomas J George (thomasjgeorge23@gmail.com)"
 SAGAOPS_WATERMARK_HMAC = "HMAC-SHA256:7f89ab103c8e5472190a6042189fbca9501a4e238120b39c0192e"
 _SECRET_KEY = b"SAGAOPS_CRITICAL_TRANSACTION_KEY_2026_PROPRIETARY"
 

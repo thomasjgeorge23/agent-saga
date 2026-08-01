@@ -1,8 +1,8 @@
 # agent-saga
 
-> **Founded & Lead Architected by [Thomas J George](https://github.com/thomasjgeorge23)**  
-> ✉️ **Direct Email / Founder Contact**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com)  
-> *For enterprise inquiries, reviews, user feedback, or feature recommendations, reach out directly.*
+> **Published & Maintained by SAGAOPS Enterprise · Founded & Owned by [Thomas J George](https://github.com/thomasjgeorge23)**  
+> ✉️ **Direct Owner Contact**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com)  
+> *For enterprise inquiries, reviews, user feedback, or feature recommendations, reach out directly to the owner.*
 
 **The accountable agent runtime.** Six layers, one rule — every layer can
 prove what it did:
