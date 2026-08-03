@@ -55,11 +55,13 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [0.6.2] - 2026-08-03
+## [0.7.0] - 2026-08-03
 
 ### Added
-- **Autonomous Space Canvas & Site Builder (`agent_saga.space_canvas` & `agent_saga.site_builder`)** — Compiles Python `@saga` functions, space canvas WebGL shaders, and visual components into standalone, zero-dependency HTML5/WebGL enterprise web applications.
-- **High-Level Cosmic Space Animation on `site/index.html`** — HTML5/WebGL interactive space canvas (`#spaceCanvas`) featuring 300+ starfield particles, cosmic warp vectors, and gravitational lens cursor distortion.
+- **Quantum-Resilient Dual Merkle WAL (`agent_saga.supreme_core.QuantumResilientMerkleWAL`)** — Hardware-grade SHA3-512 + HMAC-SHA512 Merkle tree log producing quantum-resistant audit chains (`QWAL:<sha3>:<hmac>`).
+- **Autonomous Healing Compensation Orchestrator (`AutonomousHealingOrchestrator`)** — Self-learning engine that auto-synthesizes non-destructive inverse compensations on the fly when forward step exceptions occur.
+- **Supreme Full-Stack Web & Mobile Compiler (`agent_saga.compiler_v2`)** — Compiles Python `@saga` functions and Pydantic models into standalone Next.js 15 + WebGL 3D + Tailwind application bundles.
+- **Distributed Swarm Consensus Engine (`agent_saga.agentic_mesh.SagaSwarmMesh`)** — Synchronizes Write-Ahead Logs across 1,000+ AI agent cluster nodes using Raft/Gossip consensus with leader election.
 
 ## [Unreleased]
 
