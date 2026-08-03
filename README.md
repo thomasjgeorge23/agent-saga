@@ -31,13 +31,17 @@ messages — and, yes, money.
 
 | Subsystem | Capabilities & Safety Mechanisms |
 |---|---|
+| **🌌 Space Canvas & Site Builder** | `agent_saga.space_canvas` & `site_builder.py` compile `@saga` workflows and WebGL/HTML5 space shaders into standalone enterprise web apps. |
+| **⚡ Native MCP Transaction Proxy** | `agent_saga.mcp.MCPTransactionProxy` wraps any Model Context Protocol server with WAL logging, Pre-Flight Gate policy enforcement, and LIFO compensation. |
+| **🤖 Zero-Code Auto-Patcher** | `agent_saga.patch.auto_patch()` automatically detects and instruments LangChain, CrewAI, AutoGen, LlamaIndex, FastAPI, OpenAI, and Anthropic. |
+| **📐 Pydantic v2 Integrator** | `agent_saga.pydantic.PydanticSagaAdapter` extracts model schemas for PreFlightGate validation, inverse argument mapping, and auto-UI compilation. |
 | **🛡️ Bounded Model Checking** | `agent_saga.verification.verify_rollback_invariants(max_steps=6)` exhaustively tests **321 failure interleavings** against 7 strict invariants before code ships. |
 | **🧠 Explainable Risk Scoring** | `agent_saga.risk.FailureModel` mines failure shapes from WAL logs, excludes `COLLATERAL` rollbacks, calculates lift over base rate, and enforces support thresholds. |
 | **🔐 BYOK Fernet & Anti-Tamper** | Hardware-grade AES-128-CBC Fernet encryption via `AGENT_SAGA_WAL_KEY`, HMAC-SHA256 provenance signatures, and SHA-256 module fingerprinting (`verify_engine_integrity()`). |
 | **⚙️ FastAPI Control Plane** | `saga_service/service.py` provides async lifespan, `FileSnapshotStore`, `PreFlightGate` high-value escalation ($5000+) & anti-spam filters, and background `SnapshotGC` daemon. |
 | **📊 Next.js Admin Dashboard** | `app/admin/sagas/page.tsx` & React components (`SagaTransactionTracker`, `SagaVisualLedger`, `AgentSagaBadge`) provide real-time kinetic visual audit cards and manual GC sweeps. |
 | **🎨 Visual Aesthetics Bridge** | `.agents/skills/agent-saga-visual-aesthetics/SKILL.md` bridges backend WAL state events into Framer Motion primitives, glassmorphism, and celebration particle bursts. |
-| **💾 Physical In-App Inquiry System** | Direct local disk persistence (`inquiries.json` & `.saga_inquiries.json`) and CLI inspector (`agent-saga inquiries`), eliminating external `mailto:` redirects. |
+| **💾 Physical Local Inquiry System** | Direct local disk persistence (`inquiries.json` & `.saga_inquiries.json`) and CLI inspector (`agent-saga inquiries`), eliminating external `mailto:` redirects. |
 
 ## The control nobody else has: argument provenance
 

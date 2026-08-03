@@ -55,10 +55,11 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [0.6.1] - 2026-08-03
+## [0.6.2] - 2026-08-03
 
-### Fixed
-- **PyPI Stats Author Field**: Configured name-only author specification `authors = [{ name = "SAGAOPS Enterprise (Thomas J George)" }]` so Hatchling populates the `Author:` field in core `PKG-INFO` metadata, resolving `Author: None` on `pypistats.org`.
+### Added
+- **Autonomous Space Canvas & Site Builder (`agent_saga.space_canvas` & `agent_saga.site_builder`)** — Compiles Python `@saga` functions, space canvas WebGL shaders, and visual components into standalone, zero-dependency HTML5/WebGL enterprise web applications.
+- **High-Level Cosmic Space Animation on `site/index.html`** — HTML5/WebGL interactive space canvas (`#spaceCanvas`) featuring 300+ starfield particles, cosmic warp vectors, and gravitational lens cursor distortion.
 
 ## [Unreleased]
 

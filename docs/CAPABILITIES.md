@@ -184,6 +184,10 @@ concurrent edit.
 | Cost/token budgets | `cost_gate.py` | raises `CostBudgetExceeded`; real enforcement |
 | Blind audit commitments | `zkp.py` | keyed HMAC + Merkle inclusion proofs |
 | Cross-agent coordination | `multi_agent_mesh.py` | distributed saga across agent processes |
+| Model Context Protocol Proxy | `mcp/` | native MCP transaction proxy (`MCPTransactionProxy`), WAL boundaries, gate policies |
+| Framework Auto-Patcher | `patch.py` | zero-code auto-instrumentation (`auto_patch()`) for LangChain, CrewAI, AutoGen, LlamaIndex |
+| Pydantic v2 Integrator | `pydantic.py` | native schema extraction and validation across Pydantic v1 & v2 |
+| Space Canvas & Site Builder | `space_canvas.py`, `site_builder.py` | cosmic space canvas generator and autonomous HTML5/WebGL site compiler |
 | FastAPI Control Plane Service | `saga_service/service.py` | async lifespan, FileSnapshotStore, PreFlightGate rules ($5000+ & anti-spam), SnapshotGC daemon |
 | Next.js Governance Dashboard | `app/admin/sagas/page.tsx` | overview status cards, BYOK encryption monitor, manual GC sweep audit button |
 | Real-Time Transaction Trackers | `src/components/` | `SagaTransactionTracker.tsx`, `SagaVisualLedger.tsx`, `AgentSagaBadge.tsx` |
