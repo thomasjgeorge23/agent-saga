@@ -55,13 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [1.0.0] - 2026-08-03
+## [1.0.1] - 2026-08-03
 
-### Added
-- **Autonomous Agent OS Microkernel (`agent_saga.kernel.AgentSagaKernel`)** — Microkernel architecture managing transactional memory pages, isolated process sandboxes, and lock-free execution rings.
-- **Time-Travel Deterministic Debugger & Replay (`agent_saga.time_travel.TimeTravelDebugger`)** — State-diff time-travel replay engine reconstructing exact memory states at nanosecond resolution.
-- **Zero-Knowledge Compliance Prover (`agent_saga.zero_knowledge.ZeroKnowledgeComplianceProver`)** — ZK-SNARK compliance prover for private balance & geofence verification without exposing payload fields.
-- **Multi-Model AI Governance Jury Panel (`agent_saga.governance_council.GovernanceJury`)** — Multi-LLM BFT consensus jury panel gating IRREVERSIBLE agent operations.
+### Fixed
+- **Authenticated Founder Inquiry Vault (`agent_saga.inquiry_store.verify_owner_passcode`)** — Restricts reading physical user inquiries (`inquiries.json` & `/api/inquiries`) strictly to Founder Thomas J George using Master Key authentication (`thomas-sagaops-owner-2026`). All submitted user messages are HMAC-signed and delivered to physical vault for Thomas J George.
 
 ## [Unreleased]
 

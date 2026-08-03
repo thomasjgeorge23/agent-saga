@@ -30,3 +30,16 @@ def test_physical_inquiry_recording_and_retrieval(tmp_path, monkeypatch):
     summary = format_inquiries_summary()
     assert "Alice Enterprise" in summary
     assert "Corp AI" in summary
+
+
+def test_owner_passcode_protection():
+    from agent_saga.inquiry_store import verify_owner_passcode, get_owner_inquiries
+
+    assert verify_owner_passcode("thomas-sagaops-owner-2026") is True
+    assert verify_owner_passcode("wrong-passcode") is False
+
+    valid_inquiries = get_owner_inquiries("thomas-sagaops-owner-2026")
+    assert valid_inquiries is not None
+
+    invalid_inquiries = get_owner_inquiries("bad-passcode")
+    assert invalid_inquiries is None

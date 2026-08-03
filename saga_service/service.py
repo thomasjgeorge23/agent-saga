@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 from agent_saga.encryption import FernetEncryptor, generate_key
 from agent_saga.gate import DEFAULT_RULES, Decision, GateContext, PreFlightGate, PreFlightViolation, Rule, Verdict
 from agent_saga.semantics import ActionSemantics
-from agent_saga.inquiry_store import load_all_inquiries, record_inquiry
+from agent_saga.inquiry_store import get_owner_inquiries, load_all_inquiries, record_inquiry, verify_owner_passcode
 from agent_saga.recovery import RecoveryDaemon
 from agent_saga.durable import FileSnapshotStore
 
@@ -274,9 +274,12 @@ async def submit_inquiry_api(inq: InquirySubmission):
 
 
 @app.get("/api/inquiries")
-async def list_inquiries_api(x_admin_key: Optional[str] = Header(None)):
-    inquiries = load_all_inquiries()
-    return {"count": len(inquiries), "inquiries": inquiries}
+async def list_inquiries_api(x_owner_key: Optional[str] = Header(None), passcode: Optional[str] = None):
+    key = x_owner_key or passcode or ""
+    inquiries = get_owner_inquiries(key)
+    if inquiries is None:
+        raise HTTPException(status_code=403, detail="🔒 Access Denied: Founder Inquiry Vault is restricted to Founder Thomas J George.")
+    return {"count": len(inquiries), "recipient": "Founder Thomas J George (thomasjgeorge23@gmail.com)", "inquiries": inquiries}
 
 
 def main():
