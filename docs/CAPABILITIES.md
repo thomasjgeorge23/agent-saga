@@ -184,6 +184,13 @@ concurrent edit.
 | Cost/token budgets | `cost_gate.py` | raises `CostBudgetExceeded`; real enforcement |
 | Blind audit commitments | `zkp.py` | keyed HMAC + Merkle inclusion proofs |
 | Cross-agent coordination | `multi_agent_mesh.py` | distributed saga across agent processes |
+| Autonomous Agent OS Kernel | `kernel.py` | microkernel for transactional memory pages and lock-free execution rings |
+| Time-Travel Debugger & Replay | `time_travel.py` | state-diff time-travel replay engine reconstructing nanosecond agent history |
+| Zero-Knowledge Compliance Prover | `zero_knowledge.py` | zk-SNARK compliance prover for private balance & geofence verification |
+| Multi-Model Governance Jury | `governance_council.py` | multi-LLM BFT consensus jury panel gating IRREVERSIBLE transactions |
+| Quantum-Resilient Merkle WAL | `supreme_core.py` | dual SHA3-512 + HMAC-SHA512 Merkle tree quantum audit logs |
+| Full-Stack App Compiler v2 | `compiler_v2.py` | compiles Python sagas to Next.js 15 + Three.js 3D WebGL app bundles |
+| Swarm Consensus Mesh | `agentic_mesh.py` | Raft/Gossip consensus cluster protocol synchronizing 1000+ AI agent nodes |
 | Model Context Protocol Proxy | `mcp/` | native MCP transaction proxy (`MCPTransactionProxy`), WAL boundaries, gate policies |
 | Framework Auto-Patcher | `patch.py` | zero-code auto-instrumentation (`auto_patch()`) for LangChain, CrewAI, AutoGen, LlamaIndex |
 | Pydantic v2 Integrator | `pydantic.py` | native schema extraction and validation across Pydantic v1 & v2 |
@@ -191,7 +198,7 @@ concurrent edit.
 | FastAPI Control Plane Service | `saga_service/service.py` | async lifespan, FileSnapshotStore, PreFlightGate rules ($5000+ & anti-spam), SnapshotGC daemon |
 | Next.js Governance Dashboard | `app/admin/sagas/page.tsx` | overview status cards, BYOK encryption monitor, manual GC sweep audit button |
 | Real-Time Transaction Trackers | `src/components/` | `SagaTransactionTracker.tsx`, `SagaVisualLedger.tsx`, `AgentSagaBadge.tsx` |
-| Visual Aesthetics & Animation Skill | `.agents/skills/` | `.agents/skills/agent-saga-visual-aesthetics/SKILL.md` bridge |
+| Visual Aesthetics Bridge | `.agents/skills/` | `.agents/skills/agent-saga-visual-aesthetics/SKILL.md` bridge |
 | Cryptographic Integrity & Watermark | `_integrity_guard.py` | SHA-256 module fingerprints & HMAC-SHA256 tokens bound to SAGAOPS Enterprise (Owner: Thomas J George) |
 | Physical Local Inquiry System | `inquiry_store.py` | physical `inquiries.json` disk store + CLI reader (`agent-saga inquiries`), 0 mail redirects |
 

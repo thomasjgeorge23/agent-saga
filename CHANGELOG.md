@@ -55,13 +55,13 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [0.7.0] - 2026-08-03
+## [1.0.0] - 2026-08-03
 
 ### Added
-- **Quantum-Resilient Dual Merkle WAL (`agent_saga.supreme_core.QuantumResilientMerkleWAL`)** — Hardware-grade SHA3-512 + HMAC-SHA512 Merkle tree log producing quantum-resistant audit chains (`QWAL:<sha3>:<hmac>`).
-- **Autonomous Healing Compensation Orchestrator (`AutonomousHealingOrchestrator`)** — Self-learning engine that auto-synthesizes non-destructive inverse compensations on the fly when forward step exceptions occur.
-- **Supreme Full-Stack Web & Mobile Compiler (`agent_saga.compiler_v2`)** — Compiles Python `@saga` functions and Pydantic models into standalone Next.js 15 + WebGL 3D + Tailwind application bundles.
-- **Distributed Swarm Consensus Engine (`agent_saga.agentic_mesh.SagaSwarmMesh`)** — Synchronizes Write-Ahead Logs across 1,000+ AI agent cluster nodes using Raft/Gossip consensus with leader election.
+- **Autonomous Agent OS Microkernel (`agent_saga.kernel.AgentSagaKernel`)** — Microkernel architecture managing transactional memory pages, isolated process sandboxes, and lock-free execution rings.
+- **Time-Travel Deterministic Debugger & Replay (`agent_saga.time_travel.TimeTravelDebugger`)** — State-diff time-travel replay engine reconstructing exact memory states at nanosecond resolution.
+- **Zero-Knowledge Compliance Prover (`agent_saga.zero_knowledge.ZeroKnowledgeComplianceProver`)** — ZK-SNARK compliance prover for private balance & geofence verification without exposing payload fields.
+- **Multi-Model AI Governance Jury Panel (`agent_saga.governance_council.GovernanceJury`)** — Multi-LLM BFT consensus jury panel gating IRREVERSIBLE agent operations.
 
 ## [Unreleased]
 
