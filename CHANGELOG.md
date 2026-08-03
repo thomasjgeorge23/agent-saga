@@ -55,20 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [0.6.0] - 2026-08-03
+## [0.6.1] - 2026-08-03
 
-### Added
-- **Native Model Context Protocol (MCP) Transaction Proxy Engine (`agent_saga.mcp`)** — Wraps any MCP server, stdio process, or HTTP tool provider with Write-Ahead Logging (WAL), Pre-Flight Gate policy enforcement, LIFO compensation, and crash recovery boundaries.
-- **Zero-Code AI Framework Auto-Patcher (`auto_patch()`)** — Auto-detects installed LLM/Agent frameworks (LangChain, CrewAI, AutoGen, LlamaIndex, FastAPI, OpenAI, Anthropic, Google Gemini) and automatically instruments them with idempotent saga transaction boundaries.
-- **Pydantic v2 Schema Integrator (`agent_saga.pydantic`)** — Introspects Pydantic BaseModel schemas for PreFlightGate validation, inverse argument mapping, and automatic UI field compilation.
-- **Declarative Auto-UI Compiler (`agent_saga.ui_compiler` & `DeclarativeUICompiler.tsx`)** — Inspects Python `@saga` function ASTs and compiles machine-readable UI schemas, form layouts, and React types automatically.
-- **Dynamic Liquid Mesh Shader Engine (`LiquidMeshEngine.tsx`)** — GPU-accelerated HTML5 canvas radial gradient mesh with Lerp physics velocity vectors (`mouse.x += (targetX - mouse.x) * 0.05`) dynamically shifting particle turbulence based on server load.
-- **WebGL 3D Shader State Sync (`WebGL3DBindings.tsx`)** — Binds backend saga transitions (`RUNNING`, `SUCCESS`, `ROLLED_BACK`, `HALTED`) directly to WebGL 3D geometric clear colors and vertex shader ripples.
-- **Web Audio & Vibration Haptic Synthesizer (`AudioHapticFeedback.ts`)** — Synthesizes 528Hz Solfeggio commit chimes, 110Hz sub-bass rumbles, and triggers dual-frequency haptic vibrations.
-- **Geospatial Trust Radar (`SpatialTrustRadar.tsx`)** — Interactive 360° sweeping radar overlay with distance decay rings and `PreFlightGate` risk zone indicators.
-- **Autonomous Self-Healing UI (`SelfHealingUI.tsx`)** — Renders AI-suggested inline alternative choices with 1-click retry when a saga step fails or rolls back.
-- **BYOK Privacy Matrix Visualizer (`BYOKPrivacyMatrix.tsx`)** — Interactive zero-knowledge audit card displaying AES-128-CBC Fernet ciphertext and HMAC-SHA256 integrity tokens.
-- **Dev-Mode Chaos Resiliency Theater (`ChaosResiliencyTheater.tsx`)** — Interactive fault injection simulator (`SIGKILL`, network dropouts, WAL line corruption) demonstrating live `RecoveryDaemon` sweeps.
+### Fixed
+- **PyPI Stats Author Field**: Configured name-only author specification `authors = [{ name = "SAGAOPS Enterprise (Thomas J George)" }]` so Hatchling populates the `Author:` field in core `PKG-INFO` metadata, resolving `Author: None` on `pypistats.org`.
 
 ## [Unreleased]
 

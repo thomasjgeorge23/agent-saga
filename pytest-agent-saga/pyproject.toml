@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pytest-agent-saga"
-version = "0.6.0"
+version = "0.6.1"
 description = "Pytest plugin for agent-saga: deterministic replay verification, chaos injection, and WAL fixtures."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 keywords = ["pytest", "agent-saga", "saga", "ai-agents", "testing", "chaos-engineering"]
 authors = [
-    { name = "SAGAOPS Enterprise (Thomas J George)", email = "thomasjgeorge23@gmail.com" }
+    { name = "SAGAOPS Enterprise (Thomas J George)" }
 ]
 maintainers = [
     { name = "Thomas J George (SAGAOPS Enterprise)", email = "thomasjgeorge23@gmail.com" }
