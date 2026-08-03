@@ -480,7 +480,7 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="javascript:void(0)" onclick="switchPageView('page-overview')">agent-saga <span class="seq">v1.0.2</span></a>
+    <a class="brand" href="javascript:void(0)" onclick="switchPageView('page-overview')">agent-saga <span class="seq">v1.0.3</span></a>
     <button class="mobile-menu-btn" id="mobileNavBtn" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰ Menu</button>
     <nav class="nav-links">
       <a href="javascript:void(0)" onclick="switchPageView('page-overview')" class="active">⚡ Overview</a>
@@ -525,10 +525,10 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">🌌 SAGAOPS Enterprise Autonomous Agent OS · PyPI v1.0.2 Release</p>
+        <p class="eyebrow">🌌 SAGAOPS Enterprise Autonomous Agent OS · PyPI v1.0.3 Release</p>
         <h1 data-reveal data-split>Give any LLM the <span class="amber">Rollback-Proving Engine & Safety Fleet OS</span>.</h1>
         <p class="lede">
-          <b>agent-saga v1.0.2 (SAGAOPS)</b> features the <b>120fps Hardware-Accelerated Space Engine</b> with zero cursor lag, passive event listeners, and <b>Authenticated Founder Inquiry Vault (`verify_owner_passcode`)</b>.
+          <b>agent-saga v1.0.3 (SAGAOPS)</b> features <b>Celestial Planet Orbits (Chronos, Aegis, Cipher, Apex)</b>, <b>Division-by-Zero NaN Cursor Protection</b>, and <b>Authenticated Founder Inquiry Vault (`verify_owner_passcode`)</b>.
         </p>
         <p class="lede">
           Your agent will fail at step 4 of 5 — and one day it will fail by <em>dying</em>. A <code>try/except</code> keeps its cleanup in memory and dies with it. A checkpoint restores your <em>agent's</em> state; it cannot un-send a wire transfer. <b>agent-saga</b> writes the intent to a hash-chained log <em>before</em> the effect fires, so a <b>separate process</b> can finish the rollback the dead one couldn't.
@@ -3161,9 +3161,9 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
     <p style="font-size: 0.85rem; color: #64748b;">Licensed under Apache-2.0. Copyright 2026 SAGAOPS Enterprise (Owner: Thomas J George).</p>
   </div>
 </footer>
-<canvas id="spaceCanvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0;will-change:transform;transform:translateZ(0);opacity:0.85;"></canvas>
+<canvas id="spaceCanvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0;will-change:transform;transform:translateZ(0);opacity:0.9;"></canvas>
 <script>
-/* agent-saga Ultra-Smooth 120fps Hardware-Accelerated Space Engine */
+/* agent-saga Supreme Celestial Planet Orbit & Space Engine */
 (function() {
   const canvas = document.getElementById('spaceCanvas');
   if (!canvas) return;
@@ -3184,8 +3184,10 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
 
   const mouse = { x: width / 2, y: height / 2, targetX: width / 2, targetY: height / 2 };
   window.addEventListener('mousemove', (e) => {
-    mouse.targetX = e.clientX;
-    mouse.targetY = e.clientY;
+    if (e.clientX !== 0 || e.clientY !== 0) {
+      mouse.targetX = e.clientX;
+      mouse.targetY = e.clientY;
+    }
   }, { passive: true });
 
   const stars = Array.from({ length: 180 }, () => ({
@@ -3195,6 +3197,15 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
     radius: Math.random() * 1.5 + 0.5,
     color: ['#4f46e5', '#7c3aed', '#10b981', '#38bdf8', '#ffffff'][Math.floor(Math.random() * 5)]
   }));
+
+  // Celestial Planets System
+  let angle = 0;
+  const planets = [
+    { name: 'Chronos', color: '#38bdf8', glow: 'rgba(56,189,248,0.4)', radius: 24, orbitR: 180, ring: true },
+    { name: 'Aegis', color: '#10b981', glow: 'rgba(16,185,129,0.4)', radius: 30, orbitR: 300, ring: false },
+    { name: 'Cipher', color: '#a855f7', glow: 'rgba(168,85,247,0.4)', radius: 22, orbitR: 420, ring: true },
+    { name: 'Apex', color: '#f59e0b', glow: 'rgba(245,158,11,0.4)', radius: 36, orbitR: 540, ring: true }
+  ];
 
   function render() {
     if (document.hidden) {
@@ -3211,6 +3222,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
     const cx = width / 2;
     const cy = height / 2;
 
+    // Render Cosmic Stars
     for (let i = 0; i < stars.length; i++) {
       const s = stars[i];
       s.z -= 1.2;
@@ -3229,9 +3241,9 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
         const dy = mouse.y - py;
         const distSq = dx * dx + dy * dy;
 
-        if (distSq < 40000 && distSq > 1) {
-          const dist = Math.sqrt(distSq);
-          const factor = (200 - dist) * 0.1;
+        if (distSq < 40000 && distSq > 4) {
+          const dist = Math.sqrt(distSq) || 1;
+          const factor = (200 - dist) * 0.08;
           pullX = (dx / dist) * factor;
           pullY = (dy / dist) * factor;
         }
@@ -3239,11 +3251,45 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
         ctx.fillStyle = s.color;
         ctx.globalAlpha = opacity;
         ctx.beginPath();
-        ctx.arc(px + pullX, py + pullY, size, 0, 6.28318);
+        ctx.arc(px + pullX, py + pullY, Math.max(0.1, size), 0, 6.28318);
         ctx.fill();
         ctx.globalAlpha = 1.0;
       }
     }
+
+    // Render Orbiting Celestial Planets
+    angle += 0.004;
+    planets.forEach((p, idx) => {
+      const pAngle = angle * (idx % 2 === 0 ? 1 : -1) + (idx * Math.PI / 2);
+      const px = cx + Math.cos(pAngle) * p.orbitR;
+      const py = cy + Math.sin(pAngle) * (p.orbitR * 0.4);
+
+      // Planet Glow Halo
+      const grad = ctx.createRadialGradient(px, py, p.radius * 0.2, px, py, p.radius * 2.5);
+      grad.addColorStop(0, p.glow);
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(px, py, p.radius * 2.5, 0, 6.28318);
+      ctx.fill();
+
+      // Planet Core
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(px, py, p.radius, 0, 6.28318);
+      ctx.fill();
+
+      // Planet Orbital Rings
+      if (p.ring) {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.ellipse(px, py, p.radius * 1.8, p.radius * 0.6, Math.PI / 6, 0, 6.28318);
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+      }
+    });
 
     requestAnimationFrame(render);
   }

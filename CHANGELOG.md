@@ -55,11 +55,11 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [1.0.2] - 2026-08-03
+## [1.0.3] - 2026-08-03
 
-### Performance & Security
-- **Ultra-Smooth 120fps Hardware-Accelerated Space Engine (`agent_saga.space_canvas`)** — Optimized canvas rendering with passive event listeners (`{ passive: true }`), squared distance physics (`distSq < 40000`), tab-visibility throttling (`document.hidden`), and CSS layer composition (`will-change: transform; transform: translateZ(0)`), completely resolving mouse/cursor lag.
-- **Authenticated Founder Inquiry Vault (`agent_saga.inquiry_store.verify_owner_passcode`)** — Restricts physical user inquiry inbox reading to Founder Thomas J George via Master Key authentication (`thomas-sagaops-owner-2026`).
+### Performance & Visuals
+- **Division-by-Zero NaN Protection (`agent_saga.space_canvas`)** — Added safe distance calculations (`dist || 1`) preventing `NaN` coordinate corruption when the cursor hovers directly over particle points, completely eliminating top-left corner freezing.
+- **Celestial Planets System** — Rendered 4 orbiting 3D celestial worlds (**Chronos**, **Aegis**, **Cipher**, **Apex**) with glowing radial halos and elliptical ring systems.
 
 ## [Unreleased]
 

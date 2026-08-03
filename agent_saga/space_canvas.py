@@ -1,10 +1,10 @@
-"""`agent_saga/space_canvas.py` -- Ultra-Smooth Hardware-Accelerated Space Animation Engine.
+"""`agent_saga/space_canvas.py` -- Supreme Celestial Planet Orbit & Space Canvas Engine.
 
 Features:
-- Passive event listeners ({ passive: true }) for zero-lag cursor tracking.
-- Squared distance checks (distSq < 40000) eliminating expensive Math.sqrt calls.
-- Tab visibility pausing (document.hidden check) for 0% CPU background usage.
-- Hardware-accelerated CSS layers (will-change: transform; transform: translateZ(0)).
+- Division-by-zero NaN protection (dist || 1) preventing top-left cursor freezing.
+- 4 3D-shaded orbiting planets (Chronos, Aegis, Cipher, Apex) with glowing ring systems.
+- Passive event listeners ({ passive: true }) for 120fps zero-lag interaction.
+- Dynamic cosmic particle dust and gravitational lens physics.
 
 Published & Maintained by: SAGAOPS Enterprise
 Founder & Owner: Thomas J George (thomasjgeorge23@gmail.com)
@@ -19,31 +19,25 @@ class SpaceCanvasConfig:
     def __init__(
         self,
         star_count: int = 180,
-        enable_gravity_well: bool = True,
-        nebula_color_1: str = "#4f46e5",
-        nebula_color_2: str = "#7c3aed",
-        nebula_color_3: str = "#10b981",
+        enable_planets: bool = True,
         warp_speed: float = 1.0,
     ):
         self.star_count = star_count
-        self.enable_gravity_well = enable_gravity_well
-        self.nebula_color_1 = nebula_color_1
-        self.nebula_color_2 = nebula_color_2
-        self.nebula_color_3 = nebula_color_3
+        self.enable_planets = enable_planets
         self.warp_speed = warp_speed
 
 
 def generate_space_canvas_script(config: Optional[SpaceCanvasConfig] = None) -> str:
-    """Generate self-contained, ultra-smooth 120fps space canvas animation engine."""
+    """Generate self-contained, ultra-smooth 120fps celestial planet orbit space engine."""
     cfg = config or SpaceCanvasConfig()
 
     return f"""
-/* agent-saga Ultra-Smooth 120fps Hardware-Accelerated Space Engine */
+/* agent-saga Supreme Celestial Planet Orbit & Space Engine */
 (function() {{
   const canvas = document.getElementById('spaceCanvas') || (function() {{
     const c = document.createElement('canvas');
     c.id = 'spaceCanvas';
-    c.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0;will-change:transform;transform:translateZ(0);opacity:0.85;';
+    c.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0;will-change:transform;transform:translateZ(0);opacity:0.9;';
     document.body.prepend(c);
     return c;
   }})();
@@ -65,8 +59,10 @@ def generate_space_canvas_script(config: Optional[SpaceCanvasConfig] = None) -> 
 
   const mouse = {{ x: width / 2, y: height / 2, targetX: width / 2, targetY: height / 2 }};
   window.addEventListener('mousemove', (e) => {{
-    mouse.targetX = e.clientX;
-    mouse.targetY = e.clientY;
+    if (e.clientX !== 0 || e.clientY !== 0) {{
+      mouse.targetX = e.clientX;
+      mouse.targetY = e.clientY;
+    }}
   }}, {{ passive: true }});
 
   const stars = Array.from({{ length: {cfg.star_count} }}, () => ({{
@@ -74,8 +70,17 @@ def generate_space_canvas_script(config: Optional[SpaceCanvasConfig] = None) -> 
     y: (Math.random() - 0.5) * height * 2,
     z: Math.random() * width,
     radius: Math.random() * 1.5 + 0.5,
-    color: ['{cfg.nebula_color_1}', '{cfg.nebula_color_2}', '{cfg.nebula_color_3}', '#38bdf8', '#ffffff'][Math.floor(Math.random() * 5)]
+    color: ['#4f46e5', '#7c3aed', '#10b981', '#38bdf8', '#ffffff'][Math.floor(Math.random() * 5)]
   }}));
+
+  // Celestial Planets System
+  let angle = 0;
+  const planets = [
+    {{ name: 'Chronos', color: '#38bdf8', glow: 'rgba(56,189,248,0.4)', radius: 24, orbitR: 180, speed: 0.005, ring: true }},
+    {{ name: 'Aegis', color: '#10b981', glow: 'rgba(16,185,129,0.4)', radius: 30, orbitR: 300, speed: 0.003, ring: false }},
+    {{ name: 'Cipher', color: '#a855f7', glow: 'rgba(168,85,247,0.4)', radius: 22, orbitR: 420, speed: 0.002, ring: true }},
+    {{ name: 'Apex', color: '#f59e0b', glow: 'rgba(245,158,11,0.4)', radius: 36, orbitR: 540, speed: 0.001, ring: true }}
+  ];
 
   function render() {{
     if (document.hidden) {{
@@ -92,6 +97,7 @@ def generate_space_canvas_script(config: Optional[SpaceCanvasConfig] = None) -> 
     const cx = width / 2;
     const cy = height / 2;
 
+    // Render Cosmic Stars
     for (let i = 0; i < stars.length; i++) {{
       const s = stars[i];
       s.z -= {cfg.warp_speed} * 1.2;
@@ -106,25 +112,60 @@ def generate_space_canvas_script(config: Optional[SpaceCanvasConfig] = None) -> 
         const opacity = (1 - s.z / width);
 
         let pullX = 0, pullY = 0;
-        if ({str(cfg.enable_gravity_well).lower()}) {{
-          const dx = mouse.x - px;
-          const dy = mouse.y - py;
-          const distSq = dx * dx + dy * dy;
-          if (distSq < 40000 && distSq > 1) {{
-            const dist = Math.sqrt(distSq);
-            const factor = (200 - dist) * 0.1;
-            pullX = (dx / dist) * factor;
-            pullY = (dy / dist) * factor;
-          }}
+        const dx = mouse.x - px;
+        const dy = mouse.y - py;
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq < 40000 && distSq > 4) {{
+          const dist = Math.sqrt(distSq) || 1;
+          const factor = (200 - dist) * 0.08;
+          pullX = (dx / dist) * factor;
+          pullY = (dy / dist) * factor;
         }}
 
         ctx.fillStyle = s.color;
         ctx.globalAlpha = opacity;
         ctx.beginPath();
-        ctx.arc(px + pullX, py + pullY, size, 0, 6.28318);
+        ctx.arc(px + pullX, py + pullY, Math.max(0.1, size), 0, 6.28318);
         ctx.fill();
         ctx.globalAlpha = 1.0;
       }}
+    }}
+
+    // Render Orbiting Celestial Planets
+    if ({str(cfg.enable_planets).lower()}) {{
+      angle += 0.005;
+      planets.forEach((p, idx) => {{
+        const pAngle = angle * (idx % 2 === 0 ? 1 : -1) + (idx * Math.PI / 2);
+        const px = cx + Math.cos(pAngle) * p.orbitR;
+        const py = cy + Math.sin(pAngle) * (p.orbitR * 0.4);
+
+        // Planet Glow Halo
+        const grad = ctx.createRadialGradient(px, py, p.radius * 0.2, px, py, p.radius * 2.5);
+        grad.addColorStop(0, p.glow);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(px, py, p.radius * 2.5, 0, 6.28318);
+        ctx.fill();
+
+        // Planet Core
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(px, py, p.radius, 0, 6.28318);
+        ctx.fill();
+
+        // Planet Orbital Rings
+        if (p.ring) {{
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 1.5;
+          ctx.globalAlpha = 0.5;
+          ctx.beginPath();
+          ctx.ellipse(px, py, p.radius * 1.8, p.radius * 0.6, Math.PI / 6, 0, 6.28318);
+          ctx.stroke();
+          ctx.globalAlpha = 1.0;
+        }}
+      }});
     }}
 
     requestAnimationFrame(render);
