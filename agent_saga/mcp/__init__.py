@@ -21,9 +21,11 @@ from .policy import (
     skeleton_from_observations,
 )
 from .proxy import Dispatcher, SagaMCPProxy, ToolNotDeclared, set_mcp_dispatcher
+from .transaction_proxy import MCPToolDefinition, MCPTransactionProxy
 
 __all__ = [
     "SagaMCPProxy", "ToolNotDeclared", "set_mcp_dispatcher", "Dispatcher",
     "ProxyPolicy", "ToolPolicy", "CompensationSpec", "PolicyError",
     "load_policy", "load_policy_file", "extract", "skeleton_from_observations",
+    "MCPToolDefinition", "MCPTransactionProxy",
 ]

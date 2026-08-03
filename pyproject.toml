@@ -21,7 +21,9 @@ keywords = [
     "ai-agents", "agent", "llm", "saga", "rollback", "compensation",
     "write-ahead-log", "wal", "crash-recovery", "transactions", "idempotency",
     "observability", "opentelemetry", "guardrails", "agent-safety",
-    "langgraph", "crewai", "autogen", "llamaindex", "mcp",
+    "langchain", "crewai", "autogen", "llamaindex", "openai", "anthropic", "gemini",
+    "mcp", "mcp-server", "model-context-protocol", "fastapi", "pydantic",
+    "durable-execution", "temporal-alternative", "function-calling", "state-machine", "workflow-engine",
 ]
 classifiers = [
     # No `License ::` classifier: PEP 639 deprecates it in favour of the SPDX
