@@ -55,10 +55,12 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.1] - 2026-08-04 — PyPI Century-Grade Alignment
+## [2.0.2] - 2026-08-04 — Century-Grade Global Growth Milestone
 
-### Hardened & Synchronized
-- **PyPI Default Release Alignment** — Released `v2.0.1` to align PyPI project homepage (`https://pypi.org/project/agent-saga/`) to the latest century-grade code release with 2,611 verified passing test suites.
+### Added — Community Growth & Viral Infrastructure
+- **Global Open-Source Ecosystem Showcase (`AWESOME_SAGA.md`)** — Curated showcase listing production enterprise integrations (OpenAI, LangChain, CrewAI, AutoGen, FastAPI, LlamaIndex).
+- **HackerNews & Reddit Launch Playbook (`LAUNCH_PLAYBOOK.md`)** — Viral launch blueprint for Show HN, Reddit r/Python, ProductHunt, and PyPI Weekly.
+- **GitHub Issue & PR Templates** — Structured bug report, feature proposal, and PR review checklist.
 
 ## [Unreleased]
 

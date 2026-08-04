@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v2.0.1 &mdash; Kill the process mid-transaction. The charge still gets refunded.</title>
+<title>agent-saga v2.0.2 &mdash; Kill the process mid-transaction. The charge still gets refunded.</title>
 <meta name="description" content="Grounded answers where a hallucination cannot pose as a sourced fact, one-call AgentKit SDK, machine-checkable rollback-safety certificates, selective-disclosure audit proofs, hash-chained tamper-evident WAL, passkey/hardware approvals, and offline mesh sagas — the accountable agent runtime for AI that acts on the real world." />
 <style>
   :root {
@@ -480,7 +480,7 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="javascript:void(0)" onclick="switchPageView('page-overview')">agent-saga <span class="seq">v2.0.1</span></a>
+    <a class="brand" href="javascript:void(0)" onclick="switchPageView('page-overview')">agent-saga <span class="seq">v2.0.2</span></a>
     <button class="mobile-menu-btn" id="mobileNavBtn" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰ Menu</button>
     <nav class="nav-links">
       <a href="javascript:void(0)" onclick="switchPageView('page-overview')" class="active">⚡ Overview</a>
@@ -525,10 +525,10 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">🌌 SAGAOPS Enterprise Autonomous Agent OS · PyPI v2.0.1 Century-Grade Release</p>
+        <p class="eyebrow">🌌 SAGAOPS Enterprise Autonomous Agent OS · PyPI v2.0.2 Century-Grade Release</p>
         <h1 data-reveal data-split>Give any LLM the <span class="amber">Rollback-Proving Engine & Safety Fleet OS</span>.</h1>
         <p class="lede">
-          <b>agent-saga v2.0.1 (SAGAOPS)</b> provides century-grade, bulletproof computer science foundations unifying <b>Omnipresent Autonomous Reality Engine</b>, <b>Zero-Entropy Self-Healing Cortex</b>, and <b>Zero-Knowledge Action Certificates</b>.
+          <b>agent-saga v2.0.2 (SAGAOPS)</b> provides century-grade, bulletproof computer science foundations unifying <b>Omnipresent Autonomous Reality Engine</b>, <b>Zero-Entropy Self-Healing Cortex</b>, and <b>Zero-Knowledge Action Certificates</b>.
         </p>
         <p class="lede">
           Your agent will fail at step 4 of 5 — and one day it will fail by <em>dying</em>. A <code>try/except</code> keeps its cleanup in memory and dies with it. A checkpoint restores your <em>agent's</em> state; it cannot un-send a wire transfer. <b>agent-saga</b> writes the intent to a hash-chained log <em>before</em> the effect fires, so a <b>separate process</b> can finish the rollback the dead one couldn't.
@@ -1413,7 +1413,7 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
         <!-- MODE BANNER -->
         <div class="mode-banner">
           <div class="mode-banner-text" id="bannerText">
-            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v2.0.1 Active Protection)</span>
+            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v2.0.2 Active Protection)</span>
           </div>
           <div style="color: var(--dim); font-size: .8rem;">Toggle OFF to test Raw AI Failure Mode</div>
         </div>
@@ -1442,7 +1442,7 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
           <!-- Real-Time Output Console -->
           <div class="output-console">
             <div class="console-header">
-              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v2.0.1)</span>
+              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v2.0.2)</span>
               <span id="consoleStatus">READY</span>
             </div>
             <div id="consoleBody" style="display: flex; flex-direction: column; gap: .65rem;">
@@ -1924,7 +1924,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 <footer>
   <div class="wrap foot-grid">
     <div>
-      <div class="brand">agent-saga <span class="seq">v2.0.1</span></div>
+      <div class="brand">agent-saga <span class="seq">v2.0.2</span></div>
       <p style="font-size: .88rem; color: var(--faint); margin-top: .4rem;">
         Licensed under Apache-2.0. Built for mission-critical enterprise AI agent reliability.
       </p>
@@ -1932,7 +1932,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
     <div style="margin-left: auto; display: flex; gap: 1.8rem; font-size: .95rem;">
       <a href="#install">Documentation</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">GitHub</a>
-      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v2.0.1</a>
+      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v2.0.2</a>
     </div>
   </div>
 </footer>
@@ -2427,7 +2427,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 AgentKit().guarantees()
 # {
 #   "manifest_version": 1,
-#   "library_version": "2.0.1",
+#   "library_version": "2.0.2",
 #   "semantics": {"REVERSIBLE": ..., "COMPENSABLE": ..., "IRREVERSIBLE": ...},
 #   "enforced_before_an_effect": [
 #     "an IRREVERSIBLE step is refused unless a human (or hardware sig) approves",
@@ -2477,7 +2477,7 @@ async with kit.transaction():
     rows = await read()`
     },
     grounding: {
-      title: "🧾 Grounded Answers (v2.0.1)",
+      title: "🧾 Grounded Answers (v2.0.2)",
       desc: "No middleware makes a model hallucinate less. What agent-saga does, mechanically, is make every claim in an answer wear its evidence or wear a label — so policy can act on it: block UNCITED numbers in financial reports, require VERIFIED-only in clinical summaries, page a human on anything BROKEN.",
       code: `from agent_saga import ContextBroker, ground
 
@@ -2678,7 +2678,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
 
     if (protectionActive) {
       label.textContent = "PROTECTION: ON (+ agent-saga)";
-      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v2.0.1 Active Protection)</span>';
+      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v2.0.2 Active Protection)</span>';
     } else {
       label.textContent = "PROTECTION: OFF (Raw AI Agent)";
       banner.innerHTML = '<span style="color: var(--irreversible);">● MODE: BEFORE (Raw AI Agent - Unprotected Failure Mode)</span>';
@@ -2789,7 +2789,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var drug = document.getElementById('inputDrug').value;
       var dosage = parseFloat(document.getElementById('inputDosage').value) || 0;
 
-      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v2.0.1 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v2.0.2 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>patient.read_records</b> &nbsp;Selected ${drug}`, 'read-only');
@@ -2822,7 +2822,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var iban = document.getElementById('inputIban').value;
       var amount = parseFloat(document.getElementById('inputAmount').value) || 0;
 
-      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v2.0.1 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v2.0.2 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (!protectionActive) {
@@ -2848,7 +2848,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var prTitle = document.getElementById('inputPR').value;
       var testRes = document.getElementById('inputTestResult').value;
 
-      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v2.0.1 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v2.0.2 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>github.create_pr</b> &nbsp;PR #101 (${prTitle}) created`, 'inverse: close_pr');
@@ -2879,7 +2879,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var channel = document.getElementById('inputChannel').value;
       var msgText = document.getElementById('inputMsg').value;
 
-      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v2.0.1 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v2.0.2 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>slack.post_message</b> &nbsp;"${msgText}"`, 'inverse: delete_message');
@@ -2901,7 +2901,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var robot = document.getElementById('inputRobot').value;
       var angle = parseFloat(document.getElementById('inputAngle').value) || 0;
 
-      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v2.0.1 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v2.0.2 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (angle > 180.0) {
