@@ -55,12 +55,11 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [1.1.0] - 2026-08-04
+## [1.2.0] - 2026-08-04
 
-### Added — NumPy-Level Ubiquity Milestone
-- **NumPy-Style Drop-In API (`saga.guard` & `saga.array`)** — One-line `@saga.guard` decorator and zero-copy C-aligned transactional memory buffer (`saga.array()`) for agent state with nanosecond LIFO rollback snapshots.
-- **Universal Framework Compatibility (`agent_saga.compat`)** — Universal 1-line wrappers for OpenAI, LangChain, CrewAI, AutoGen, and FastAPI.
-- **Community Governance & GitHub Infrastructure** — Published `CONTRIBUTING.md`, `GOVERNANCE.md`, `SECURITY.md`, `.github/workflows/ci.yml`, and GitHub issue/PR templates.
+### Added — Futuristic CS Standard Milestone
+- **AI Agent CS Educational Curriculum Engine (`agent_saga.curriculum.AgentCurriculum`)** — Interactive educational module (`saga.learn()`) designed for school students, academic researchers, and developers to master non-deterministic AI agent transactions.
+- **Futuristic Self-Synthesizing Agent Engine (`agent_saga.future.AutonomousFutureAgent`)** — Self-synthesizing, self-governing autonomous agent core (`saga.create_future_agent()`) with guaranteed quantum-resilient Merkle WAL protection.
 
 ## [Unreleased]
 

@@ -27,6 +27,10 @@ arr.rollback()   # Reverts instantly on step failure!
 
 # 3. Universal 1-line auto-patcher for OpenAI, LangChain, CrewAI, AutoGen, FastAPI:
 saga.patch_all()
+
+# 4. Futuristic CS Educational Engine & Self-Synthesizing Agent:
+lessons = saga.learn()  # Interactive CS curriculum for students & researchers
+agent = saga.create_future_agent("CosmicAgent")
 ```
 
 **The accountable agent runtime.** Six layers, one rule — every layer can

@@ -683,13 +683,19 @@ __all__ += ["INVARIANTS", "Interleaving", "InvariantViolation",
 # agent_saga` would be wrong regardless of that. Use `agent-saga demo`, or
 # `from agent_saga.demo import run_demo`.
 from .array import SagaArray, array
+from .curriculum import AgentCurriculum, learn
+from .future import AutonomousFutureAgent, create_future_agent
 from . import compat
 
 guard = saga
 
 __all__ += [
+    "AgentCurriculum",
+    "AutonomousFutureAgent",
     "SagaArray",
     "array",
     "compat",
+    "create_future_agent",
     "guard",
+    "learn",
 ]
