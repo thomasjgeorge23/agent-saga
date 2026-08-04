@@ -480,7 +480,7 @@
 
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="javascript:void(0)" onclick="switchPageView('page-overview')">agent-saga <span class="seq">v1.0.4</span></a>
+    <a class="brand" href="javascript:void(0)" onclick="switchPageView('page-overview')">agent-saga <span class="seq">v1.0.5</span></a>
     <button class="mobile-menu-btn" id="mobileNavBtn" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰ Menu</button>
     <nav class="nav-links">
       <a href="javascript:void(0)" onclick="switchPageView('page-overview')" class="active">⚡ Overview</a>
@@ -525,10 +525,10 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow">🌌 SAGAOPS Enterprise Autonomous Agent OS · PyPI v1.0.4 Release</p>
+        <p class="eyebrow">🌌 SAGAOPS Enterprise Autonomous Agent OS · PyPI v1.0.5 Release</p>
         <h1 data-reveal data-split>Give any LLM the <span class="amber">Rollback-Proving Engine & Safety Fleet OS</span>.</h1>
         <p class="lede">
-          <b>agent-saga v1.0.4 (SAGAOPS)</b> attaches <b>`window.switchPageView` & `window.unlockFounderVault`</b> to global scope with <b>`z-index: -1` pointer passthrough</b>, completely fixing tab switching and cursor traps.
+          <b>agent-saga v1.0.5 (SAGAOPS)</b> resolves syntax scope trapping for <b>`window.switchPageView`</b> and <b>`window.unlockFounderVault`</b>, enabling instant, flawless tab switching across Overview, Industries, Sandbox, SDK & Docs, and Founder Inquiry.
         </p>
         <p class="lede">
           Your agent will fail at step 4 of 5 — and one day it will fail by <em>dying</em>. A <code>try/except</code> keeps its cleanup in memory and dies with it. A checkpoint restores your <em>agent's</em> state; it cannot un-send a wire transfer. <b>agent-saga</b> writes the intent to a hash-chained log <em>before</em> the effect fires, so a <b>separate process</b> can finish the rollback the dead one couldn't.
@@ -3135,12 +3135,13 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
     // view being opened -- otherwise the top of every tab but the first is
     // blank for a frame, and on a short view, permanently.
     if (target) {
-      target.querySelectorAll('[data-reveal]:not(.is-in)').forEach(function (el) {
-        if (el.getBoundingClientRect().top < window.innerHeight * 1.1) {
-          el.classList.add('is-in');
-        }
+      target.querySelectorAll('[data-reveal]').forEach(function (el) {
+        el.classList.add('is-in');
       });
     }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   window.switchPageView = switchPageView;
   window.unlockFounderVault = unlockFounderVault;

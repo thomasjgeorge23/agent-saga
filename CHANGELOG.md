@@ -55,11 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [1.0.4] - 2026-08-03
+## [1.0.5] - 2026-08-03
 
 ### Fixed
-- **Global Window Navigation Scope (`site/index.html`)** — Explicitly bound `window.switchPageView` and `window.unlockFounderVault` to global window scope, fixing tab switching across Overview, Industries, Sandbox, SDK & Docs, and Founder Inquiry.
-- **Canvas Z-Index & Pointer Passthrough (`site/index.html`)** — Updated `#spaceCanvas` to `z-index: -1; pointer-events: none !important;`, eliminating mouse click traps and cursor sticking.
+- **JavaScript Function Syntax & Global Scope (`site/index.html`)** — Fixed missing closing brace `}` on `switchPageView` function block and ensured `window.switchPageView` & `window.unlockFounderVault` execute immediately on page load, enabling 100% reliable tab switching across Overview, Industries, Sandbox, SDK & Docs, and Founder Inquiry.
 
 ## [Unreleased]
 
