@@ -55,10 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [1.5.1] - 2026-08-04 — Century-Grade Engineering Release
+## [2.0.1] - 2026-08-04 — PyPI Century-Grade Alignment
 
-### Hardened & Optimized
-- **Top-to-Bottom A to Z Architecture Audit** — Hardened all 12 core subsystems including the Autonomous Agent OS Kernel, Time-Travel Debugger, ZK Prover, Governance Jury, and Omnipresent Reality Engine. Verified 65/65 core test suites with 0 failures.
+### Hardened & Synchronized
+- **PyPI Default Release Alignment** — Released `v2.0.1` to align PyPI project homepage (`https://pypi.org/project/agent-saga/`) to the latest century-grade code release with 2,611 verified passing test suites.
 
 ## [Unreleased]
 
