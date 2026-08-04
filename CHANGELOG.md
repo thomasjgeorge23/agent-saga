@@ -55,7 +55,7 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.0] - 2026-08-04 — Major v2.0 Omnipresent Milestone
+## [1.5.0] - 2026-08-04 — Omnipresent Milestone
 
 ### Added — The Omnipresent Reality Engine (`agent_saga.omni`)
 - **Omnipresent Reality Shield (`saga.omni.shield()`)** — Universal process shield providing zero-entropy self-healing, quantum determinism simulation, and anti-entropy action proofs.
