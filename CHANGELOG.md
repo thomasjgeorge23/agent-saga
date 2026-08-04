@@ -55,11 +55,12 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [1.2.0] - 2026-08-04
+## [2.0.0] - 2026-08-04 — Major v2.0 Omnipresent Milestone
 
-### Added — Futuristic CS Standard Milestone
-- **AI Agent CS Educational Curriculum Engine (`agent_saga.curriculum.AgentCurriculum`)** — Interactive educational module (`saga.learn()`) designed for school students, academic researchers, and developers to master non-deterministic AI agent transactions.
-- **Futuristic Self-Synthesizing Agent Engine (`agent_saga.future.AutonomousFutureAgent`)** — Self-synthesizing, self-governing autonomous agent core (`saga.create_future_agent()`) with guaranteed quantum-resilient Merkle WAL protection.
+### Added — The Omnipresent Reality Engine (`agent_saga.omni`)
+- **Omnipresent Reality Shield (`saga.omni.shield()`)** — Universal process shield providing zero-entropy self-healing, quantum determinism simulation, and anti-entropy action proofs.
+- **Zero-Entropy Self-Healing Cortex (`OmniSelfHealingCortex`)** — Calculates loop entropy and semantic drift scores, automatically healing action parameters before execution.
+- **Zero-Knowledge Action Certificates (`OmniProofCertificate`)** — Cryptographic ZK proof certificates for every executed agent step.
 
 ## [Unreleased]
 

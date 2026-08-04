@@ -685,17 +685,25 @@ __all__ += ["INVARIANTS", "Interleaving", "InvariantViolation",
 from .array import SagaArray, array
 from .curriculum import AgentCurriculum, learn
 from .future import AutonomousFutureAgent, create_future_agent
+from .omni import OmniProofCertificate, OmniRealityEngine, OmniSelfHealingCortex, get_omni_engine, shield
 from . import compat
+from . import omni
 
 guard = saga
 
 __all__ += [
     "AgentCurriculum",
     "AutonomousFutureAgent",
+    "OmniProofCertificate",
+    "OmniRealityEngine",
+    "OmniSelfHealingCortex",
     "SagaArray",
     "array",
     "compat",
     "create_future_agent",
+    "get_omni_engine",
     "guard",
     "learn",
+    "omni",
+    "shield",
 ]
