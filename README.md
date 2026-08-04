@@ -781,7 +781,7 @@ The rollback fork is the point: `compensated` (clean), `COMPENSATION FAILED —
 needs a human`, and `ORPHANED — no undo exists` render as three visually
 distinct outcomes. A partial rollback can never draw like a clean one.
 
-## The 30-second version — Universal Agent Engine & `AgentKit` (v0.4.0)
+## The 30-second version — Universal Agent Engine & `AgentKit` (v2.0.1)
 
 The whole engine behind one object. Wrap a tool once, run work in a transaction,
 and — the part that's new — let the agent *read what it's guaranteed*.
