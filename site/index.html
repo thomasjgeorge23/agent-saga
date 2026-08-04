@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>agent-saga v0.5.4 &mdash; Kill the process mid-transaction. The charge still gets refunded.</title>
+<title>agent-saga v1.5.1 &mdash; Kill the process mid-transaction. The charge still gets refunded.</title>
 <meta name="description" content="Grounded answers where a hallucination cannot pose as a sourced fact, one-call AgentKit SDK, machine-checkable rollback-safety certificates, selective-disclosure audit proofs, hash-chained tamper-evident WAL, passkey/hardware approvals, and offline mesh sagas — the accountable agent runtime for AI that acts on the real world." />
 <style>
   :root {
@@ -859,7 +859,7 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
            that reproduces it. See docs/BENCHMARKS.md for the methodology. -->
       <div class="stat-row" style="margin-top:3.5rem">
         <div class="stat" data-reveal>
-          <b data-count="2579">0</b>
+          <b data-count="2611">0</b>
           <span>tests passing · <code>pytest -q</code></span>
         </div>
         <div class="stat" data-reveal>
@@ -1077,8 +1077,8 @@ print(report.format_text())
       </div>
       <figure class="saga-anim" style="margin:2.5rem 0 0" data-reveal="scale">
         <!-- BEGIN:viz-fleet -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 528" width="880" height="528" role="img" aria-label="9 saga(s) over 45 ms. 3 aborted and rolled back">
-<title>agent-saga fleet timeline</title><desc>9 saga(s) over 45 ms. 3 aborted and rolled back.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 528" width="880" height="528" role="img" aria-label="9 saga(s) over 49 ms. 3 aborted and rolled back">
+<title>agent-saga fleet timeline</title><desc>9 saga(s) over 49 ms. 3 aborted and rolled back.</desc>
 <style>
 text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;dominant-baseline:middle}
 .t{fill:#e5e7eb}.m{fill:#8b9bb4}
@@ -1097,67 +1097,67 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
 <rect width="880" height="528" rx="18" fill="#0b0f19"/>
 <rect x="1" y="1" width="878" height="526" rx="18" fill="none" stroke="#1f2937"/>
 <g class="a0">
-<text class="t" x="40" y="48" font-size="19" font-weight="700">9 saga(s) over 45 ms</text>
+<text class="t" x="40" y="48" font-size="19" font-weight="700">9 saga(s) over 49 ms</text>
 <text x="40" y="71" font-size="12" fill="#ef4444">3 aborted and rolled back</text>
 <text class="m" x="840" y="48" font-size="12" text-anchor="end">agent-saga</text>
 </g>
 <rect x="214" y="92" width="1" height="384" fill="#1a2231"/>
 <text class="m" x="214" y="86" font-size="10" text-anchor="middle">0 ms</text>
 <rect x="371.5" y="92" width="1" height="384" fill="#1a2231"/>
-<text class="m" x="371.5" y="86" font-size="10" text-anchor="middle">11.18 ms</text>
+<text class="m" x="371.5" y="86" font-size="10" text-anchor="middle">12.21 ms</text>
 <rect x="529" y="92" width="1" height="384" fill="#1a2231"/>
-<text class="m" x="529" y="86" font-size="10" text-anchor="middle">22.35 ms</text>
+<text class="m" x="529" y="86" font-size="10" text-anchor="middle">24.42 ms</text>
 <rect x="686.5" y="92" width="1" height="384" fill="#1a2231"/>
-<text class="m" x="686.5" y="86" font-size="10" text-anchor="middle">33.53 ms</text>
+<text class="m" x="686.5" y="86" font-size="10" text-anchor="middle">36.63 ms</text>
 <rect x="844" y="92" width="1" height="384" fill="#1a2231"/>
-<text class="m" x="844" y="86" font-size="10" text-anchor="middle">44.71 ms</text>
+<text class="m" x="844" y="86" font-size="10" text-anchor="middle">48.85 ms</text>
 <text class="m" x="40" y="125" font-size="11">order-00</text>
 <rect x="214" y="114" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a1">
-<rect x="214" y="114" width="493.11" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="114" width="503.54" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="166" font-size="11">order-01</text>
 <rect x="214" y="155" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a2">
-<rect x="214" y="155" width="493.11" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="155" width="503.54" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="207" font-size="11">order-02</text>
 <rect x="214" y="196" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a3">
-<rect x="221.09" y="196" width="577.75" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
-<rect x="221.09" y="196" width="577.75" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+<rect x="214" y="196" width="594.52" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="196" width="594.52" height="3" fill="#0b0f19" fill-opacity="0.55"/>
 </g>
 <text class="m" x="40" y="248" font-size="11">order-03</text>
 <rect x="214" y="237" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a4">
-<rect x="221.09" y="237" width="486.02" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="237" width="503.54" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="289" font-size="11">order-04</text>
 <rect x="214" y="278" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a5">
-<rect x="221.09" y="278" width="486.02" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="278" width="503.54" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="330" font-size="11">order-05</text>
 <rect x="214" y="319" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a6">
-<rect x="221.09" y="319" width="577.75" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
-<rect x="221.09" y="319" width="577.75" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+<rect x="214" y="319" width="594.52" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="319" width="594.52" height="3" fill="#0b0f19" fill-opacity="0.55"/>
 </g>
 <text class="m" x="40" y="371" font-size="11">order-06</text>
 <rect x="214" y="360" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a7">
-<rect x="221.09" y="360" width="486.02" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="360" width="503.54" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="412" font-size="11">order-07</text>
 <rect x="214" y="401" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a8">
-<rect x="221.09" y="401" width="486.02" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="226.99" y="401" width="538.37" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="453" font-size="11">order-08</text>
 <rect x="214" y="442" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a9">
-<rect x="221.09" y="442" width="622.91" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
-<rect x="221.09" y="442" width="622.91" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+<rect x="226.99" y="442" width="617.01" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="226.99" y="442" width="617.01" height="3" fill="#0b0f19" fill-opacity="0.55"/>
 </g>
 <rect x="40" y="493" width="10" height="10" rx="2" fill="#10b981"/>
 <text class="m" x="56" y="498" font-size="10">complete</text>
@@ -1413,7 +1413,7 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
         <!-- MODE BANNER -->
         <div class="mode-banner">
           <div class="mode-banner-text" id="bannerText">
-            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.5.4 Active Protection)</span>
+            <span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v1.5.1 Active Protection)</span>
           </div>
           <div style="color: var(--dim); font-size: .8rem;">Toggle OFF to test Raw AI Failure Mode</div>
         </div>
@@ -1442,7 +1442,7 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
           <!-- Real-Time Output Console -->
           <div class="output-console">
             <div class="console-header">
-              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v0.5.4)</span>
+              <span>REAL-TIME TRANSACTION EXECUTION LOG (WAL v1.5.1)</span>
               <span id="consoleStatus">READY</span>
             </div>
             <div id="consoleBody" style="display: flex; flex-direction: column; gap: .65rem;">
@@ -1518,124 +1518,124 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
 <g class="a1">
 <rect x="40" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#38bdf8" stroke-width="1"/>
 <text class="m" x="50" y="126" font-size="9">#1</text>
-<text x="50" y="146" font-size="11" fill="#38bdf8">ab9bee70</text>
+<text x="50" y="146" font-size="11" fill="#38bdf8">3ac837be</text>
 <text class="m" x="50" y="162" font-size="8">SAGA_START</text>
 </g>
 <g class="a1"><rect x="136" y="148" width="8" height="2" fill="#1f2937"/></g>
 <g class="a2">
 <rect x="144" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="154" y="126" font-size="9">#2</text>
-<text x="154" y="146" font-size="11" fill="#10b981">6907aa0b</text>
+<text x="154" y="146" font-size="11" fill="#10b981">e740ee7d</text>
 <text class="m" x="154" y="162" font-size="8">SAGA_START</text>
 </g>
 <g class="a2"><rect x="240" y="148" width="8" height="2" fill="#1f2937"/></g>
 <g class="a3">
 <rect x="248" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="258" y="126" font-size="9">#3</text>
-<text x="258" y="146" font-size="11" fill="#10b981">0aa6b955</text>
+<text x="258" y="146" font-size="11" fill="#10b981">480e51ef</text>
 <text class="m" x="258" y="162" font-size="8">SAGA_START</text>
 </g>
 <g class="a3"><rect x="344" y="148" width="8" height="2" fill="#1f2937"/></g>
 <g class="a4">
 <rect x="352" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="362" y="126" font-size="9">#8</text>
-<text x="362" y="146" font-size="11" fill="#10b981">21a24bb1</text>
+<text x="362" y="146" font-size="11" fill="#10b981">2c318587</text>
 <text class="m" x="362" y="162" font-size="8">SAGA_START</text>
 </g>
 <g class="a4"><rect x="448" y="148" width="8" height="2" fill="#1f2937"/></g>
 <g class="a5">
 <rect x="456" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="466" y="126" font-size="9">#15</text>
-<text x="466" y="146" font-size="11" fill="#10b981">27764dbe</text>
+<text x="466" y="146" font-size="11" fill="#10b981">5ae83cbb</text>
 <text class="m" x="466" y="162" font-size="8">STEP_INTENT</text>
 </g>
 <g class="a5"><rect x="552" y="148" width="8" height="2" fill="#1f2937"/></g>
 <g class="a6">
 <rect x="560" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="570" y="126" font-size="9">#22</text>
-<text x="570" y="146" font-size="11" fill="#10b981">9a8dc108</text>
+<text x="570" y="146" font-size="11" fill="#10b981">f8f328c7</text>
 <text class="m" x="570" y="162" font-size="8">STEP_COMMITT…</text>
 </g>
 <g class="a6"><rect x="656" y="148" width="8" height="2" fill="#1f2937"/></g>
 <g class="a7">
 <rect x="664" y="110" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="674" y="126" font-size="9">#29</text>
-<text x="674" y="146" font-size="11" fill="#10b981">aacdd426</text>
+<text x="674" y="146" font-size="11" fill="#10b981">45a8d04b</text>
 <text class="m" x="674" y="162" font-size="8">STEP_INTENT</text>
 </g>
 <g class="a8">
 <rect x="40" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="50" y="226" font-size="9">#36</text>
-<text x="50" y="246" font-size="11" fill="#10b981">0cea313a</text>
+<text x="50" y="246" font-size="11" fill="#10b981">a96831a4</text>
 <text class="m" x="50" y="262" font-size="8">STEP_INTENT</text>
 </g>
 <g class="a8"><rect x="136" y="248" width="8" height="2" fill="#1f2937"/></g>
 <g class="a9">
 <rect x="144" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="154" y="226" font-size="9">#43</text>
-<text x="154" y="246" font-size="11" fill="#10b981">628ce85c</text>
+<text x="154" y="246" font-size="11" fill="#10b981">28cce6e6</text>
 <text class="m" x="154" y="262" font-size="8">STEP_COMMITT…</text>
 </g>
 <g class="a9"><rect x="240" y="248" width="8" height="2" fill="#1f2937"/></g>
 <g class="a10">
 <rect x="248" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="258" y="226" font-size="9">#50</text>
-<text x="258" y="246" font-size="11" fill="#10b981">90d05bb9</text>
+<text x="258" y="246" font-size="11" fill="#10b981">8faee263</text>
 <text class="m" x="258" y="262" font-size="8">STEP_INTENT</text>
 </g>
 <g class="a10"><rect x="344" y="248" width="8" height="2" fill="#1f2937"/></g>
 <g class="a11">
 <rect x="352" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="362" y="226" font-size="9">#57</text>
-<text x="362" y="246" font-size="11" fill="#10b981">bfe4179f</text>
+<text x="362" y="246" font-size="11" fill="#10b981">5afb3d53</text>
 <text class="m" x="362" y="262" font-size="8">STEP_UNKNOWN</text>
 </g>
 <g class="a11"><rect x="448" y="248" width="8" height="2" fill="#1f2937"/></g>
 <g class="a12">
 <rect x="456" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="466" y="226" font-size="9">#64</text>
-<text x="466" y="246" font-size="11" fill="#10b981">14801fa3</text>
+<text x="466" y="246" font-size="11" fill="#10b981">d517ea66</text>
 <text class="m" x="466" y="262" font-size="8">SAGA_ABORT_C…</text>
 </g>
 <g class="a12"><rect x="552" y="248" width="8" height="2" fill="#1f2937"/></g>
 <g class="a13">
 <rect x="560" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="570" y="226" font-size="9">#71</text>
-<text x="570" y="246" font-size="11" fill="#10b981">395a24bc</text>
+<text x="570" y="246" font-size="11" fill="#10b981">19e62896</text>
 <text class="m" x="570" y="262" font-size="8">SAGA_COMPLETE</text>
 </g>
 <g class="a13"><rect x="656" y="248" width="8" height="2" fill="#1f2937"/></g>
 <g class="a14">
 <rect x="664" y="210" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="674" y="226" font-size="9">#78</text>
-<text x="674" y="246" font-size="11" fill="#10b981">cc93e3a0</text>
-<text class="m" x="674" y="262" font-size="8">COMPENSATED</text>
+<text x="674" y="246" font-size="11" fill="#10b981">5ec580cd</text>
+<text class="m" x="674" y="262" font-size="8">ROLLBACK_END</text>
 </g>
 <g class="a15">
 <rect x="40" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="50" y="326" font-size="9">#85</text>
-<text x="50" y="346" font-size="11" fill="#10b981">f2b2497c</text>
+<text x="50" y="346" font-size="11" fill="#10b981">21fe8a48</text>
 <text class="m" x="50" y="362" font-size="8">COMPENSATED</text>
 </g>
 <g class="a15"><rect x="136" y="348" width="8" height="2" fill="#1f2937"/></g>
 <g class="a16">
 <rect x="144" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="154" y="326" font-size="9">#88</text>
-<text x="154" y="346" font-size="11" fill="#10b981">822a5211</text>
+<text x="154" y="346" font-size="11" fill="#10b981">2cd0b4f3</text>
 <text class="m" x="154" y="362" font-size="8">SAGA_ABORTED</text>
 </g>
 <g class="a16"><rect x="240" y="348" width="8" height="2" fill="#1f2937"/></g>
 <g class="a17">
 <rect x="248" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="258" y="326" font-size="9">#89</text>
-<text x="258" y="346" font-size="11" fill="#10b981">4e2a5228</text>
+<text x="258" y="346" font-size="11" fill="#10b981">5f4442bc</text>
 <text class="m" x="258" y="362" font-size="8">SAGA_ABORTED</text>
 </g>
 <g class="a17"><rect x="344" y="348" width="8" height="2" fill="#1f2937"/></g>
 <g class="a18">
 <rect x="352" y="310" width="96" height="78" rx="10" fill="#161d2e" stroke="#10b981" stroke-width="1"/>
 <text class="m" x="362" y="326" font-size="9">#90</text>
-<text x="362" y="346" font-size="11" fill="#10b981">66e77edc</text>
+<text x="362" y="346" font-size="11" fill="#10b981">94806b02</text>
 <text class="m" x="362" y="362" font-size="8">SAGA_ABORTED</text>
 </g>
 <text class="m" x="40" y="418" font-size="10">72 record(s) elided; every break is shown</text>
@@ -1924,7 +1924,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 <footer>
   <div class="wrap foot-grid">
     <div>
-      <div class="brand">agent-saga <span class="seq">v0.5.4</span></div>
+      <div class="brand">agent-saga <span class="seq">v1.5.1</span></div>
       <p style="font-size: .88rem; color: var(--faint); margin-top: .4rem;">
         Licensed under Apache-2.0. Built for mission-critical enterprise AI agent reliability.
       </p>
@@ -1932,7 +1932,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
     <div style="margin-left: auto; display: flex; gap: 1.8rem; font-size: .95rem;">
       <a href="#install">Documentation</a>
       <a href="https://github.com/thomasjgeorge23/agent-saga" target="_blank">GitHub</a>
-      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v0.5.4</a>
+      <a href="https://pypi.org/project/agent-saga/" target="_blank">PyPI v1.5.1</a>
     </div>
   </div>
 </footer>
@@ -2427,7 +2427,7 @@ pr = await gh.create_pull_request(repo="org/app", title="Auto Patch", head="fix-
 AgentKit().guarantees()
 # {
 #   "manifest_version": 1,
-#   "library_version": "0.5.4",
+#   "library_version": "1.5.1",
 #   "semantics": {"REVERSIBLE": ..., "COMPENSABLE": ..., "IRREVERSIBLE": ...},
 #   "enforced_before_an_effect": [
 #     "an IRREVERSIBLE step is refused unless a human (or hardware sig) approves",
@@ -2477,7 +2477,7 @@ async with kit.transaction():
     rows = await read()`
     },
     grounding: {
-      title: "🧾 Grounded Answers (v0.5.4)",
+      title: "🧾 Grounded Answers (v1.5.1)",
       desc: "No middleware makes a model hallucinate less. What agent-saga does, mechanically, is make every claim in an answer wear its evidence or wear a label — so policy can act on it: block UNCITED numbers in financial reports, require VERIFIED-only in clinical summaries, page a human on anything BROKEN.",
       code: `from agent_saga import ContextBroker, ground
 
@@ -2678,7 +2678,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
 
     if (protectionActive) {
       label.textContent = "PROTECTION: ON (+ agent-saga)";
-      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v0.5.4 Active Protection)</span>';
+      banner.innerHTML = '<span style="color: var(--reversible);">● MODE: AFTER (+ agent-saga v1.5.1 Active Protection)</span>';
     } else {
       label.textContent = "PROTECTION: OFF (Raw AI Agent)";
       banner.innerHTML = '<span style="color: var(--irreversible);">● MODE: BEFORE (Raw AI Agent - Unprotected Failure Mode)</span>';
@@ -2789,7 +2789,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var drug = document.getElementById('inputDrug').value;
       var dosage = parseFloat(document.getElementById('inputDosage').value) || 0;
 
-      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Prescriber Agent for <b>${patient}</b>...`, protectionActive ? '+ agent-saga v1.5.1 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>patient.read_records</b> &nbsp;Selected ${drug}`, 'read-only');
@@ -2822,7 +2822,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var iban = document.getElementById('inputIban').value;
       var amount = parseFloat(document.getElementById('inputAmount').value) || 0;
 
-      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing FinTech Wire Transfer of <b>$${amount.toLocaleString()}</b>...`, protectionActive ? '+ agent-saga v1.5.1 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (!protectionActive) {
@@ -2848,7 +2848,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var prTitle = document.getElementById('inputPR').value;
       var testRes = document.getElementById('inputTestResult').value;
 
-      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing GitHub & Cloud Agent on <b>${repo}</b>...`, protectionActive ? '+ agent-saga v1.5.1 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>github.create_pr</b> &nbsp;PR #101 (${prTitle}) created`, 'inverse: close_pr');
@@ -2879,7 +2879,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var channel = document.getElementById('inputChannel').value;
       var msgText = document.getElementById('inputMsg').value;
 
-      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Slack Bot Agent in <b>${channel}</b>...`, protectionActive ? '+ agent-saga v1.5.1 ON' : 'Raw AI OFF');
       await wait(350);
 
       logRow('ok', '✓', `<b>slack.post_message</b> &nbsp;"${msgText}"`, 'inverse: delete_message');
@@ -2901,7 +2901,7 @@ link_llm_trace(saga_id="saga_402", trace_id="tr_9988", prompt_context="Refactor 
       var robot = document.getElementById('inputRobot').value;
       var angle = parseFloat(document.getElementById('inputAngle').value) || 0;
 
-      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v0.5.4 ON' : 'Raw AI OFF');
+      logRow('note', '⚡', `Initializing Robot Arm <b>${robot}</b> Actuator Command...`, protectionActive ? '+ agent-saga v1.5.1 ON' : 'Raw AI OFF');
       await wait(350);
 
       if (angle > 180.0) {
