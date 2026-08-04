@@ -10,6 +10,9 @@
 > **Published & Maintained by SAGAOPS Enterprise · Founded & Owned by [Thomas J George](https://github.com/thomasjgeorge23)**  
 > ✉️ **Direct Owner Contact**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com)  
 
+| 🌟 [Awesome Showcase](AWESOME_SAGA.md) | 🚀 [Launch Playbook](LAUNCH_PLAYBOOK.md) | 🤝 [Contributing](CONTRIBUTING.md) | 👑 [Governance](GOVERNANCE.md) | 🛡️ [Security](SECURITY.md) |
+|---|---|---|---|---|
+
 ## 🚀 One-Line Drop-in Integration (`import agent_saga as saga`)
 
 ```python
