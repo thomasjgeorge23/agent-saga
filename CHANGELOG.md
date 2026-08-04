@@ -55,10 +55,12 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [1.0.5] - 2026-08-03
+## [1.1.0] - 2026-08-04
 
-### Fixed
-- **JavaScript Function Syntax & Global Scope (`site/index.html`)** — Fixed missing closing brace `}` on `switchPageView` function block and ensured `window.switchPageView` & `window.unlockFounderVault` execute immediately on page load, enabling 100% reliable tab switching across Overview, Industries, Sandbox, SDK & Docs, and Founder Inquiry.
+### Added — NumPy-Level Ubiquity Milestone
+- **NumPy-Style Drop-In API (`saga.guard` & `saga.array`)** — One-line `@saga.guard` decorator and zero-copy C-aligned transactional memory buffer (`saga.array()`) for agent state with nanosecond LIFO rollback snapshots.
+- **Universal Framework Compatibility (`agent_saga.compat`)** — Universal 1-line wrappers for OpenAI, LangChain, CrewAI, AutoGen, and FastAPI.
+- **Community Governance & GitHub Infrastructure** — Published `CONTRIBUTING.md`, `GOVERNANCE.md`, `SECURITY.md`, `.github/workflows/ci.yml`, and GitHub issue/PR templates.
 
 ## [Unreleased]
 

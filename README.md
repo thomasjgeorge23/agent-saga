@@ -1,8 +1,33 @@
-# agent-saga
+# agent-saga 🌌
+
+[![PyPI Version](https://img.shields.io/pypi/v/agent-saga.svg?color=blue)](https://pypi.org/project/agent-saga/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/agent-saga.svg?color=green)](https://pypi.org/project/agent-saga/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![CI/CD Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/thomasjgeorge23/agent-saga/actions)
+[![Python Versions](https://img.shields.io/pypi/pyversions/agent-saga.svg)](https://pypi.org/project/agent-saga/)
+[![GitHub Stars](https://img.shields.io/github/stars/thomasjgeorge23/agent-saga.svg?style=social)](https://github.com/thomasjgeorge23/agent-saga)
 
 > **Published & Maintained by SAGAOPS Enterprise · Founded & Owned by [Thomas J George](https://github.com/thomasjgeorge23)**  
 > ✉️ **Direct Owner Contact**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com)  
-> *For enterprise inquiries, reviews, user feedback, or feature recommendations, reach out directly to the owner.*
+
+## 🚀 One-Line Drop-in Integration (`import agent_saga as saga`)
+
+```python
+import agent_saga as saga
+
+# 1. Protect ANY AI agent or API function in 1 line:
+@saga.guard
+async def checkout_cart(user_id: str, amount: float):
+    ...
+
+# 2. NumPy-like zero-copy C-aligned transactional array:
+arr = saga.array([100.0, 250.0, 500.0])
+arr[0] = 999.0   # Instant nanosecond snapshot
+arr.rollback()   # Reverts instantly on step failure!
+
+# 3. Universal 1-line auto-patcher for OpenAI, LangChain, CrewAI, AutoGen, FastAPI:
+saga.patch_all()
+```
 
 **The accountable agent runtime.** Six layers, one rule — every layer can
 prove what it did:

@@ -682,6 +682,14 @@ __all__ += ["INVARIANTS", "Interleaving", "InvariantViolation",
 # with the wrong exit code. Eagerly importing a demo on every `import
 # agent_saga` would be wrong regardless of that. Use `agent-saga demo`, or
 # `from agent_saga.demo import run_demo`.
-from .adopt import AdoptionPlan, ToolCandidate, analyse
+from .array import SagaArray, array
+from . import compat
 
-__all__ += ["AdoptionPlan", "ToolCandidate", "analyse"]
+guard = saga
+
+__all__ += [
+    "SagaArray",
+    "array",
+    "compat",
+    "guard",
+]
