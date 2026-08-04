@@ -55,12 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.2] - 2026-08-04 — Century-Grade Global Growth Milestone
+## [2.0.3] - 2026-08-04 — PyPI Navigation Link Alignment
 
-### Added — Community Growth & Viral Infrastructure
-- **Global Open-Source Ecosystem Showcase (`AWESOME_SAGA.md`)** — Curated showcase listing production enterprise integrations (OpenAI, LangChain, CrewAI, AutoGen, FastAPI, LlamaIndex).
-- **HackerNews & Reddit Launch Playbook (`LAUNCH_PLAYBOOK.md`)** — Viral launch blueprint for Show HN, Reddit r/Python, ProductHunt, and PyPI Weekly.
-- **GitHub Issue & PR Templates** — Structured bug report, feature proposal, and PR review checklist.
+### Fixed
+- **PyPI 404 Markdown Links (`README.md`)** — Updated relative markdown links to absolute GitHub URLs (`https://github.com/thomasjgeorge23/agent-saga/blob/main/...`), ensuring links to `AWESOME_SAGA.md`, `LAUNCH_PLAYBOOK.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`, and `SECURITY.md` work seamlessly on both PyPI and GitHub.
 
 ## [Unreleased]
 

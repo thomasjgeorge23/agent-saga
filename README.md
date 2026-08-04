@@ -10,7 +10,7 @@
 > **Published & Maintained by SAGAOPS Enterprise · Founded & Owned by [Thomas J George](https://github.com/thomasjgeorge23)**  
 > ✉️ **Direct Owner Contact**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com)  
 
-| 🌟 [Awesome Showcase](AWESOME_SAGA.md) | 🚀 [Launch Playbook](LAUNCH_PLAYBOOK.md) | 🤝 [Contributing](CONTRIBUTING.md) | 👑 [Governance](GOVERNANCE.md) | 🛡️ [Security](SECURITY.md) |
+| 🌟 [Awesome Showcase](https://github.com/thomasjgeorge23/agent-saga/blob/main/AWESOME_SAGA.md) | 🚀 [Launch Playbook](https://github.com/thomasjgeorge23/agent-saga/blob/main/LAUNCH_PLAYBOOK.md) | 🤝 [Contributing](https://github.com/thomasjgeorge23/agent-saga/blob/main/CONTRIBUTING.md) | 👑 [Governance](https://github.com/thomasjgeorge23/agent-saga/blob/main/GOVERNANCE.md) | 🛡️ [Security](https://github.com/thomasjgeorge23/agent-saga/blob/main/SECURITY.md) |
 |---|---|---|---|---|
 
 ## 🚀 One-Line Drop-in Integration (`import agent_saga as saga`)
@@ -31,7 +31,7 @@ arr.rollback()   # Reverts instantly on step failure!
 # 3. Universal 1-line auto-patcher for OpenAI, LangChain, CrewAI, AutoGen, FastAPI:
 saga.patch_all()
 
-# 4. Omnipresent Reality Shield & Universal Anti-Entropy Engine (v2.0.2):
+# 4. Omnipresent Reality Shield & Universal Anti-Entropy Engine (v2.0.3):
 saga.omni.shield()  # Activates zero-entropy self-healing cortex across active process
 
 # 5. Futuristic CS Educational Engine & Self-Synthesizing Agent:
