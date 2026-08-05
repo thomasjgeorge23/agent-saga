@@ -10,7 +10,7 @@ name = "agent-saga"
 dynamic = ["version"]
 description = "Kill the process mid-transaction and the charge still gets refunded. Run `agent-saga demo`. Transactional tool execution with crash-safe rollback, receipted context, truthful multi-model routing, and one audit log that reconstructs every decision."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = "Apache-2.0"
 # NOTICE is required downstream by Apache-2.0 section 4(d); TRADEMARKS.md states
 # the section 6 carve-out. Both travel with the wheel, not just the repo.
@@ -24,12 +24,14 @@ keywords = [
     "langchain", "crewai", "autogen", "llamaindex", "openai", "anthropic", "gemini",
     "mcp", "mcp-server", "model-context-protocol", "fastapi", "pydantic",
     "durable-execution", "temporal-alternative", "function-calling", "state-machine", "workflow-engine",
+    "numpy", "pandas", "requests", "boto3", "pytest", "ai-framework", "production-ready",
 ]
 classifiers = [
     # No `License ::` classifier: PEP 639 deprecates it in favour of the SPDX
     # expression above, and PyPI rejects a distribution that carries both.
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

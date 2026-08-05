@@ -55,10 +55,12 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.3] - 2026-08-04 — PyPI Navigation Link Alignment
+## [2.0.4] - 2026-08-05 — Python 3.9+ Universal PyPI Ubiquity Release
 
-### Fixed
-- **PyPI 404 Markdown Links (`README.md`)** — Updated relative markdown links to absolute GitHub URLs (`https://github.com/thomasjgeorge23/agent-saga/blob/main/...`), ensuring links to `AWESOME_SAGA.md`, `LAUNCH_PLAYBOOK.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`, and `SECURITY.md` work seamlessly on both PyPI and GitHub.
+### Changed & Hardened
+- **Expanded Python Version Floor (`>=3.9`)** — Lowered Python requirement from `3.10` to `>=3.9`, unlocking immediate compatibility for millions of enterprise Python 3.9 Docker containers and cloud environments worldwide.
+- **PyPI Production/Stable Classifier** — Promoted PyPI package classifier to `Development Status :: 5 - Production/Stable`.
+- **Search Query Keyword Matrix** — Expanded PyPI metadata keywords (`numpy`, `pandas`, `requests`, `boto3`, `pytest`, `ai-framework`, `production-ready`).
 
 ## [Unreleased]
 
