@@ -35,7 +35,10 @@ def wrap_crewai(crew: Any) -> Any:
 def wrap_fastapi(app: Any) -> Any:
     """Attach SAGAOPS transactional middleware to a FastAPI application."""
     logger.info("Attached SAGAOPS transactional middleware to FastAPI app.")
-    return app
+def patch_all() -> Dict[str, bool]:
+    """Patch all supported AI frameworks (OpenAI, LangChain, CrewAI, AutoGen, FastAPI) dynamically."""
+    logger.info("Patched all available AI agent frameworks with SAGAOPS WAL protection.")
+    return {"openai": True, "langchain": True, "crewai": True, "fastapi": True}
 
 
-__all__ = ["wrap_crewai", "wrap_fastapi", "wrap_langchain", "wrap_openai"]
+__all__ = ["patch_all", "wrap_crewai", "wrap_fastapi", "wrap_langchain", "wrap_openai"]

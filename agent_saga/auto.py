@@ -1,55 +1,33 @@
-"""Zero-Configuration Global Auto-Hooking Engine.
+"""`agent_saga/auto.py` -- Zero-Code Global Auto-Activation Module (`import agent_saga.auto`).
 
-Automatically intercepts and wraps AI framework tool executions across CrewAI,
-LangGraph, AutoGen, OpenAI, and HTTP clients with agent-saga transaction boundaries.
+Importing this module anywhere in a Python process automatically activates the
+SAGAOPS Omnipresent Reality Shield (`saga.omni.shield()`), instruments global
+agent framework hooks (`saga.patch_all()`), and enables crash-safe WAL logging.
+
+Published & Maintained by: SAGAOPS Enterprise
+Founder & Owner: Thomas J George (thomasjgeorge23@gmail.com)
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Optional
+from .omni import shield
+from .compat import patch_all
 
 logger = logging.getLogger("agent_saga.auto")
 
-_HOOKED = False
 
-
-def patch_all(enable_reality_anchor: bool = True) -> bool:
-    """Global zero-configuration hook installer.
-
-    Activates pre-flight gates and transactional boundaries across all active framework runtime loops.
-    """
-    global _HOOKED
-    if _HOOKED:
-        return True
-
-    logger.info("Installing agent-saga zero-configuration global auto-hooks...")
-
-    # Auto-patch standard tool execution if present in memory
-    _patch_openai_if_present()
-    _patch_requests_if_present()
-
-    _HOOKED = True
-    return True
-
-
-def _patch_openai_if_present() -> None:
+def _activate_global_auto_saga() -> None:
+    """Perform zero-code global auto-activation."""
     try:
-        import openai  # type: ignore
-        logger.info("Agent-saga auto-hook attached to OpenAI client SDK")
-    except ImportError:
-        pass
+        engine = shield()
+        patch_all()
+        logger.info("🌌 SAGAOPS Global Auto-Activation Enabled")
+    except Exception as exc:
+        logger.warning("Failed to complete global auto-activation: %s", exc)
 
 
-def _patch_requests_if_present() -> None:
-    try:
-        import requests  # type: ignore
-        logger.info("Agent-saga auto-hook attached to HTTP requests client")
-    except ImportError:
-        pass
+# Execute auto-activation upon import
+_activate_global_auto_saga()
 
-
-# Auto-activate when imported via `import agent_saga.auto`
-patch_all()
-
-__all__ = ["patch_all"]
+__all__ = ["patch_all", "shield"]

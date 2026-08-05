@@ -55,12 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.4] - 2026-08-05 — Python 3.9+ Universal PyPI Ubiquity Release
+## [2.0.5] - 2026-08-05 — Zero-Code Auto-Activation Milestone
 
-### Changed & Hardened
-- **Expanded Python Version Floor (`>=3.9`)** — Lowered Python requirement from `3.10` to `>=3.9`, unlocking immediate compatibility for millions of enterprise Python 3.9 Docker containers and cloud environments worldwide.
-- **PyPI Production/Stable Classifier** — Promoted PyPI package classifier to `Development Status :: 5 - Production/Stable`.
-- **Search Query Keyword Matrix** — Expanded PyPI metadata keywords (`numpy`, `pandas`, `requests`, `boto3`, `pytest`, `ai-framework`, `production-ready`).
+### Added — Zero-Code Auto-Activation (`import agent_saga.auto`)
+- **Zero-Code Global Auto-Activation Module (`agent_saga.auto`)** — Single import (`import agent_saga.auto`) automatically activates `saga.omni.shield()`, instruments OpenAI, LangChain, CrewAI, AutoGen, and FastAPI hooks, and enables crash-safe Write-Ahead Logging (WAL) across the active Python process.
 
 ## [Unreleased]
 

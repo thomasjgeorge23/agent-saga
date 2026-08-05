@@ -18,6 +18,9 @@
 ```python
 import agent_saga as saga
 
+# 0. Zero-Code Global Auto-Activation (Auto-Instruments OpenAI, LangChain, CrewAI, FastAPI):
+import agent_saga.auto
+
 # 1. Protect ANY AI agent or API function in 1 line:
 @saga.guard
 async def checkout_cart(user_id: str, amount: float):

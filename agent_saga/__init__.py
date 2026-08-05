@@ -686,6 +686,7 @@ from .array import SagaArray, array
 from .curriculum import AgentCurriculum, learn
 from .future import AutonomousFutureAgent, create_future_agent
 from .omni import OmniProofCertificate, OmniRealityEngine, OmniSelfHealingCortex, get_omni_engine, shield
+from . import auto
 from . import compat
 from . import omni
 
@@ -699,6 +700,7 @@ __all__ += [
     "OmniSelfHealingCortex",
     "SagaArray",
     "array",
+    "auto",
     "compat",
     "create_future_agent",
     "get_omni_engine",
