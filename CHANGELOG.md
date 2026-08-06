@@ -55,10 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.5] - 2026-08-05 — Zero-Code Auto-Activation Milestone
+## [2.0.6] - 2026-08-06 — PyPI Ubiquity Boost Milestone
 
-### Added — Zero-Code Auto-Activation (`import agent_saga.auto`)
-- **Zero-Code Global Auto-Activation Module (`agent_saga.auto`)** — Single import (`import agent_saga.auto`) automatically activates `saga.omni.shield()`, instruments OpenAI, LangChain, CrewAI, AutoGen, and FastAPI hooks, and enables crash-safe Write-Ahead Logging (WAL) across the active Python process.
+### Added — CLI Boost Command (`agent-saga boost`)
+- **Ubiquity Boost CLI (`agent-saga boost`)** — Command line tool to inspect and activate global WAL auto-hooks, Omnipresent Reality Shield, and zero-copy memory arrays across production environments.
 
 ## [Unreleased]
 
