@@ -10,8 +10,8 @@
 > **Published & Maintained by SAGAOPS Enterprise · Founded & Owned by [Thomas J George](https://github.com/thomasjgeorge23)**  
 > ✉️ **Direct Owner Contact**: [thomasjgeorge23@gmail.com](mailto:thomasjgeorge23@gmail.com)  
 
-| 🌟 [Awesome Showcase](https://github.com/thomasjgeorge23/agent-saga/blob/main/AWESOME_SAGA.md) | 🚀 [Launch Playbook](https://github.com/thomasjgeorge23/agent-saga/blob/main/LAUNCH_PLAYBOOK.md) | 🤝 [Contributing](https://github.com/thomasjgeorge23/agent-saga/blob/main/CONTRIBUTING.md) | 👑 [Governance](https://github.com/thomasjgeorge23/agent-saga/blob/main/GOVERNANCE.md) | 🛡️ [Security](https://github.com/thomasjgeorge23/agent-saga/blob/main/SECURITY.md) |
-|---|---|---|---|---|
+| 🌟 [Awesome Showcase](https://github.com/thomasjgeorge23/agent-saga/blob/main/AWESOME_SAGA.md) | 📈 [Growth Strategy](https://github.com/thomasjgeorge23/agent-saga/blob/main/GROWTH_STRATEGY.md) | 🚀 [Launch Playbook](https://github.com/thomasjgeorge23/agent-saga/blob/main/LAUNCH_PLAYBOOK.md) | 🤝 [Contributing](https://github.com/thomasjgeorge23/agent-saga/blob/main/CONTRIBUTING.md) | 👑 [Governance](https://github.com/thomasjgeorge23/agent-saga/blob/main/GOVERNANCE.md) | 🛡️ [Security](https://github.com/thomasjgeorge23/agent-saga/blob/main/SECURITY.md) |
+|---|---|---|---|---|---|
 
 ## 🚀 One-Line Drop-in Integration (`import agent_saga as saga`)
 

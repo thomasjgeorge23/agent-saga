@@ -55,10 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.6] - 2026-08-06 — PyPI Ubiquity Boost Milestone
+## [2.0.7] - 2026-08-06 — Global Growth Blueprint Milestone
 
-### Added — CLI Boost Command (`agent-saga boost`)
-- **Ubiquity Boost CLI (`agent-saga boost`)** — Command line tool to inspect and activate global WAL auto-hooks, Omnipresent Reality Shield, and zero-copy memory arrays across production environments.
+### Added — Growth Blueprint & Download Flywheel (`GROWTH_STRATEGY.md`)
+- **PyPI 10k+ to 1M+ Daily Download Strategy (`GROWTH_STRATEGY.md`)** — Documented 5-pillar growth blueprint detailing transitive framework adoption, automated CI/CD integration (`pytest-agent-saga`), zero-code auto-hooks (`import agent_saga.auto`), Python 3.9+ Docker ubiquity, and viral community launch channels.
 
 ## [Unreleased]
 

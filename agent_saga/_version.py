@@ -12,6 +12,6 @@ cheap to import from the CLI without pulling in the whole dependency graph.
 
 from __future__ import annotations
 
-__version__ = "2.0.6"
+__version__ = "2.0.7"
 
 __all__ = ["__version__"]
