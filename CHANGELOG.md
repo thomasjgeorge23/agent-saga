@@ -55,19 +55,11 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.3.0] - 2026-08-07 — Universal AutoProxy, HITL Manager & 2PC Consensus Release
+## [2.3.1] - 2026-08-07 — Sequential Incremental Patch Versioning Rule Release
 
-### Added — Universal Auto-Inference Proxy (`agent_saga.auto_proxy`)
-- **Universal Global AutoProxy (`UniversalAutoProxy`, `auto_proxy`)** — Eliminates manual decorator boilerplate by automatically inferring action semantics (REVERSIBLE, COMPENSABLE, IRREVERSIBLE) from function names, docstrings, and signatures across OpenAI, LangChain, LlamaIndex, CrewAI, and AutoGen.
-
-### Added — Autonomous HITL Recovery Portal (`agent_saga.hitl`)
-- **Human-In-The-Loop Manager (`HITLManager`, `@human_in_the_loop`)** — Classifies external gateway rollback failures into `NEEDS_HUMAN` or `ORPHANED` states, queueing them into an interactive portal for manual reconciliation when downstream APIs fail permanently.
-
-### Added — SagaMesh 2PC Consensus (`agent_saga.mesh.SagaMesh2PC`)
-- **Two-Phase Commit Consensus Orchestrator (`SagaMesh2PC`)** — Distributed 2PC consensus protocol enabling cryptographically secure multi-node saga execution.
-
-### Promoted — Local Testing Ecosystem (`pytest-agent-saga`)
-- Prominently highlighted the PyPI companion plugin `pytest-agent-saga` providing WAL fixtures, chaos injection, and deterministic replay testing.
+### Changed & Refined
+- **Strict Sequential Patch Versioning (`v2.3.1`)** — Adopted strict incremental patch release policy (`v2.3.1`, `v2.3.2`, `v2.3.3`, ..., `v2.3.10`) ensuring predictable, seamless release cadence.
+- **Internal Optimization** — Performance tuning for AutoProxy semantic inference and HITL recovery queue indexing.
 
 ## [Unreleased]
 
