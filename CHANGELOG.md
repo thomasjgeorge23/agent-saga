@@ -55,10 +55,11 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.1.0] - 2026-08-07 — Universal Autonomous Safety Fleet OS Release
+## [2.1.1] - 2026-08-07 — Futuristic Architecture & Paradigm Shift Release
 
-### Changed & Refined
-- **Universal AI Agent Protection Positioning** — Updated package descriptions, project metadata, and documentation to explicitly define `agent-saga` as the **Universal Autonomous Safety Fleet OS & Pre-flight Gate Runtime** protecting ANY existing AI Agent (OpenAI, LangChain, CrewAI, AutoGen, LlamaIndex, FastAPI) with crash-safe WAL rollbacks, pre-flight gates, receipted context, and tamper-proof audit trails.
+### Added — Architectural Vision (`FUTURE_PARADIGM.md`)
+- **Futuristic Architectural Manifest (`FUTURE_PARADIGM.md`)** — Documented the foundational paradigm shift positioning `agent-saga` as the transactional primitive for autonomous AI agents (the NumPy of AI Systems / Temporal of Workflows).
+- **Cleaned Attribution Metadata** — Reinforced sole founder attribution to Thomas J George (SAGAOPS Enterprise) across all project manifests.
 
 ## [Unreleased]
 
