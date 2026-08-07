@@ -55,10 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.7] - 2026-08-06 — Global Growth Blueprint Milestone
+## [2.0.8] - 2026-08-07 — Zero-Tension Ultra Engine Release
 
-### Added — Growth Blueprint & Download Flywheel (`GROWTH_STRATEGY.md`)
-- **PyPI 10k+ to 1M+ Daily Download Strategy (`GROWTH_STRATEGY.md`)** — Documented 5-pillar growth blueprint detailing transitive framework adoption, automated CI/CD integration (`pytest-agent-saga`), zero-code auto-hooks (`import agent_saga.auto`), Python 3.9+ Docker ubiquity, and viral community launch channels.
+### Added — Ultra Engine (`import agent_saga.ultra`)
+- **Zero-Tension Ultra Engine (`agent_saga.ultra`)** — 1-line auto-shielding engine providing nanosecond zero-copy memory protections (`SagaArray`), stdlib auto-instrumentation, and zero-stress WAL durability across OpenAI, LangChain, CrewAI, AutoGen, FastAPI, and requests.
 
 ## [Unreleased]
 

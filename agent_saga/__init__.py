@@ -686,9 +686,11 @@ from .array import SagaArray, array
 from .curriculum import AgentCurriculum, learn
 from .future import AutonomousFutureAgent, create_future_agent
 from .omni import OmniProofCertificate, OmniRealityEngine, OmniSelfHealingCortex, get_omni_engine, shield
+from .ultra import UltraEngine, auto_shield
 from . import auto
 from . import compat
 from . import omni
+from . import ultra
 
 guard = saga
 
@@ -699,8 +701,10 @@ __all__ += [
     "OmniRealityEngine",
     "OmniSelfHealingCortex",
     "SagaArray",
+    "UltraEngine",
     "array",
     "auto",
+    "auto_shield",
     "compat",
     "create_future_agent",
     "get_omni_engine",
@@ -708,4 +712,5 @@ __all__ += [
     "learn",
     "omni",
     "shield",
+    "ultra",
 ]

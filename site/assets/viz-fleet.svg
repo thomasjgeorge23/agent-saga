@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 528" width="880" height="528" role="img" aria-label="9 saga(s) over 46 ms. 3 aborted and rolled back">
-<title>agent-saga fleet timeline</title><desc>9 saga(s) over 46 ms. 3 aborted and rolled back.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 528" width="880" height="528" role="img" aria-label="9 saga(s) over 27 ms. 3 aborted and rolled back">
+<title>agent-saga fleet timeline</title><desc>9 saga(s) over 27 ms. 3 aborted and rolled back.</desc>
 <style>
 text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;dominant-baseline:middle}
 .t{fill:#e5e7eb}.m{fill:#8b9bb4}
@@ -18,61 +18,61 @@ text{font-family:ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Libe
 <rect width="880" height="528" rx="18" fill="#0b0f19"/>
 <rect x="1" y="1" width="878" height="526" rx="18" fill="none" stroke="#1f2937"/>
 <g class="a0">
-<text class="t" x="40" y="48" font-size="19" font-weight="700">9 saga(s) over 46 ms</text>
+<text class="t" x="40" y="48" font-size="19" font-weight="700">9 saga(s) over 27 ms</text>
 <text x="40" y="71" font-size="12" fill="#ef4444">3 aborted and rolled back</text>
 <text class="m" x="840" y="48" font-size="12" text-anchor="end">agent-saga</text>
 </g>
 <rect x="214" y="92" width="1" height="384" fill="#1a2231"/>
 <text class="m" x="214" y="86" font-size="10" text-anchor="middle">0 ms</text>
 <rect x="371.5" y="92" width="1" height="384" fill="#1a2231"/>
-<text class="m" x="371.5" y="86" font-size="10" text-anchor="middle">11.43 ms</text>
+<text class="m" x="371.5" y="86" font-size="10" text-anchor="middle">6.65 ms</text>
 <rect x="529" y="92" width="1" height="384" fill="#1a2231"/>
-<text class="m" x="529" y="86" font-size="10" text-anchor="middle">22.85 ms</text>
+<text class="m" x="529" y="86" font-size="10" text-anchor="middle">13.3 ms</text>
 <rect x="686.5" y="92" width="1" height="384" fill="#1a2231"/>
-<text class="m" x="686.5" y="86" font-size="10" text-anchor="middle">34.28 ms</text>
+<text class="m" x="686.5" y="86" font-size="10" text-anchor="middle">19.95 ms</text>
 <rect x="844" y="92" width="1" height="384" fill="#1a2231"/>
-<text class="m" x="844" y="86" font-size="10" text-anchor="middle">45.71 ms</text>
+<text class="m" x="844" y="86" font-size="10" text-anchor="middle">26.6 ms</text>
 <text class="m" x="40" y="125" font-size="11">order-00</text>
 <rect x="214" y="114" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a1">
-<rect x="214" y="114" width="519.83" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="114" width="512.1" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="166" font-size="11">order-01</text>
 <rect x="214" y="155" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a2">
-<rect x="214" y="155" width="519.83" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="155" width="512.1" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="207" font-size="11">order-02</text>
 <rect x="214" y="196" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a3">
-<rect x="214" y="196" width="602.34" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
-<rect x="214" y="196" width="602.34" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+<rect x="214" y="196" width="583.36" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="196" width="583.36" height="3" fill="#0b0f19" fill-opacity="0.55"/>
 </g>
 <text class="m" x="40" y="248" font-size="11">order-03</text>
 <rect x="214" y="237" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a4">
-<rect x="214" y="237" width="519.83" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="237" width="512.1" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="289" font-size="11">order-04</text>
 <rect x="214" y="278" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a5">
-<rect x="214" y="278" width="519.83" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="278" width="512.1" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="330" font-size="11">order-05</text>
 <rect x="214" y="319" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a6">
-<rect x="214" y="319" width="602.34" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
-<rect x="214" y="319" width="602.34" height="3" fill="#0b0f19" fill-opacity="0.55"/>
+<rect x="214" y="319" width="583.36" height="22" rx="6" fill="#ef4444" fill-opacity="0.85"/>
+<rect x="214" y="319" width="583.36" height="3" fill="#0b0f19" fill-opacity="0.55"/>
 </g>
 <text class="m" x="40" y="371" font-size="11">order-06</text>
 <rect x="214" y="360" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a7">
-<rect x="214" y="360" width="519.83" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="360" width="512.1" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="412" font-size="11">order-07</text>
 <rect x="214" y="401" width="630" height="22" rx="6" fill="#161d2e"/>
 <g class="a8">
-<rect x="214" y="401" width="519.83" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
+<rect x="214" y="401" width="512.1" height="22" rx="6" fill="#10b981" fill-opacity="0.85"/>
 </g>
 <text class="m" x="40" y="453" font-size="11">order-08</text>
 <rect x="214" y="442" width="630" height="22" rx="6" fill="#161d2e"/>
