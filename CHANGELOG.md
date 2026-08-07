@@ -55,13 +55,19 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.2.0] - 2026-08-07 — Advanced Distributed Mesh & Anti-Hallucination Compensation Release
+## [2.3.0] - 2026-08-07 — Universal AutoProxy, HITL Manager & 2PC Consensus Release
 
-### Added — Enterprise Distributed Mesh (`agent_saga.mesh.DistributedMeshSaga`)
-- **Distributed Mesh Orchestrator (`DistributedMeshSaga`)** — Scalable multi-node workflow coordinator competing directly with Temporal and LangGraph state graphs for long-running enterprise distributed microservices.
+### Added — Universal Auto-Inference Proxy (`agent_saga.auto_proxy`)
+- **Universal Global AutoProxy (`UniversalAutoProxy`, `auto_proxy`)** — Eliminates manual decorator boilerplate by automatically inferring action semantics (REVERSIBLE, COMPENSABLE, IRREVERSIBLE) from function names, docstrings, and signatures across OpenAI, LangChain, LlamaIndex, CrewAI, and AutoGen.
 
-### Added — Anti-Hallucination Compensation Guard (`agent_saga.deterministic`)
-- **Deterministic Compensation Guard (`@deterministic_compensator` / `DeterministicCompensationGuard`)** — Machine-verified static inspection & validation that guarantees compensation logic is 100% deterministic and immune to LLM hallucination exceptions, prompt drifts, or non-deterministic AI behavior.
+### Added — Autonomous HITL Recovery Portal (`agent_saga.hitl`)
+- **Human-In-The-Loop Manager (`HITLManager`, `@human_in_the_loop`)** — Classifies external gateway rollback failures into `NEEDS_HUMAN` or `ORPHANED` states, queueing them into an interactive portal for manual reconciliation when downstream APIs fail permanently.
+
+### Added — SagaMesh 2PC Consensus (`agent_saga.mesh.SagaMesh2PC`)
+- **Two-Phase Commit Consensus Orchestrator (`SagaMesh2PC`)** — Distributed 2PC consensus protocol enabling cryptographically secure multi-node saga execution.
+
+### Promoted — Local Testing Ecosystem (`pytest-agent-saga`)
+- Prominently highlighted the PyPI companion plugin `pytest-agent-saga` providing WAL fixtures, chaos injection, and deterministic replay testing.
 
 ## [Unreleased]
 

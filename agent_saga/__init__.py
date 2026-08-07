@@ -683,15 +683,19 @@ __all__ += ["INVARIANTS", "Interleaving", "InvariantViolation",
 # agent_saga` would be wrong regardless of that. Use `agent-saga demo`, or
 # `from agent_saga.demo import run_demo`.
 from .array import SagaArray, array
+from .auto_proxy import UniversalAutoProxy, auto_proxy
 from .curriculum import AgentCurriculum, learn
 from .deterministic import DeterministicCompensationGuard, DeterministicRollbackProof, deterministic_compensator
 from .future import AutonomousFutureAgent, create_future_agent
-from .mesh import DistributedMeshNode, DistributedMeshSaga
+from .hitl import HITLManager, OrphanedTransaction, get_hitl_manager, human_in_the_loop
+from .mesh import DistributedMeshNode, DistributedMeshSaga, SagaMesh2PC
 from .omni import OmniProofCertificate, OmniRealityEngine, OmniSelfHealingCortex, get_omni_engine, shield
 from .ultra import UltraEngine, auto_shield
 from . import auto
+from . import auto_proxy
 from . import compat
 from . import deterministic
+from . import hitl
 from . import integrations
 from . import mesh
 from . import omni
@@ -706,20 +710,28 @@ __all__ += [
     "DeterministicRollbackProof",
     "DistributedMeshNode",
     "DistributedMeshSaga",
+    "HITLManager",
     "OmniProofCertificate",
     "OmniRealityEngine",
     "OmniSelfHealingCortex",
+    "OrphanedTransaction",
     "SagaArray",
+    "SagaMesh2PC",
     "UltraEngine",
+    "UniversalAutoProxy",
     "array",
     "auto",
+    "auto_proxy",
     "auto_shield",
     "compat",
     "create_future_agent",
     "deterministic",
     "deterministic_compensator",
+    "get_hitl_manager",
     "get_omni_engine",
     "guard",
+    "hitl",
+    "human_in_the_loop",
     "integrations",
     "learn",
     "mesh",
