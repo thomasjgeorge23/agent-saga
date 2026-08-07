@@ -55,11 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.3.1] - 2026-08-07 — Sequential Incremental Patch Versioning Rule Release
+## [2.3.2] - 2026-08-07 — PyPI Live Release Alignment & Cache-Busting Release
 
 ### Changed & Refined
-- **Strict Sequential Patch Versioning (`v2.3.1`)** — Adopted strict incremental patch release policy (`v2.3.1`, `v2.3.2`, `v2.3.3`, ..., `v2.3.10`) ensuring predictable, seamless release cadence.
-- **Internal Optimization** — Performance tuning for AutoProxy semantic inference and HITL recovery queue indexing.
+- **Live PyPI Metadata Synchronization (`v2.3.2`)** — Verified live PyPI index API (`https://pypi.org/pypi/agent-saga/json`) and synchronized repository badges with real-time PyPI deployment status.
 
 ## [Unreleased]
 
