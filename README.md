@@ -1,6 +1,6 @@
 # agent-saga 🌌
 
-> **Universal Autonomous Safety Fleet OS & Pre-flight Gate Runtime** protecting ANY AI Agent (OpenAI, LangChain, CrewAI, AutoGen, LlamaIndex, FastAPI) with crash-safe Write-Ahead Logging (WAL) rollbacks, receipted context, truthful multi-model routing, and tamper-proof audit logs.
+> **Never worry about your AI agent breaking production again.** Kill the process mid-flight — the wire transfer is still safely refunded, your database stays clean, and your users never lose trust. `agent-saga` is the **1-line bulletproof safety OS** that turns unpredictable LLMs (OpenAI, LangChain, CrewAI, AutoGen, LlamaIndex, FastAPI) into crash-proof, enterprise-grade autonomous engines.
 
 [![PyPI Version](https://img.shields.io/pypi/v/agent-saga.svg?color=blue)](https://pypi.org/project/agent-saga/)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/agent-saga.svg?color=green)](https://pypi.org/project/agent-saga/)

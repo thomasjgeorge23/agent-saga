@@ -55,11 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.1.1] - 2026-08-07 — Futuristic Architecture & Paradigm Shift Release
+## [2.1.2] - 2026-08-07 — Psychological Conversion & Peace-of-Mind Copywriting Release
 
-### Added — Architectural Vision (`FUTURE_PARADIGM.md`)
-- **Futuristic Architectural Manifest (`FUTURE_PARADIGM.md`)** — Documented the foundational paradigm shift positioning `agent-saga` as the transactional primitive for autonomous AI agents (the NumPy of AI Systems / Temporal of Workflows).
-- **Cleaned Attribution Metadata** — Reinforced sole founder attribution to Thomas J George (SAGAOPS Enterprise) across all project manifests.
+### Changed & Refined
+- **Psychological Developer Conversion Copywriting** — Updated package descriptions, project metadata, and documentation header to speak directly to developer pain points (fear of production agent failure, DB corruption, user trust loss) and highlight `agent-saga` as the ultimate 1-line peace-of-mind safety OS.
 
 ## [Unreleased]
 
