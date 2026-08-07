@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agent-saga"
 dynamic = ["version"]
-description = "Kill the process mid-transaction and the charge still gets refunded. Run `agent-saga demo`. Transactional tool execution with crash-safe rollback, receipted context, truthful multi-model routing, and one audit log that reconstructs every decision."
+description = "Kill the process mid-transaction and the charge still gets refunded. Universal safety & rollback runtime protecting any AI agent (OpenAI, LangChain, CrewAI, AutoGen, FastAPI) with crash-safe WAL rollbacks, pre-flight gates, receipted context, truthful multi-model routing, and tamper-proof audit logs."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "Apache-2.0"

@@ -1,5 +1,7 @@
 # agent-saga 🌌
 
+> **Universal Autonomous Safety Fleet OS & Pre-flight Gate Runtime** protecting ANY AI Agent (OpenAI, LangChain, CrewAI, AutoGen, LlamaIndex, FastAPI) with crash-safe Write-Ahead Logging (WAL) rollbacks, receipted context, truthful multi-model routing, and tamper-proof audit logs.
+
 [![PyPI Version](https://img.shields.io/pypi/v/agent-saga.svg?color=blue)](https://pypi.org/project/agent-saga/)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/agent-saga.svg?color=green)](https://pypi.org/project/agent-saga/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)

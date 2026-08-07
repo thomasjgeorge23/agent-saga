@@ -55,11 +55,10 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.9] - 2026-08-07 — Official Framework Integration Adapters
+## [2.1.0] - 2026-08-07 — Universal Autonomous Safety Fleet OS Release
 
-### Added — Framework Integration Module (`agent_saga.integrations`)
-- **Official Framework Adapters (`agent_saga.integrations`)** — Dedicated 1-line middleware & callback handlers for LangChain (`SagaLangChainCallback`, `wrap_runnable`), CrewAI (`SagaCrewHook`), AutoGen (`SagaAutoGenMiddleware`), and FastAPI (`SagaFastAPIMiddleware`).
-- **Framework Integration Blueprint (`INTEGRATION_PLUGINS.md`)** — Documented integration blueprints enabling open-source framework maintainers to adopt `agent-saga` as their default transactional engine.
+### Changed & Refined
+- **Universal AI Agent Protection Positioning** — Updated package descriptions, project metadata, and documentation to explicitly define `agent-saga` as the **Universal Autonomous Safety Fleet OS & Pre-flight Gate Runtime** protecting ANY existing AI Agent (OpenAI, LangChain, CrewAI, AutoGen, LlamaIndex, FastAPI) with crash-safe WAL rollbacks, pre-flight gates, receipted context, and tamper-proof audit trails.
 
 ## [Unreleased]
 
