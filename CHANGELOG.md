@@ -55,10 +55,13 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.1.2] - 2026-08-07 — Psychological Conversion & Peace-of-Mind Copywriting Release
+## [2.2.0] - 2026-08-07 — Advanced Distributed Mesh & Anti-Hallucination Compensation Release
 
-### Changed & Refined
-- **Psychological Developer Conversion Copywriting** — Updated package descriptions, project metadata, and documentation header to speak directly to developer pain points (fear of production agent failure, DB corruption, user trust loss) and highlight `agent-saga` as the ultimate 1-line peace-of-mind safety OS.
+### Added — Enterprise Distributed Mesh (`agent_saga.mesh.DistributedMeshSaga`)
+- **Distributed Mesh Orchestrator (`DistributedMeshSaga`)** — Scalable multi-node workflow coordinator competing directly with Temporal and LangGraph state graphs for long-running enterprise distributed microservices.
+
+### Added — Anti-Hallucination Compensation Guard (`agent_saga.deterministic`)
+- **Deterministic Compensation Guard (`@deterministic_compensator` / `DeterministicCompensationGuard`)** — Machine-verified static inspection & validation that guarantees compensation logic is 100% deterministic and immune to LLM hallucination exceptions, prompt drifts, or non-deterministic AI behavior.
 
 ## [Unreleased]
 

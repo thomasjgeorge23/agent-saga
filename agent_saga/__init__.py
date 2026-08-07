@@ -684,12 +684,16 @@ __all__ += ["INVARIANTS", "Interleaving", "InvariantViolation",
 # `from agent_saga.demo import run_demo`.
 from .array import SagaArray, array
 from .curriculum import AgentCurriculum, learn
+from .deterministic import DeterministicCompensationGuard, DeterministicRollbackProof, deterministic_compensator
 from .future import AutonomousFutureAgent, create_future_agent
+from .mesh import DistributedMeshNode, DistributedMeshSaga
 from .omni import OmniProofCertificate, OmniRealityEngine, OmniSelfHealingCortex, get_omni_engine, shield
 from .ultra import UltraEngine, auto_shield
 from . import auto
 from . import compat
+from . import deterministic
 from . import integrations
+from . import mesh
 from . import omni
 from . import ultra
 
@@ -698,6 +702,10 @@ guard = saga
 __all__ += [
     "AgentCurriculum",
     "AutonomousFutureAgent",
+    "DeterministicCompensationGuard",
+    "DeterministicRollbackProof",
+    "DistributedMeshNode",
+    "DistributedMeshSaga",
     "OmniProofCertificate",
     "OmniRealityEngine",
     "OmniSelfHealingCortex",
@@ -708,10 +716,13 @@ __all__ += [
     "auto_shield",
     "compat",
     "create_future_agent",
+    "deterministic",
+    "deterministic_compensator",
     "get_omni_engine",
     "guard",
     "integrations",
     "learn",
+    "mesh",
     "omni",
     "shield",
     "ultra",
