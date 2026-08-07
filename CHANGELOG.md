@@ -55,10 +55,11 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.0.8] - 2026-08-07 — Zero-Tension Ultra Engine Release
+## [2.0.9] - 2026-08-07 — Official Framework Integration Adapters
 
-### Added — Ultra Engine (`import agent_saga.ultra`)
-- **Zero-Tension Ultra Engine (`agent_saga.ultra`)** — 1-line auto-shielding engine providing nanosecond zero-copy memory protections (`SagaArray`), stdlib auto-instrumentation, and zero-stress WAL durability across OpenAI, LangChain, CrewAI, AutoGen, FastAPI, and requests.
+### Added — Framework Integration Module (`agent_saga.integrations`)
+- **Official Framework Adapters (`agent_saga.integrations`)** — Dedicated 1-line middleware & callback handlers for LangChain (`SagaLangChainCallback`, `wrap_runnable`), CrewAI (`SagaCrewHook`), AutoGen (`SagaAutoGenMiddleware`), and FastAPI (`SagaFastAPIMiddleware`).
+- **Framework Integration Blueprint (`INTEGRATION_PLUGINS.md`)** — Documented integration blueprints enabling open-source framework maintainers to adopt `agent-saga` as their default transactional engine.
 
 ## [Unreleased]
 

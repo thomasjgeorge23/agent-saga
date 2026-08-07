@@ -689,6 +689,7 @@ from .omni import OmniProofCertificate, OmniRealityEngine, OmniSelfHealingCortex
 from .ultra import UltraEngine, auto_shield
 from . import auto
 from . import compat
+from . import integrations
 from . import omni
 from . import ultra
 
@@ -709,6 +710,7 @@ __all__ += [
     "create_future_agent",
     "get_omni_engine",
     "guard",
+    "integrations",
     "learn",
     "omni",
     "shield",
