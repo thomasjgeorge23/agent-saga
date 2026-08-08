@@ -15,6 +15,25 @@
 | 🌌 [Future Paradigm](https://github.com/thomasjgeorge23/agent-saga/blob/main/FUTURE_PARADIGM.md) | 🌟 [Awesome Showcase](https://github.com/thomasjgeorge23/agent-saga/blob/main/AWESOME_SAGA.md) | 🔌 [Integration Plugins](https://github.com/thomasjgeorge23/agent-saga/blob/main/INTEGRATION_PLUGINS.md) | 📈 [Growth Strategy](https://github.com/thomasjgeorge23/agent-saga/blob/main/GROWTH_STRATEGY.md) | 🚀 [Launch Playbook](https://github.com/thomasjgeorge23/agent-saga/blob/main/LAUNCH_PLAYBOOK.md) | 🤝 [Contributing](https://github.com/thomasjgeorge23/agent-saga/blob/main/CONTRIBUTING.md) | 👑 [Governance](https://github.com/thomasjgeorge23/agent-saga/blob/main/GOVERNANCE.md) | 🛡️ [Security](https://github.com/thomasjgeorge23/agent-saga/blob/main/SECURITY.md) |
 |---|---|---|---|---|---|---|---|
 
+> 🛡️ **Show the world your AI agent is crash-proof**: Add the official `Protected by agent-saga` badge to your project's `README.md`:
+> ```markdown
+> [![Protected by agent-saga](https://img.shields.io/badge/protected_by-agent--saga-8A2BE2?style=for-the-badge&logo=shield)](https://github.com/thomasjgeorge23/agent-saga)
+> ```
+> [![Protected by agent-saga](https://img.shields.io/badge/protected_by-agent--saga-8A2BE2?style=for-the-badge&logo=shield)](https://github.com/thomasjgeorge23/agent-saga)
+
+## ⚡ 3-Second Viral Hook: The Universal Undo Button for AI Agents
+
+```python
+# pip install agent-saga
+from agent_saga import auto_proxy
+
+@auto_proxy  # 1 Line protects any AI agent tool from production crashes!
+def process_user_wire(user_id: str, amount: float):
+    return bank_api.transfer(user_id, amount)
+
+# Kill the process mid-flight -- agent-saga automatically refunds the transaction!
+```
+
 ## 🚀 One-Line Drop-in Integration (`import agent_saga as saga`)
 
 ```python

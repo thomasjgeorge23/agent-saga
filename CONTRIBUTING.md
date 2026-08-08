@@ -9,6 +9,15 @@ Thank you for your interest in contributing to **`agent-saga`** — the world's 
 ## 🏛️ Code of Conduct
 We are committed to providing a welcoming, inclusive, and harassment-free environment for all contributors. Please review our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
 
+## 🌟 Why Contribute to `agent-saga`?
+
+`agent-saga` is rapidly becoming the standard safety primitive for autonomous AI agent systems (analogous to NumPy in data science or Temporal in microservices). Contributing to `agent-saga` positions you as a core pioneer in mission-critical AI infrastructure!
+
+### 💡 High-Impact Ways to Contribute:
+1. **Build a New Framework Adapter**: Connect `agent-saga` to your favorite framework (e.g. `instructor`, `dspy`, `guidance`, `semantic-kernel`).
+2. **Add a New Service Connector**: Write compensator handlers for SaaS APIs (`twilio`, `sendgrid`, `aws-lambda`, `github-actions`).
+3. **Submit a Good First Issue**: Look for issues tagged `good-first-issue` on GitHub.
+
 ---
 
 ## ⚡ Quickstart Development Setup

@@ -55,11 +55,12 @@ use any of them, upgrade.
 - `dashboard` documents that it has no authentication and is safe only on
   `127.0.0.1`; `agent-saga ui` remains the auth-capable console.
 
-## [2.3.4] - 2026-08-08 — Comprehensive Folder-by-Folder & Line-by-Line Codebase Verification Release
+## [2.3.5] - 2026-08-08 — Viral Adoption & Contributor Growth Engine Release
 
 ### Changed & Refined
-- **Line-by-Line & Folder-by-Folder Audit (`v2.3.4`)** — Executed folder-by-folder and line-by-line inspection across all 11 subdirectories (`adapters`, `connectors`, `wal`, `mcp`, `ui`, `observability`, `codemod`, `patterns`, `frameworks`, `integrations`).
-- **Verified Zero Loose Ends** — Verified that every module, framework wrapper, connector, and WAL backend is 100% complete and operational with zero unhandled edge cases.
+- **Viral Adoption & Positioning (`v2.3.5`)** — Re-framed library positioning as "The Universal Undo Button for AI Agents" with a 3-second code snippet at the top of README.
+- **Community Badge Engine** — Added official `Protected by agent-saga` badge (`[![Protected by agent-saga](https://img.shields.io/badge/protected_by-agent--saga-8A2BE2?style=for-the-badge&logo=shield)](https://github.com/thomasjgeorge23/agent-saga)`).
+- **Growth Blueprint Artifact** — Created `growth_blueprint.md` detailing launch strategies for Hacker News, Reddit, Twitter/X, and Awesome Lists.
 
 ## [Unreleased]
 
